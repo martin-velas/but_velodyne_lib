@@ -13,39 +13,14 @@ from odometry_cnn_data import horizontal_split
 from odometry_cnn_data import schema_to_dic
 from odometry_cnn_data import odom_deg_to_rad
 
-BATCH_SCHEMA_DATA = [[3, 0],
-                     [4, 1],
-                     [5, 2],
-                     [6, 3],
-
-                     [3, 1],
-                     [4, 2],
-                     [5, 3],
-                     [6, 4],
-                     
-                     [3, 2],
-                     [4, 3],
-                     [5, 4],
-                     [6, 5],
-
-                     [2, 0],
-                     [3, 1],
-                     [4, 2],
-                     [5, 3],
-
-                     [2, 1],
-                     [3, 2],
-                     [4, 3],
-                     [5, 4],
-
-                     [1, 0],
+BATCH_SCHEMA_DATA = [[1, 0],
                      [2, 1],
                      [3, 2],
                      [4, 3]]
-BATCH_SCHEMA_ODOM = [[3],
-                     [4],
-                     [5],
-                     [6]]
+BATCH_SCHEMA_ODOM = [[1],
+                     [2],
+                     [3],
+                     [4]]
 
 BATCH_SIZE = len(BATCH_SCHEMA_ODOM)
 HISTORY_SIZE = len(BATCH_SCHEMA_DATA)/BATCH_SIZE
@@ -69,7 +44,7 @@ OUTPUT_LAYER_NAME = "out_odometry"
 
 DOF_REQUIRED = 6
 DOF_PREDICTED = 3
-DOF_PREDICTED_FIRST = 0
+DOF_PREDICTED_FIRST = 3
 
 def create_blob(input_files, schema_dic):
     blob = np.empty([BATCH_SIZE*HISTORY_SIZE, JOINED_FRAMES*CHANNELS, 64, 360 / HORIZONTAL_DIVISION + HORIZONTAL_DIVISION_OVERLAY * 2])

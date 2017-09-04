@@ -13,7 +13,52 @@ from odometry_cnn_data import horizontal_split
 from odometry_cnn_data import schema_to_dic
 from odometry_cnn_data import odom_deg_to_rad
 
-BATCH_SCHEMA_DATA = [[3, 0],
+BATCH_SCHEMA_DATA = [[5, 0],
+                     [6, 1],
+                     [7, 2],
+                     [8, 3],
+
+                     [5, 1],
+                     [6, 2],
+                     [7, 3],
+                     [8, 4],
+
+                     [5, 2],
+                     [6, 3],
+                     [7, 4],
+                     [8, 5],
+
+                     [5, 3],
+                     [6, 4],
+                     [7, 5],
+                     [8, 6],
+
+                     [5, 4],
+                     [6, 5],
+                     [7, 6],
+                     [8, 7],
+
+                     [4, 0],
+                     [5, 1],
+                     [6, 2],
+                     [7, 3],
+
+                     [4, 1],
+                     [5, 2],
+                     [6, 3],
+                     [7, 4],
+
+                     [4, 2],
+                     [5, 3],
+                     [6, 4],
+                     [7, 5],
+
+                     [4, 3],
+                     [5, 4],
+                     [6, 5],
+                     [7, 6],
+
+                     [3, 0],
                      [4, 1],
                      [5, 2],
                      [6, 3],
@@ -42,10 +87,10 @@ BATCH_SCHEMA_DATA = [[3, 0],
                      [2, 1],
                      [3, 2],
                      [4, 3]]
-BATCH_SCHEMA_ODOM = [[3],
-                     [4],
-                     [5],
-                     [6]]
+BATCH_SCHEMA_ODOM = [[5],
+                     [6],
+                     [7],
+                     [8]]
 
 BATCH_SIZE = len(BATCH_SCHEMA_ODOM)
 HISTORY_SIZE = len(BATCH_SCHEMA_DATA)/BATCH_SIZE
@@ -69,7 +114,7 @@ OUTPUT_LAYER_NAME = "out_odometry"
 
 DOF_REQUIRED = 6
 DOF_PREDICTED = 3
-DOF_PREDICTED_FIRST = 0
+DOF_PREDICTED_FIRST = 3
 
 def create_blob(input_files, schema_dic):
     blob = np.empty([BATCH_SIZE*HISTORY_SIZE, JOINED_FRAMES*CHANNELS, 64, 360 / HORIZONTAL_DIVISION + HORIZONTAL_DIVISION_OVERLAY * 2])
