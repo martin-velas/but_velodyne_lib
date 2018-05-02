@@ -28,15 +28,15 @@ Eigen::Matrix4f SubseqRegistration::registerLineClouds(
   Termination termination(pipeline_params.minIterations, pipeline_params.maxIterations,
       pipeline_params.maxTimeSpent, pipeline_params.significantErrorDeviation,
       pipeline_params.targetError);
-  Eigen::Matrix4f transformation = initial_transformation;
   CollarLinesRegistration icl_fitting(source, target, registration_params,
-      transformation);
+      initial_transformation);
+  Eigen::Matrix4f transformation;
   while (!termination()) {
     float error = icl_fitting.refine();
     termination.addNewError(error);
-    transformation = icl_fitting.getTransformation();
+    transformation = icl_fitting.getRefinedTransformation();
   }
-  return transformation;
+  return transformation*initial_transformation;
 }
 
 ManualSubseqRegistration::ManualSubseqRegistration(const LineCloud &src_lines_, const LineCloud &trg_lines_,

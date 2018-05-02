@@ -159,7 +159,15 @@ public:
    */
   const Eigen::Matrix4f getTransformation() const
   {
-    return initial_transformation * transformation;
+    return initial_transformation*transformation;
+  }
+
+  /**!
+   * @return refined transformation
+   */
+  const Eigen::Matrix4f getRefinedTransformation() const
+  {
+    return transformation;
   }
 
   /**!
@@ -207,7 +215,7 @@ private:
   LineCloud target_cloud;
   std::vector<cv::DMatch> matches;
   std::vector<cv::DMatch> rejected_matches;
-  Eigen::Matrix4f initial_transformation;
+  const Eigen::Matrix4f initial_transformation;
   Eigen::Matrix4f transformation;
   Eigen::VectorXf correspondences_weights;
 };
