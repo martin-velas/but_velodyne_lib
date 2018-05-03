@@ -234,8 +234,8 @@ int main(int argc, char** argv) {
   visualizer.addColorPointCloud(rgb_cloud);
 
   if(!poses.empty()) {
-    poses.erase(poses.begin()+cloud_i, poses.end());
-    visualizer.setColor(0, 100, 200).addPosesDots(poses);
+    //poses.erase(poses.begin()+cloud_i, poses.end());
+    visualizer.setColor(0, 100, 200).addPoses(poses);
   }
   visualizer.show();
 
