@@ -54,6 +54,7 @@ public:
     for(int i = 0; i < seq_len_ && sequence.hasNext(); i++) {
       frames[i].reset(new PointCloud<PointXYZI>);
       sequence.getNext().joinTo(*frames[i]);
+      transformPointCloud(*frames[i], *frames[i], poses[sequence.getIndex()]);
     }
 
     setDataToVis();
@@ -69,6 +70,7 @@ protected:
           PointCloud<PointXYZI>::Ptr new_frame(new PointCloud<PointXYZI>);
           sequence.getPrev().joinTo(*new_frame);
           transformPointCloud(*new_frame, *new_frame, poses[sequence.getIndex()]);
+          cerr << "pose " << sequence.getIndex() << " of " << poses.size() << " " << poses[sequence.getIndex()].matrix() << endl;
           frames.push_front(new_frame);
           frames.pop_back();
         }
@@ -77,6 +79,7 @@ protected:
           PointCloud<PointXYZI>::Ptr new_frame(new PointCloud<PointXYZI>);
           sequence.getNext().joinTo(*new_frame);
           transformPointCloud(*new_frame, *new_frame, poses[sequence.getIndex()]);
+          cerr << "pose " << sequence.getIndex() << " of " << poses.size() << " " << poses[sequence.getIndex()].matrix() << endl;
           frames.push_back(new_frame);
           frames.pop_front();
         }
