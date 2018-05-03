@@ -122,8 +122,11 @@ target_link_libraries(normals-estimation but_velodyne)
 add_executable(refined-clustering src/apps/refined-clustering.cpp)
 target_link_libraries(refined-clustering but_velodyne)
 
-add_executable(reduce-plane-thickness src/apps/reduce-plane-thickness)
+add_executable(reduce-plane-thickness src/apps/reduce-plane-thickness.cpp)
 target_link_libraries(reduce-plane-thickness but_velodyne)
+
+add_executable(reduce-plane-thickness-by-ray src/apps/reduce-plane-thickness-by-ray.cpp)
+target_link_libraries(reduce-plane-thickness-by-ray but_velodyne)
 
 add_executable(estimate-gmm-ransac-planes src/apps/estimate-gmm-ransac-planes)
 target_link_libraries(estimate-gmm-ransac-planes but_velodyne)
@@ -133,6 +136,12 @@ target_link_libraries(pcl_labels_viewer but_velodyne)
 
 add_executable(cls-registration-of-picked-frames src/apps/cls-registration-of-picked-frames)
 target_link_libraries(cls-registration-of-picked-frames but_velodyne)
+
+add_executable(pcl_subsample_normals src/apps/pcl_subsample_normals.cpp)
+target_link_libraries(pcl_subsample_normals but_velodyne)
+
+add_executable(sync-velodyne-clouds src/apps/sync-velodyne-clouds.cpp)
+target_link_libraries(sync-velodyne-clouds but_velodyne)
 
 ########################## Visualization apps: ###############################
 
@@ -157,6 +166,9 @@ target_link_libraries(threshold-intensity but_velodyne)
 add_executable(hor-align-and-defile src/apps/hor-align-and-defile.cpp)
 target_link_libraries(hor-align-and-defile but_velodyne)
 
+add_executable(hor-align-from-ground-normal src/apps/hor-align-from-ground-normal.cpp)
+target_link_libraries(hor-align-from-ground-normal but_velodyne)
+
 add_executable(normalize-intensity src/apps/normalize-intensity.cpp)
 target_link_libraries(normalize-intensity but_velodyne)
 
@@ -171,6 +183,12 @@ target_link_libraries(visualize-part-clouds but_velodyne)
 
 add_executable(showroom-demo src/apps/showroom-demo.cpp)
 target_link_libraries(showroom-demo but_velodyne)
+
+add_executable(cloud-intensities-normalization src/apps/cloud-intensities-normalization.cpp)
+target_link_libraries(cloud-intensities-normalization but_velodyne)
+
+add_executable(pick-sources src/apps/pick-sources.cpp)
+target_link_libraries(pick-sources but_velodyne)
 
 ########################## Loops detection/closure: ##########################
 
