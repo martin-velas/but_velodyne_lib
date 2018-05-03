@@ -41,79 +41,61 @@ using namespace velodyne_pointcloud;
 using namespace but_velodyne;
 namespace po = boost::program_options;
 
+typedef PointXYZ PointType;
+
 class CloudEraser {
 public:
-  CloudEraser(const PointCloud<PointXYZRGB>::Ptr &cloud_) :
-    cloud(cloud_) {
-    vector<int> indices;
-    removeNaNFromPointCloud(*cloud, *cloud, indices);
-    preserve_mask.resize(cloud->size(), 1);
-
+  CloudEraser(const PointCloud<PointType>::Ptr cloud_, PointIndices::Ptr input_indices_) :
+    cloud(cloud_), indices(input_indices_) {
     visualizer.getViewer()->setBackgroundColor(0.0, 0.0, 0.0);
     visualizer.getViewer()->registerAreaPickingCallback(&CloudEraser::pickPointsCallback, *this);
-    visualizer.getViewer()->registerKeyboardCallback(&CloudEraser::keyCallback, *this);
   }
 
-  PointCloud<PointXYZRGB>::Ptr run() {
+  PointIndices::Ptr run() {
     visualizeCloud();
     visualizer.show();
-    PointCloud<PointXYZRGB>::Ptr cloud_erased(new PointCloud<PointXYZRGB>);
-    vector<int> indices;
-    for(int i = 0; i < preserve_mask.size(); i++) {
-      if(preserve_mask[i] > 0) {
-        indices.push_back(i);
-      }
-    }
-    copyPointCloud(*cloud, indices, *cloud_erased);
-    return cloud_erased;
+    return indices;
   }
 
 protected:
 
   void visualizeCloud() {
-    PointCloud<PointXYZRGB>::Ptr cloud_colored(new PointCloud<PointXYZRGB>);
-    *cloud_colored += *cloud;
-    for(int i = 0; i < preserve_mask.size(); i++) {
-      if(preserve_mask[i] == 0) {
-        cloud_colored->at(i).r = cloud_colored->at(i).g = cloud_colored->at(i).b = 0;
-      } else if(preserve_mask[i] < 0) {
-        cloud_colored->at(i).r = 200;
-        cloud_colored->at(i).g = cloud_colored->at(i).b = 0;
-      }
-    }
-    visualizer.keepOnlyClouds(0).addColorPointCloud(cloud_colored);
+    PointCloud<PointType> vis_cloud;
+    extract_indices(cloud, indices, vis_cloud);
+    visualizer.keepOnlyClouds(0).addPointCloud(vis_cloud);
   }
 
   void pickPointsCallback(const pcl::visualization::AreaPickingEvent& event, void*) {
-    vector<int> indices;
-    if(event.getPointsIndices(indices)) {
-      for(vector<int>::iterator i = indices.begin(); i < indices.end(); i++) {
-        preserve_mask[*i] = -1;
+    vector<int> indices_to_remove;
+    if(event.getPointsIndices(indices_to_remove)) {
+      cerr << "Picked " << indices_to_remove.size() << " points" << endl;
+
+      int counter = 0;
+      for(vector<int>::iterator i = indices_to_remove.begin(); i < indices_to_remove.end(); i++) {
+        indices->indices[*i] = -1;
+        counter++;
       }
+      cerr << counter << " indices marked" << endl;
+
+      int copy_to_index = 0;
+      for(vector<int>::iterator i = indices->indices.begin(); i < indices->indices.end(); i++) {
+        if(*i >= 0) {
+          indices->indices[copy_to_index] = *i;
+          copy_to_index++;
+        }
+      }
+      indices->indices.resize(copy_to_index);
+
+      cerr << "Indices processed." << endl;
+
       visualizeCloud();
     }
   }
 
-  void keyCallback(const pcl::visualization::KeyboardEvent &event, void*) {
-    if(event.keyDown()) {
-      if(event.getKeySym() == "d") {
-        for(vector<int>::iterator i = preserve_mask.begin(); i < preserve_mask.end(); i++) {
-          *i = MAX(*i, 0);
-        }
-        visualizeCloud();
-      } else if(event.getKeySym() == "u") {
-        for(vector<int>::iterator i = preserve_mask.begin(); i < preserve_mask.end(); i++) {
-          *i = abs(*i);
-        }
-        visualizeCloud();
-      }
-    }
-  }
-
 private:
-  PointCloud<PointXYZRGB>::Ptr cloud;
+  PointCloud<PointType>::Ptr cloud;
   Visualizer3D visualizer;
-  vector<int> preserve_mask;
+  PointIndices::Ptr indices;
 };
 
 int main(int argc, char** argv) {
@@ -121,17 +103,22 @@ int main(int argc, char** argv) {
   string src_filename, trg_filename;
 
   if(argc != 3) {
-    cerr << "ERROR, expected arguments: [in_cloud.pcd] [out_cloud.pcd]" << endl;
+    cerr << "ERROR, expected arguments: [in_cloud.pcd] [init.indices]" << endl;
     return EXIT_FAILURE;
   }
 
-  PointCloud<PointXYZRGB>::Ptr in_cloud(new PointCloud<PointXYZRGB>);
+  PointCloud<PointType>::Ptr in_cloud(new PointCloud<PointType>);
   io::loadPCDFile(argv[1], *in_cloud);
 
-  CloudEraser eraser(in_cloud);
-  PointCloud<PointXYZRGB>::Ptr out_cloud = eraser.run();
+  PointIndices::Ptr indices(new PointIndices);
+  load_vector_from_file(argv[2], indices->indices);
 
-  io::savePCDFileBinary(argv[2], *out_cloud);
+  CloudEraser eraser(in_cloud, indices);
+  PointIndices::Ptr out_indices = eraser.run();
+
+  for(vector<int>::iterator i = out_indices->indices.begin(); i < out_indices->indices.end(); i++) {
+    cout << *i << endl;
+  }
 
   return EXIT_SUCCESS;
 }
