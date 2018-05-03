@@ -1926,6 +1926,20 @@ def _import_module(name, package=None, warn=True, prefix='_py_', ignore='_'):
         return True
 
 
+#################### MY FUNCTIONS (ivelas@fit.vutbr.cz): ####################
+def quaternion_to_axis_angle(quaternion):
+    if abs(quaternion[0] - 1.0) < 1e-6:
+        return [1.0, 0.0, 0.0], 0.0
+    theta = 2*math.acos(quaternion[0])
+    return quaternion[1:] / math.sin(theta / 2.0), theta
+
+
+def matrix_to_axis_angle(R):
+    quaternion = quaternion_from_matrix(R)
+    return quaternion_to_axis_angle(quaternion)
+############################# MY FUNCTIONS DONE #############################
+
+
 _import_module('transformations')
 
 if __name__ == "__main__":
