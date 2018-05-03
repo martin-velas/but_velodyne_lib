@@ -47,26 +47,26 @@ class PairPicker {
 
 public:
 
-  PairPicker(VelodyneFileSequence &sequence_, const vector<Eigen::Affine3f> &poses_,
-      Visualizer3D::Ptr vis_) :
-    frames(sequence_.size()), poses(poses_), src_i(0), trg_i(sequence_.size()/2), vis(vis_),
+  PairPicker(VelodyneFileSequence &sequence_, const vector<Eigen::Affine3f> &poses_) :
+    frames(sequence_.size()), poses(poses_), src_i(0), trg_i(sequence_.size()/2),
     sum_cloud(new PointCloud<PointXYZRGB>) {
-    vis->getViewer()->registerKeyboardCallback(&PairPicker::keyCallback, *this);
+    vis.getViewer()->registerKeyboardCallback(&PairPicker::keyCallback, *this);
 
     for (int frame_i = 0; sequence_.hasNext(); frame_i++) {
       PointCloud<PointXYZI>::Ptr cloud(new PointCloud<PointXYZI>);
       VelodyneMultiFrame multiframe = sequence_.getNext();
       multiframe.joinTo(*cloud);
       transformPointCloud(*cloud, *cloud, poses[frame_i]);
+      subsample_cloud<PointXYZI>(cloud, 0.2);
       frames[frame_i] += *cloud;
-      subsample_cloud<PointXYZI>(cloud, 0.005);
+      subsample_cloud<PointXYZI>(cloud, 0.01);
       *sum_cloud += *Visualizer3D::colorizeCloud(*cloud, true);
     }
   }
 
   void run(int &src_i_, int &trg_i_) {
     setDataToVis();
-    vis->show();
+    vis.show();
     src_i_ = src_i;
     trg_i_ = trg_i;
   }
@@ -91,14 +91,14 @@ protected:
   }
 
   void setDataToVis(void) {
-    vis->keepOnlyClouds(0).addColorPointCloud(sum_cloud);
-    vis->setColor(255, 0, 0).addPointCloud(frames[src_i]);
-    vis->setColor(0, 0, 255).addPointCloud(frames[trg_i]);
+    vis.keepOnlyClouds(0).addColorPointCloud(sum_cloud);
+    vis.setColor(255, 0, 0).addPointCloud(frames[src_i]);
+    vis.setColor(0, 0, 255).addPointCloud(frames[trg_i]);
   }
 
 private:
   vector < PointCloud<PointXYZI> > frames;
-  Visualizer3D::Ptr vis;
+  Visualizer3D vis;
   const vector<Eigen::Affine3f> poses;
   int src_i, trg_i;
   PointCloud<PointXYZRGB>::Ptr sum_cloud;
@@ -178,8 +178,7 @@ int main(int argc, char** argv) {
   }
 
   VelodyneFileSequence sequence(filenames, calibration);
-  Visualizer3D::Ptr vis(new Visualizer3D);
-  PairPicker picker(sequence, poses, vis);
+  PairPicker picker(sequence, poses);
   int src_i, trg_i;
   picker.run(src_i, trg_i);
 
@@ -193,8 +192,7 @@ int main(int argc, char** argv) {
   ManualSubseqRegistration registration(src_lines, trg_lines,
       Eigen::Affine3f::Identity(),
       pipeline_params,
-      reg_params, vis);
-  vis->keepOnlyClouds(0);
+      reg_params);
   Eigen::Affine3f t = registration.run();
 
   cout << src_i << " " << trg_i << " " << endl;
