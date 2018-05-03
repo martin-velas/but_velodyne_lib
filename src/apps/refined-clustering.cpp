@@ -60,8 +60,8 @@ bool parse_arguments(int argc, char **argv,
     ("input_normals,n", po::value<string>(&normals_fn)->required(), "File with input normals (subsampled).")
     ("input_indices", po::value<string>(&indices_fn)->required(), "Indices of subsampling.")
     ("gmm_train_ratio,r", po::value<float>(&gmm_train_ratio)->default_value(0.1), "GMM train ratio.")
-    ("gmms_count,g", po::value<int>(&gmms_count)->default_value(12), "Number of GMMs used.")
-    ("cluster_size,c", po::value<int>(&cluster_size)->default_value(1000), "Expected points within final cluster.")
+    ("gmms_count,g", po::value<int>(&gmms_count)->default_value(10), "Number of GMMs used.")
+    ("cluster_size,c", po::value<int>(&cluster_size)->default_value(30000), "Expected points within final cluster.")
     ("output_cloud,o", po::value<string>(&output_fn)->required(), "Output pcd file.")
   ;
   po::variables_map vm;
