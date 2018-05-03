@@ -26,20 +26,25 @@
 
 #include <fstream>
 
+#include <but_velodyne/VelodyneSpecification.h>
+#include <but_velodyne/KittiUtils.h>
+#include <but_velodyne/common.h>
+#include <but_velodyne/point_types.h>
+
 #include <pcl/point_cloud.h>
 #include <pcl/io/pcd_io.h>
 #include <pcl/filters/random_sample.h>
 #include <pcl/filters/extract_indices.h>
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/kdtree/kdtree_flann.h>
+#include <pcl/impl/pcl_base.hpp>
+#include <pcl/filters/impl/filter.hpp>
+#include <pcl/filters/impl/extract_indices.hpp>
+#include <pcl/filters/impl/random_sample.hpp>
 
 #include <velodyne_pointcloud/point_types.h>
 
 #include <cv.h>
-
-#include <but_velodyne/VelodyneSpecification.h>
-#include <but_velodyne/KittiUtils.h>
-#include <but_velodyne/common.h>
 
 namespace but_velodyne {
 
@@ -459,6 +464,8 @@ public:
   VelodyneMultiFrame(const std::vector<std::string> &filenames_,
       const SensorsCalibration &calibration_,
       bool transform_pcd_files_ = false);
+
+  void joinTo(pcl::PointCloud<PointWithSource> &output);
 
   void joinTo(pcl::PointCloud<velodyne_pointcloud::VelodynePoint> &output, bool distinguish_rings = false);
 

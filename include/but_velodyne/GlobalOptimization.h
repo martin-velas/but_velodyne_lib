@@ -84,11 +84,17 @@ void getClosestMatches(const typename pcl::PointCloud<PointT>::Ptr points, float
 class Origin {
 public:
   int pose_id, sensor_id;
+
   Origin(int pose_id_ = 0, int sensor_id_ = 0) :
     pose_id(pose_id_), sensor_id(sensor_id_) {
   }
+
   int edgeIdx(int poses_cnt) const {
     return pose_id + sensor_id*poses_cnt;
+  }
+
+  static Origin fromPointSource(const int point_src, const int poses_count) {
+    return Origin(point_src%poses_count, point_src/poses_count);
   }
 };
 

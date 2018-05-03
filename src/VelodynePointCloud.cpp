@@ -446,6 +446,18 @@ VelodyneMultiFrame::VelodyneMultiFrame(const std::vector<std::string> &filenames
   }
 }
 
+void VelodyneMultiFrame::joinTo(PointCloud<PointWithSource> &output) {
+  for(int sensor_i = 0; sensor_i < clouds.size(); sensor_i++) {
+    PointCloud<PointWithSource> transformed;
+    copyPointCloud(*clouds[sensor_i], transformed);
+    pcl::transformPointCloud(transformed, transformed, calibration.ofSensor(sensor_i));
+    for(int i = 0; i < transformed.size(); i++) {
+      transformed[i].source = sensor_i;
+    }
+    output += transformed;
+  }
+}
+
 void VelodyneMultiFrame::joinTo(pcl::PointCloud<velodyne_pointcloud::VelodynePoint> &output, bool distinguish_rings) {
   int rings_count = 0;
   for(int i = 0; i < clouds.size(); i++) {

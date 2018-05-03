@@ -30,6 +30,7 @@
 
 #include <but_velodyne/Visualizer3D.h>
 #include <but_velodyne/KittiUtils.h>
+#include <but_velodyne/point_types.h>
 
 #include <pcl/PCLPointCloud2.h>
 #include <pcl/common/eigen.h>
@@ -44,6 +45,8 @@ using namespace pcl;
 using namespace velodyne_pointcloud;
 using namespace but_velodyne;
 namespace po = boost::program_options;
+
+typedef PointWithSource PointType;
 
 bool parse_arguments(int argc, char **argv,
                      float &sampling_ratio,
@@ -148,8 +151,8 @@ int main(int argc, char** argv) {
     return EXIT_FAILURE;
   }
 
-  PointCloud<PointXYZI> sum_cloud;
-  PointCloud<PointXYZI>::Ptr cloud(new PointCloud<PointXYZI>);
+  PointCloud<PointType> sum_cloud;
+  PointCloud<PointType>::Ptr cloud(new PointCloud<PointType>);
   VelodyneFileSequence file_sequence(filenames, calibration);
   for (int frame_i = 0; file_sequence.hasNext(); frame_i++) {
     if(frame_i >= poses.size()) {
@@ -160,18 +163,15 @@ int main(int argc, char** argv) {
     VelodyneMultiFrame multiframe = file_sequence.getNext();
     if(mask[frame_i]) {
       multiframe.joinTo(*cloud);
-
-/*      for(PointCloud<PointXYZI>::iterator p = cloud->begin(); p < cloud->end(); p++) {
-        p->intensity = frame_i*0.1;
-      }
-*/
-      subsample_cloud<PointXYZI>(cloud, sampling_ratio);
+      subsample_cloud<PointType>(cloud, sampling_ratio);
       transformPointCloud(*cloud, *cloud, poses[frame_i]);
+      for(PointCloud<PointType>::iterator pt = cloud->begin(); pt < cloud->end(); pt++) {
+        pt->source = pt->source*poses.size() + frame_i;
+      }
       sum_cloud += *cloud;
+      cloud->clear();
     }
   }
-
-  //Visualizer3D::normalizeMinMaxIntensity(sum_cloud, sum_cloud, 0.0001, 0, 1);
 
   pcl::PointCloud<pcl::PointXYZRGB>::Ptr rgb_cloud;
   rgb_cloud = Visualizer3D::colorizeCloud(sum_cloud, true);
