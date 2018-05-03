@@ -55,7 +55,11 @@ void getSlices(const VelodynePointCloud &in_cloud, vector<VelodynePointCloud> &s
   float polar_bin_size = 1.0 / slices.size();
   for(VelodynePointCloud::const_iterator pt = in_cloud.begin(); pt < in_cloud.end(); pt++) {
     int bin = floor(pt->phase/polar_bin_size);
-    slices[bin].push_back(*pt);
+    if(bin >= SLICES_COUNT) {
+      cerr << pt->phase << endl;
+    } else {
+      slices[bin].push_back(*pt);
+    }
   }
 }
 
