@@ -81,7 +81,8 @@ bool parse_arguments(int argc, char **argv,
                      vector<Eigen::Affine3f> &poses,
                      vector<string> &clouds_to_process,
                      vector<bool> &mask,
-                     vector<double> &times) {
+                     vector<double> &times,
+                     bool &show_axis) {
   string pose_filename, skip_filename, times_filename;
 
   po::options_description desc("Collar Lines Registration of Velodyne scans\n"
@@ -93,6 +94,7 @@ bool parse_arguments(int argc, char **argv,
       ("pose_file,p", po::value<string>(&pose_filename)->required(), "KITTI poses file.")
       ("skip_file,s", po::value<string>(&skip_filename)->default_value(""), "File with indidces to skip.")
       ("times_file,t", po::value<string>(&times_filename)->default_value(""), "File with timestamps for poses.")
+      ("axis,a", po::value<bool>(&show_axis)->default_value(true), "Show frame axis.")
   ;
   po::variables_map vm;
   po::parsed_options parsed = po::parse_command_line(argc, argv, desc);
@@ -130,7 +132,8 @@ int main(int argc, char** argv) {
   vector<bool> mask;
   vector<double> times;
   vector<string> clouds_fnames;
-  if(!parse_arguments(argc, argv, poses, clouds_fnames, mask, times)) {
+  bool show_axis;
+  if(!parse_arguments(argc, argv, poses, clouds_fnames, mask, times, show_axis)) {
     return EXIT_FAILURE;
   }
 
@@ -161,6 +164,11 @@ int main(int argc, char** argv) {
       poses_to_skip.push_back(poses[i]);
     }
   }
+
+  if(!show_axis) {
+    visualizer.getViewer()->removeAllCoordinateSystems();
+  }
+
   visualizer
     .addPoses(poses_to_vis, 0.3)
     .setColor(200, 50, 50).addPosesDots(poses_to_vis)
