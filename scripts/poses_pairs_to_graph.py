@@ -1,7 +1,8 @@
 #! /usr/bin/env python
 
 import argparse
-from odometry_cnn_data import Odometry, Edge3D, load_kitti_poses, load_poses_corrections
+from odometry_cnn_data import load_kitti_poses, load_poses_corrections
+from pose_graph import Edge3D
 
 parser = argparse.ArgumentParser(description="Registered frames pairs to EDGE3D")
 parser.add_argument("--poses", dest="poses", type=str, required=True)

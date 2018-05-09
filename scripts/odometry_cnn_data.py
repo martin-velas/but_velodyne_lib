@@ -104,32 +104,6 @@ class Odometry:
         inverted.setDofFromM()
         return inverted
 
-class Edge3D:
-    def __init__(self, src_id, trg_id, dof6):
-        self.srcId = src_id
-        self.trgId = trg_id
-        self.dof6 = dof6
-
-    def __gt__(self, other):
-        if self.srcId > other.srcId:
-            return True
-        elif self.srcId < other.srcId:
-            return False
-        else:
-            return self.trgId > other.trgId
-
-    def __str__(self):
-        output = "EDGE3 %s %s " % (self.srcId, self.trgId)
-        for d in self.dof6:
-            output += "%s " % d
-        output += "99.1304 -0.869565 -0.869565 -1.73913 -1.73913 -1.73913 "
-        output +=          "99.13040 -0.869565 -1.73913 -1.73913 -1.73913 "
-        output +=                    "99.13050 -1.73913 -1.73913 -1.73913 "
-        output +=                              "96.5217 -3.47826 -3.47826 "
-        output +=                                       "96.5217 -3.47826 "
-        output +=                                               "96.52170"
-        return output
-
 def load_kitti_poses(file):
     poses = []
     if not hasattr(file, "readlines"):
