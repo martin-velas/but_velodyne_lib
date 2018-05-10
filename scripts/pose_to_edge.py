@@ -4,7 +4,7 @@
 
 import argparse
 from odometry_cnn_data import load_kitti_poses
-from pose_graph import Edge3D, EdgesGenerator
+from pose_graph import EdgesGenerator
 
 
 parser = argparse.ArgumentParser(description="Pose from subsequence registration to EDGE3D")
