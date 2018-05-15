@@ -244,9 +244,6 @@ target_link_libraries(ground-det-annotation but_velodyne)
 add_executable(ground-det-kitti-ann src/apps/ground-det-kitti-ann.cpp)
 target_link_libraries(ground-det-kitti-ann but_velodyne)
 
-add_executable(ground-det-cnn src/apps/ground-det-cnn.cpp)
-target_link_libraries(ground-det-cnn but_velodyne)
-
 add_executable(ground-by-median src/apps/ground-by-median.cpp)
 target_link_libraries(ground-by-median but_velodyne)
 
