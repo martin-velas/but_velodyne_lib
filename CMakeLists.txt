@@ -224,9 +224,6 @@ target_link_libraries(cloud-eraser-from-seq but_velodyne)
 
 ########################## RANSAC registration (visual features): ############
 
-add_executable(sac-visual-registration src/apps/sac-visual-registration.cpp)
-target_link_libraries(sac-visual-registration but_velodyne)
-
 add_executable(manual-registration src/apps/manual-registration.cpp)
 target_link_libraries(manual-registration but_velodyne)
 
@@ -269,7 +266,7 @@ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/but_velodyne-config.cmake" "${CMAKE_C
 
 install(
 TARGETS but_velodyne collar-lines-odom show-kitti-poses show_correspondences extract-vfh
-    find-loops-vfh verify-loops register-loops slampp-solution-to-poses sac-visual-registration
+    find-loops-vfh verify-loops register-loops slampp-solution-to-poses
     move-detection
 RUNTIME DESTINATION bin/
 LIBRARY DESTINATION lib/
