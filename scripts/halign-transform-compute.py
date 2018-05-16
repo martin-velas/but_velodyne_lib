@@ -12,6 +12,10 @@ VELO_TO_IMU = np.array([0,0,1,0,
                         0,1,0,0,
                         0,0,0,1]).reshape((4,4))
 
+CALIBRATION = Odometry()
+CALIBRATION.move([0,0,0,-0.05,0,0]) # Velodyne is tilted a bit
+
+
 def get_imu_orientations(imu_data, frame_times):
     orientations_timed = {}
     for record in imu_data:
@@ -40,7 +44,7 @@ imu_data = json.load(open(sys.argv[3]))
 
 imu_orientations = get_imu_orientations(imu_data, frame_times)
 
-alignment = slam_poses[0].inv() * imu_orientations[0]
+alignment = slam_poses[0].inv() * imu_orientations[0] * CALIBRATION
 
 aligned_poses_file = open(sys.argv[4], "w")
 out_imu_poses_file = open(sys.argv[5], "w")
