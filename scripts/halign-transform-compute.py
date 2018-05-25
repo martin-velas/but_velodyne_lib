@@ -2,10 +2,12 @@
 
 import sys
 import numpy as np
-from transformations_kittilike import quaternion_to_matrix
+from transformations_kittilike import quaternion_to_matrix, matrix_to_quaternion
 from odometry_cnn_data import load_kitti_poses, Odometry
 import json
 import math
+from averageQuaternions import averageQuaternions
+import transformations
 
 
 VELO_TO_IMU = np.array([0,0,1,0,
@@ -39,6 +41,18 @@ def get_imu_orientations(imu_data, frame_times):
     return orientations
 
 
+def get_alignment(poses_by_slam, poses_by_imu):
+    delta_quaternions = np.zeros((len(poses_by_imu), 4))
+    for i, (slam_p, imu_p) in enumerate(zip(poses_by_slam, poses_by_imu)):
+        delta_m = imu_p.M[0:3, 0:3] * np.linalg.inv(slam_p.M[0:3, 0:3])
+        delta_quaternions[i, :] = matrix_to_quaternion(delta_m)
+    avg_q = averageQuaternions(delta_quaternions)
+    alignment = Odometry()
+    alignment.M = quaternion_to_matrix(avg_q)
+    alignment.setDofFromM()
+    return alignment
+
+
 if len(sys.argv) != 6:
     sys.stderr.write("ERROR, expecting arguments: [slam-poses] [frame-times] [imu-data-log] [out-imu-aligned-slam.poses] [out-imu-in-velodyne-body.poses]\n")
     sys.exit(1)
@@ -50,7 +64,8 @@ imu_data = json.load(open(sys.argv[3]))
 imu_orientations = get_imu_orientations(imu_data, frame_times)
 imu_orientations_in_velodyne_body = map(lambda x: x*CALIBRATION, imu_orientations)
 
-alignment = imu_orientations_in_velodyne_body[0]
+alignment = get_alignment(slam_poses, imu_orientations_in_velodyne_body)
+print alignment
 slam_poses_imu_aligned = map(lambda x: alignment*x, slam_poses)
 
 aligned_poses_file = open(sys.argv[4], "w")
