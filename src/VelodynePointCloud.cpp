@@ -446,7 +446,7 @@ VelodyneMultiFrame::VelodyneMultiFrame(const std::vector<std::string> &filenames
   }
 }
 
-void VelodyneMultiFrame::joinTo(PointCloud<PointWithSource> &output) {
+void VelodyneMultiFrame::joinTo(PointCloud<PointWithSource> &output) const {
   for(int sensor_i = 0; sensor_i < clouds.size(); sensor_i++) {
     PointCloud<PointWithSource> transformed;
     copyPointCloud(*clouds[sensor_i], transformed);
@@ -458,7 +458,7 @@ void VelodyneMultiFrame::joinTo(PointCloud<PointWithSource> &output) {
   }
 }
 
-void VelodyneMultiFrame::joinTo(pcl::PointCloud<velodyne_pointcloud::VelodynePoint> &output, bool distinguish_rings) {
+void VelodyneMultiFrame::joinTo(pcl::PointCloud<velodyne_pointcloud::VelodynePoint> &output, bool distinguish_rings) const {
   int rings_count = 0;
   for(int i = 0; i < clouds.size(); i++) {
     VelodynePointCloud transformed;
@@ -476,7 +476,7 @@ void VelodyneMultiFrame::joinTo(pcl::PointCloud<velodyne_pointcloud::VelodynePoi
   }
 }
 
-void VelodyneMultiFrame::joinTo(PointCloud<PointXYZI> &output) {
+void VelodyneMultiFrame::joinTo(PointCloud<PointXYZI> &output) const {
   PointCloud<velodyne_pointcloud::VelodynePoint> mid_output;
   joinTo(mid_output);
   output.resize(mid_output.size());
@@ -486,7 +486,7 @@ void VelodyneMultiFrame::joinTo(PointCloud<PointXYZI> &output) {
   }
 }
 
-void VelodyneMultiFrame::joinTo(PointCloud<PointXYZ> &output) {
+void VelodyneMultiFrame::joinTo(PointCloud<PointXYZ> &output) const {
   PointCloud<velodyne_pointcloud::VelodynePoint> mid_output;
   joinTo(mid_output);
   output.resize(mid_output.size());

@@ -53,6 +53,61 @@ using namespace but_velodyne;
 
 namespace po = boost::program_options;
 
+
+class LineCloudsWithTimeAndQuality {
+
+public:
+  PointCloud<pcl::PointXYZ>::Ptr getMiddlesPtr(void) {
+    return all_lines.line_middles.makeShared();
+  }
+
+  int size(void) {
+    return all_lines.line_cloud.size();
+  }
+
+  void add(const LineCloud &lines) {
+    prune();
+    all_lines += lines;
+    frame_sizes.push_back(lines.line_cloud.size());
+    cerr << "all: " << all_lines.line_cloud.size() << "; new: " << lines.line_cloud.size() << endl;
+  }
+
+protected:
+
+  void prune(void) {
+    int coutn_so_far = 0;
+    for(int si = 0; si < frame_sizes.size(); si++) {
+      if(si > frame_sizes.size() - FRAMES_TO_PRUNE) {
+        vector<PointCloudLine>::iterator line_it = all_lines.line_cloud.begin() + coutn_so_far;
+        PointCloud<PointXYZ>::iterator middles_it = all_lines.line_middles.begin() + coutn_so_far;
+        int removed = 0;
+        for(int li = 0; li < frame_sizes[si]; li++) {
+          if(cv::theRNG().uniform(0,2) != 0) {
+            line_it = all_lines.line_cloud.erase(line_it);
+            middles_it = all_lines.line_middles.erase(middles_it);
+            removed++;
+          } else {
+            line_it++;
+            middles_it++;
+          }
+        }
+        frame_sizes[si] -= removed;
+      }
+      cerr << frame_sizes[si] << ", ";
+      cerr << endl;
+      coutn_so_far += frame_sizes[si];
+    }
+  }
+
+public:
+  LineCloud all_lines;
+
+private:
+  vector<int> frame_sizes;
+  static const int FRAMES_TO_PRUNE = 6;
+};
+
+
 class CollarLinesRegistrationToMap {
 public:
   CollarLinesRegistrationPipeline::Parameters params;
@@ -63,44 +118,57 @@ public:
                                  filter(pipeline_params_.linesPerCellPreserved),
                                  params(pipeline_params_),
                                  registration_params(registration_params_),
-                                 indexed(false) {
+                                 indexed(false), vis(Visualizer3D::getCommonVisualizer()) {
   }
 
-  void addToMap(const VelodynePointCloud &src_cloud,
-      const Eigen::Affine3f &src_pose) {
-    PolarGridOfClouds src_polar_grid(src_cloud);
-    LineCloud src_line_cloud(src_polar_grid, params.linesPerCellGenerated, filter);
-    src_line_cloud.transform(src_pose.matrix());
-    lines_map += src_line_cloud;
+  void addToMap(const std::vector<VelodynePointCloud::Ptr> &point_clouds,
+      const SensorsCalibration &calibration, const Eigen::Matrix4f &pose) {
+    PolarGridOfClouds polar_grid(point_clouds, calibration);
+    LineCloud line_cloud(polar_grid, params.linesPerCellGenerated, filter);
+    addToMap(line_cloud, pose);
+  }
+
+  void addToMap(const LineCloud &line_cloud,
+      const Eigen::Matrix4f &pose) {
+    LineCloud line_cloud_transformed;
+    line_cloud.transform(pose, line_cloud_transformed);
+    lines_map.add(line_cloud_transformed);
     indexed = false;
   }
 
-  Eigen::Matrix4f runRegistration(const VelodynePointCloud &target_cloud,
-      const Eigen::Affine3f &init_pose) {
+  Eigen::Matrix4f runMapping(const VelodyneMultiFrame &multiframe,
+      const SensorsCalibration &calibration, const Eigen::Matrix4f &init_pose) {
+    PointCloud<PointXYZ> target_cloud_vis;
+    multiframe.joinTo(target_cloud_vis);
+    vis->keepOnlyClouds(0).setColor(200,0,200).addPointCloud(target_cloud_vis, init_pose)
+        .setColor(150,150,150).addPointCloud(lines_map.all_lines.line_middles).show();
     if(!indexed) {
       buildKdTree();
     }
-    PolarGridOfClouds target_polar_grid(target_cloud);
-    LineCloud::Ptr target_line_cloud(new LineCloud(target_polar_grid, params.linesPerCellGenerated, filter));
-    return registerLineClouds(lines_map, *target_line_cloud, init_pose.matrix());
+    PolarGridOfClouds target_polar_grid(multiframe.clouds, calibration);
+    LineCloud target_line_cloud(target_polar_grid, params.linesPerCellGenerated, filter);
+    Eigen::Matrix4f refined_pose = registerLineCloud(target_line_cloud, init_pose);
+    addToMap(target_line_cloud, refined_pose);
+    vis->keepOnlyClouds(1).setColor(0,200,0).addPointCloud(target_cloud_vis, refined_pose).show();
+    return refined_pose;
   }
 
 protected:
 
   void buildKdTree(void) {
-    map_kdtree.setInputCloud(lines_map.line_middles.makeShared());
+    map_kdtree.setInputCloud(lines_map.getMiddlesPtr());
     indexed = true;
   }
 
-  Eigen::Matrix4f registerLineClouds(const LineCloud &source,
-      const LineCloud &target, const Eigen::Matrix4f &initial_transformation) {
+  Eigen::Matrix4f registerLineCloud(const LineCloud &target,
+      const Eigen::Matrix4f &initial_transformation) {
     Termination termination(params.minIterations, params.maxIterations,
         params.maxTimeSpent, params.significantErrorDeviation,
         params.targetError);
     Eigen::Matrix4f transformation = initial_transformation;
     while (!termination()) {
-      CollarLinesRegistration icl_fitting(source, target, registration_params,
-          transformation);
+      CollarLinesRegistration icl_fitting(lines_map.all_lines, map_kdtree, target,
+          registration_params, transformation);
       float error = icl_fitting.refine();
       termination.addNewError(error);
       transformation = icl_fitting.getTransformation();
@@ -110,9 +178,10 @@ protected:
 
 private:
   CollarLinesFilter filter;
-  LineCloud lines_map;
+  LineCloudsWithTimeAndQuality lines_map;
   pcl::KdTreeFLANN<pcl::PointXYZ> map_kdtree;
   bool indexed;
+  Visualizer3D::Ptr vis;
 };
 
 void read_lines(const string &fn, vector<string> &lines) {
@@ -126,54 +195,31 @@ void read_lines(const string &fn, vector<string> &lines) {
 bool parse_arguments(int argc, char **argv,
     CollarLinesRegistration::Parameters &registration_parameters,
     CollarLinesRegistrationPipeline::Parameters &pipeline_parameters,
-    vector<Eigen::Affine3f> &src_poses, vector<string> &src_clouds_filenames,
-    vector<Eigen::Affine3f> &trg_poses, vector<string> &trg_clouds_filenames) {
-  string source_poses_file, target_poses_file;
-  string source_clouds_list, target_clouds_list;
+    vector<Eigen::Affine3f> &init_poses, SensorsCalibration &calibration,
+    vector<string> &clouds_to_process) {
+  string pose_file, sensors_pose_file;
 
-  po::options_description desc("Collar Lines Registration of Velodyne scans\n"
+  po::options_description desc("Collar Lines Registration of Velodyne scans against the map\n"
       "======================================\n"
       " * Reference(s): Velas et al, ICRA 2016\n"
       " * Allowed options");
+  registration_parameters.prepareForLoading(desc);
+  pipeline_parameters.linesPerCellGenerated = 10;
+  pipeline_parameters.linesPerCellPreserved = 1;
+  pipeline_parameters.maxIterations = 1000;
+  pipeline_parameters.prepareForLoading(desc);
   desc.add_options()
     ("help,h", "produce help message")
-    ("matching_threshold", po::value<CollarLinesRegistration::Threshold>(&registration_parameters.distance_threshold)->default_value(registration_parameters.distance_threshold),
-      "How the value of line matching threshold is estimated (mean/median/... of line pairs distance). Possible values: MEDIAN_THRESHOLD|MEAN_THRESHOLD|NO_THRESHOLD")
-    ("line_weightning", po::value<CollarLinesRegistration::Weights>(&registration_parameters.weighting)->default_value(registration_parameters.weighting),
-      "How the weights are assigned to the line matches - prefer vertical lines, close or treat matches as equal. Possible values: DISTANCE_WEIGHTS|VERTICAL_ANGLE_WEIGHTS|NO_WEIGHTS")
-    ("shifts_per_match", po::value<int>(&registration_parameters.correnspPerLineMatch)->default_value(registration_parameters.correnspPerLineMatch),
-      "[Experimental] How many shift vectors (for SVD) are generated per line match - each is amended by small noise")
-    ("shifts_noise_sigma", po::value<float>(&registration_parameters.lineCorrenspSigma)->default_value(registration_parameters.lineCorrenspSigma),
-      "[Experimental] Deviation of noise generated for shift vectors (see above)")
-    ("lines_per_bin_generated,g", po::value<int>(&pipeline_parameters.linesPerCellGenerated)->default_value(pipeline_parameters.linesPerCellGenerated),
-      "How many collar lines are generated per single polar bin")
-    ("lines_per_bin_preserved,p", po::value<int>(&pipeline_parameters.linesPerCellPreserved)->default_value(pipeline_parameters.linesPerCellPreserved),
-      "How many collar lines are preserved per single polar bin after filtering")
-    ("min_iterations", po::value<int>(&pipeline_parameters.minIterations)->default_value(pipeline_parameters.minIterations),
-      "Minimal number of registration iterations (similar to ICP iterations)")
-    ("max_iterations", po::value<int>(&pipeline_parameters.maxIterations)->default_value(pipeline_parameters.maxIterations),
-      "Maximal number of registration iterations")
-    ("max_time_for_registration", po::value<int>(&pipeline_parameters.maxTimeSpent)->default_value(pipeline_parameters.maxTimeSpent),
-      "Maximal time for registration [sec]")
-    ("target_error", po::value<float>(&pipeline_parameters.targetError)->default_value(pipeline_parameters.targetError),
-      "Minimal error (average distance of line matches) causing termination of registration")
-    ("significant_error_deviation", po::value<float>(&pipeline_parameters.significantErrorDeviation)->default_value(pipeline_parameters.significantErrorDeviation),
-      "If standard deviation of error from last N=min_iterations iterations if below this value - registration is terminated")
-    ("source_clouds_list", po::value<string>(&source_clouds_list)->required(),
-      "List of source point clouds")
-    ("target_clouds_list", po::value<string>(&target_clouds_list)->required(),
-      "List of target point clouds")
-    ("source_poses_file", po::value<string>(&source_poses_file)->required(),
-      "File with source poses")
-    ("target_poses_file", po::value<string>(&target_poses_file)->required(),
-      "File with poses of target clouds for initialisation")
-    ("nearest_neighbors", po::value<int>(&registration_parameters.nearestNeighbors)->default_value(registration_parameters.nearestNeighbors),
-      "How many nearest neighbors (matches) are found for each line of source frame.")
+    ("poses", po::value<string>(&pose_file)->required(),
+      "File with initial poses")
+    ("sensors_pose_file", po::value<string>(&sensors_pose_file)->default_value(""),
+        "Extrinsic calibration parameters, when multiple Velodyne LiDARs are used")
   ;
 
   po::variables_map vm;
   po::parsed_options parsed = po::parse_command_line(argc, argv, desc);
   po::store(parsed, vm);
+  clouds_to_process = po::collect_unrecognized(parsed.options, po::include_positional);
 
   if (vm.count("help")) {
     std::cerr << desc << std::endl;
@@ -188,10 +234,13 @@ bool parse_arguments(int argc, char **argv,
     return false;
   }
 
-  src_poses = KittiUtils::load_kitti_poses(source_poses_file);
-  trg_poses = KittiUtils::load_kitti_poses(target_poses_file);
-  read_lines(source_clouds_list, src_clouds_filenames);
-  read_lines(target_clouds_list, trg_clouds_filenames);
+  init_poses = KittiUtils::load_kitti_poses(pose_file);
+
+  if(sensors_pose_file.empty()) {
+    calibration = SensorsCalibration();
+  } else {
+    calibration = SensorsCalibration(sensors_pose_file);
+  }
 
   return true;
 }
@@ -203,30 +252,30 @@ int main(int argc, char** argv) {
 
   CollarLinesRegistration::Parameters registration_parameters;
   CollarLinesRegistrationPipeline::Parameters pipeline_parameters;
-  vector<Eigen::Affine3f> src_poses, trg_poses;
-  vector<string> src_clouds_filenames, trg_clouds_filenames;
+  vector<Eigen::Affine3f> init_poses;
+  vector<string> clouds_filenames;
+  SensorsCalibration calibration;
 
   if (!parse_arguments(argc, argv,
       registration_parameters, pipeline_parameters,
-      src_poses, src_clouds_filenames, trg_poses, trg_clouds_filenames)) {
+      init_poses, calibration, clouds_filenames)) {
     return EXIT_FAILURE;
   }
 
   CollarLinesRegistrationToMap registration(pipeline_parameters, registration_parameters);
 
-  int map_size = MIN(src_poses.size(), src_clouds_filenames.size());
-  for(int i = 0; i < map_size; i++) {
-    VelodynePointCloud src_cloud;
-    VelodynePointCloud::fromFile(src_clouds_filenames[i], src_cloud, false);
-    registration.addToMap(src_cloud, src_poses[i]);
-  }
-
-  int clouds_to_register = MIN(trg_clouds_filenames.size(), trg_poses.size());
-  for(int i = 0; i < clouds_to_register; i++) {
-    VelodynePointCloud trg_cloud;
-    VelodynePointCloud::fromFile(trg_clouds_filenames[i], trg_cloud, false);
-    Eigen::Matrix4f delta = registration.runRegistration(trg_cloud, trg_poses[i]);
-    KittiUtils::printPose(std::cout, trg_poses[i].matrix()*delta);
+  VelodyneFileSequence sequence(clouds_filenames, calibration);
+  Eigen::Matrix4f last_refined_pose;
+  for (int frame_i = 0; sequence.hasNext(); frame_i++) {
+    VelodyneMultiFrame multiframe = sequence.getNext();
+    if(frame_i == 0) {
+      last_refined_pose = init_poses.front().matrix();
+      registration.addToMap(multiframe.clouds, calibration, last_refined_pose);
+    } else {
+      Eigen::Matrix4f init_pose = last_refined_pose * (init_poses[frame_i-1].inverse() * init_poses[frame_i]).matrix();
+      last_refined_pose = registration.runMapping(multiframe, calibration, init_pose);
+    }
+    KittiUtils::printPose(std::cout, last_refined_pose);
   }
 
   return EXIT_SUCCESS;

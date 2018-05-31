@@ -465,13 +465,13 @@ public:
       const SensorsCalibration &calibration_,
       bool transform_pcd_files_ = false);
 
-  void joinTo(pcl::PointCloud<PointWithSource> &output);
+  void joinTo(pcl::PointCloud<PointWithSource> &output) const;
 
-  void joinTo(pcl::PointCloud<velodyne_pointcloud::VelodynePoint> &output, bool distinguish_rings = false);
+  void joinTo(pcl::PointCloud<velodyne_pointcloud::VelodynePoint> &output, bool distinguish_rings = false) const;
 
-  void joinTo(pcl::PointCloud<pcl::PointXYZI> &output);
+  void joinTo(pcl::PointCloud<pcl::PointXYZI> &output) const;
 
-  void joinTo(pcl::PointCloud<pcl::PointXYZ> &output);
+  void joinTo(pcl::PointCloud<pcl::PointXYZ> &output) const;
 
   void subsample(float ratio);
 
