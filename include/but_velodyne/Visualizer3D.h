@@ -545,7 +545,6 @@ public:
 
   std::string getId(const string &what);
 
-protected:
   double rngF();
 
   unsigned rngU();
