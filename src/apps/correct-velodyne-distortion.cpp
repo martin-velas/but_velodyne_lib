@@ -109,6 +109,16 @@ bool parse_arguments(
   return true;
 }
 
+Eigen::Affine3f get_fraction_of_transformation(const Eigen::Affine3f &whole, const float portion) {
+  assert(0.0 <= portion && portion  <= 1.0);
+
+  Eigen::Quaternionf rotation(whole.rotation());
+  rotation = Eigen::Quaternionf::Identity().slerp(portion, rotation);
+  Eigen::Translation3f translation(whole.translation() * portion);
+
+  return translation * rotation;
+}
+
 void fix_cloud(const VelodynePointCloud &in_cloud,
     Eigen::Affine3f delta_pose,
     VelodynePointCloud &out_cloud) {
@@ -121,11 +131,8 @@ void fix_cloud(const VelodynePointCloud &in_cloud,
   }
   vis.show();
   */
-  vector<float> dof(6);
-  getTranslationAndEulerAngles(delta_pose, dof[0], dof[1], dof[2], dof[3], dof[4], dof[5]);
   for(int i = 0; i < slices.size(); i++) {
-    Eigen::Affine3f t = getTransformation(dof[0]/SLICES_COUNT*i, dof[1]/SLICES_COUNT*i, dof[2]/SLICES_COUNT*i,
-        dof[3]/SLICES_COUNT*i, dof[4]/SLICES_COUNT*i, dof[5]/SLICES_COUNT*i);
+    Eigen::Affine3f t = get_fraction_of_transformation(delta_pose, ((float) i)/SLICES_COUNT);
     transformPointCloud(slices[i], slices[i], t);
 //      vis.setColor(i*(255.0/SLICES_COUNT), 100, 0).addPointCloud(slices[i]);
     out_cloud += slices[i];
