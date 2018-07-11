@@ -86,6 +86,29 @@ class Termination
 {
 public:
 
+  typedef enum {
+    ERR_DEVIATION,
+    ERROR,
+    TIME,
+    ITERATIONS,
+    NO
+  } Reason;
+
+  static std::string reasonToString(const Reason reason) {
+    switch(reason) {
+    case ERR_DEVIATION:
+      return "min_err_deviation";
+    case ERROR:
+      return "min_error";
+    case TIME:
+      return "max_time_spent";
+    case ITERATIONS:
+      return "max_iterations";
+    default:
+      return "no_reason";
+    }
+  }
+
   /**!
    * @param min_iterations minimal number of the iterations
    * @param max_iterations maximum iterations
@@ -105,6 +128,11 @@ public:
    * @return true if algorithm should be terminated
    */
   bool operator()();
+
+  Reason why(void) const {
+    return reason;
+  }
+
 private:
   Stopwatch stopwatch;
   ErrorDeviation err_deviation;
@@ -115,6 +143,7 @@ private:
 
   float last_error;
   int iterations;
+  Reason reason;
 };
 
 } /* namespace but_velodyne */

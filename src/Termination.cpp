@@ -33,7 +33,7 @@ Termination::Termination(int min_iterations, int max_iterations, float max_time_
             float min_err_deviation, float min_error) :
               err_deviation(min_iterations), min_error(min_error),
               max_time_spent(max_time_spent), max_iterations(max_iterations),
-              iterations(0), min_err_deviation(min_err_deviation) {
+              iterations(0), min_err_deviation(min_err_deviation), reason(NO) {
   stopwatch.restart();
   last_error = INFINITY;
 }
@@ -45,31 +45,27 @@ void Termination::addNewError(float new_error) {
 }
 
 bool Termination::operator()() {
-  bool terminate = false;
-  std::string reason;
 
   if(iterations >= max_iterations) {
-    terminate = true;
-    reason = "max_iterations";
+    reason = ITERATIONS;
   } else if(stopwatch.elapsed() > max_time_spent) {
-    terminate = true;
-    reason = "max_time_spent";
-  } if(!err_deviation.isSignificant(min_err_deviation)) {
-    terminate = true;
-    reason = "min_err_deviation";
-  } if(last_error < min_error) {
-    terminate = true;
-    reason = "min_error";
+    reason = TIME;
+  } else if(!err_deviation.isSignificant(min_err_deviation)) {
+    reason = ERR_DEVIATION;
+  } else if(last_error < min_error) {
+    reason = ERROR;
+  } else {
+    reason = NO;
   }
 
-  if(terminate) {
+  if(reason != NO) {
     std::cerr << "Termination after " << stopwatch.elapsed()
-        << "[sec], reason: " << reason <<". Iterations: " << iterations
+        << "[sec], reason: " << reasonToString(reason) <<". Iterations: " << iterations
         << " err_deviation: " << err_deviation.getDeviation()
         << " last_error" << last_error << std::endl;
   }
 
-  return terminate;
+  return reason != NO;
 }
 
 float ErrorDeviation::getDeviation() const {
