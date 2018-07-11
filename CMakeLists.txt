@@ -143,6 +143,9 @@ target_link_libraries(pcl_subsample_normals but_velodyne)
 add_executable(sync-velodyne-clouds src/apps/sync-velodyne-clouds.cpp)
 target_link_libraries(sync-velodyne-clouds but_velodyne)
 
+add_executable(calibrate-imu-velodyne-by-normals src/apps/calibrate-imu-velodyne-by-normals.cpp)
+target_link_libraries(calibrate-imu-velodyne-by-normals but_velodyne)
+
 ########################## Visualization apps: ###############################
 
 add_executable(show-kitti-poses src/apps/show-kitti-poses.cpp)
