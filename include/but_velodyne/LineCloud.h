@@ -106,6 +106,11 @@ public:
 
   void decodeFrom(const pcl::PointCloud<pcl::PointXYZ> &cloud);
 
+  int size(void) const {
+    assert(line_cloud.size() == line_middles.size());
+    return line_cloud.size();
+  }
+
 protected:
   void generateLineCloudFromCell(const PolarGridOfClouds &polar_grid,
                                  const CellId &source_cell,
