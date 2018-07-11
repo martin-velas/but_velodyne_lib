@@ -219,6 +219,9 @@ target_link_libraries(keypoints-matches but_velodyne)
 add_executable(correct-velodyne-distortion src/apps/correct-velodyne-distortion.cpp)
 target_link_libraries(correct-velodyne-distortion but_velodyne)
 
+add_executable(correct-velodyne-distortion-fine src/apps/correct-velodyne-distortion-fine.cpp)
+target_link_libraries(correct-velodyne-distortion-fine but_velodyne)
+
 add_executable(pose-graph-viewer src/apps/pose-graph-viewer.cpp)
 target_link_libraries(pose-graph-viewer but_velodyne)
 
