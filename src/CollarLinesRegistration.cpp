@@ -138,9 +138,7 @@ float CollarLinesRegistration::computeError() {
                                       matches.size()*params.correnspPerLineMatch);
   MatrixOfPoints target_coresp_points(size_t(TPoint3D::RowsAtCompileTime),
                                       matches.size()*params.correnspPerLineMatch);
-  cerr << "before" << endl;
   getCorrespondingPoints(source_coresp_points, target_coresp_points);
-  cerr << "after" << endl;
 
   float error = computeError(source_coresp_points, target_coresp_points,
                              Eigen::Matrix4f::Identity());
@@ -190,6 +188,8 @@ void CollarLinesRegistration::findClosestMatchesByMiddles() {
       effective_threshold = getMatchesPortion(0.25);
     } else if(params.distance_threshold == TENTH_THRESHOLD) {
       effective_threshold = getMatchesPortion(0.1);
+    } else if(params.distance_threshold == PERC_90_THRESHOLD) {
+      effective_threshold = getMatchesPortion(0.9);
     } else if(params.distance_threshold == VALUE_THRESHOLD) {
       assert(!isnan(params.distance_threshold_value));
       if(isnan(params.distance_threshold_value)) {

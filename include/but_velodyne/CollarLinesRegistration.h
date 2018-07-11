@@ -64,6 +64,7 @@ public:
       MEDIAN_THRESHOLD,         // all matches with distance above median are discarded
       QUARTER_THRESHOLD,
       TENTH_THRESHOLD,
+      PERC_90_THRESHOLD,
       VALUE_THRESHOLD,
       MEAN_THRESHOLD,           // threshold = mean
       NO_THRESHOLD              // no thresholding - all matches are preserved
