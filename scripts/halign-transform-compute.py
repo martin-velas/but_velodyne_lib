@@ -7,38 +7,11 @@ from odometry_cnn_data import load_kitti_poses, Odometry
 import json
 import math
 from averageQuaternions import averageQuaternions
-import transformations
+from imu_orientations_extraction import get_imu_orientations
 
-
-VELO_TO_IMU = np.array([0,0,1,0,
-                        1,0,0,0,
-                        0,1,0,0,
-                        0,0,0,1]).reshape((4,4))
 
 CALIBRATION = Odometry()
 CALIBRATION.move([0, 0, 0, math.radians(-3), 0, 0])     # Velodyne is tilted -3deg
-
-
-def find_closest_value(dict, key):
-    return dict[key] if key in dict else dict[min(dict.keys(), key=lambda k: abs(k - key))]
-
-
-def get_imu_orientations(imu_data, frame_times):
-    orientations_timed = {}
-    for record in imu_data:
-        if record["type"] == "quat_data":
-            orientations_timed[float(record["gpsTimeOfWeek"])] = record["quaternion"]
-
-    orientations = []
-    for t in frame_times:
-        quat = find_closest_value(orientations_timed, t) # [x, y, z, w] in JSON
-        M = quaternion_to_matrix(quat[3:] + quat[0:3])
-        M = np.matmul(np.matmul(np.linalg.inv(VELO_TO_IMU), M), VELO_TO_IMU)
-        o = Odometry()
-        o.M = M
-        o.setDofFromM()
-        orientations.append(o)
-    return orientations
 
 
 def get_alignment(poses_by_slam, poses_by_imu):
