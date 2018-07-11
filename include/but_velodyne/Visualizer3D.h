@@ -56,7 +56,7 @@ class Visualizer3D
 public:
   typedef boost::shared_ptr<Visualizer3D> Ptr;
 
-  Visualizer3D();
+  Visualizer3D(pcl::visualization::PCLVisualizer::Ptr viewer = pcl::visualization::PCLVisualizer::Ptr(new pcl::visualization::PCLVisualizer));
 
   ~Visualizer3D();
 
