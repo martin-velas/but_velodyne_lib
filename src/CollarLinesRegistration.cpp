@@ -100,6 +100,8 @@ void CollarLinesRegistration::Parameters::prepareForLoading(po::options_descript
           "[Experimental] Deviation of noise generated for shift vectors (see above)")
       ("translation_only", po::bool_switch(&this->estimate_translation_only),
           "Estimate only the translation (rotation should be presented as the initial pose)")
+      ("no_roll_pitch", po::bool_switch(&this->dont_estimate_roll_pitch),
+          "Do not estimate the roll and pitch angles (only the heading and the translation)")
       ("nearest_neighbors", po::value<int>(&this->nearestNeighbors)->default_value(this->nearestNeighbors),
         "How many nearest neighbors (matches) are found for each line of source frame.")
   ;
@@ -354,7 +356,7 @@ Eigen::Matrix4f CollarLinesRegistration::computeTransformationWeighted(
   }
 
   Eigen::Matrix<TPoint3D::Scalar, 1, Eigen::Dynamic> identity_vec =
-		  Eigen::Matrix<TPoint3D::Scalar, 1, Eigen::Dynamic>::Ones(1, target_coresp_points.cols()); //setOnes();
+                 Eigen::Matrix<TPoint3D::Scalar, 1, Eigen::Dynamic>::Ones(1, target_coresp_points.cols()); //setOnes();
 
   // Create matrix with repeating values in columns
   MatrixOfPoints translate_0_mat = centroid_0 * identity_vec;
@@ -376,6 +378,11 @@ Eigen::Matrix4f CollarLinesRegistration::computeTransformationWeighted(
   // 1/N is important for computing eigenvalues(scale), not the eigenvectors(directions) - as we are interested in eigenvectors
 
   Matrix3f A = target_coresp_points_translated * weights * source_coresp_points_translated.transpose();
+
+  if(params.dont_estimate_roll_pitch) {
+    A.row(1) << 0, 0, 0;
+    A.col(1) << 0, 0, 0;
+  }
 
   // Compute the SVD upon A = USV^t
   Eigen::JacobiSVD<Matrix3f> svd(A, Eigen::ComputeFullU | Eigen::ComputeFullV);

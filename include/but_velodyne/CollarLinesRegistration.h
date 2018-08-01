@@ -85,14 +85,16 @@ public:
         int correnspPerLineMatch_ = 1,
         float lineCorrenspSigma_ = 0.0001,
         int nearestNeighbors_ = 1,
-        bool estimate_translation_only_ = false) :
+        bool estimate_translation_only_ = false,
+        bool dont_estimate_roll_pitch_ = false) :
         distance_threshold(distance_threshold_),
         distance_threshold_value(distance_threshold_value_),
         weighting(weighting_),
         correnspPerLineMatch(correnspPerLineMatch_),
         lineCorrenspSigma(lineCorrenspSigma_),
         nearestNeighbors(nearestNeighbors_),
-        estimate_translation_only(estimate_translation_only_) {
+        estimate_translation_only(estimate_translation_only_),
+        dont_estimate_roll_pitch(dont_estimate_roll_pitch_) {
     }
     Threshold distance_threshold;       /// how is the threshold of line matches distance estimated
     float distance_threshold_value;
@@ -101,6 +103,7 @@ public:
     float lineCorrenspSigma;            /// [Experimental] deviation of Gaussian noise added to the point correspondences
     int nearestNeighbors;
     bool estimate_translation_only;
+    bool dont_estimate_roll_pitch;
 
     void prepareForLoading(boost::program_options::options_description &options_desc);
 
