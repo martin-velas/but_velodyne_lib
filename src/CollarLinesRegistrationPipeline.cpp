@@ -147,7 +147,7 @@ void CollarLinesRegistrationPipeline::pickBestByAverage(const vector<Eigen::Matr
   }
 
   MoveParameters mean(0, 0, 0, 0, 0, 0);
-  MoveParameters::getGaussDistributionOf(meassurements, mean, covariance);
+  covariance = mean.setAsAverageFrom(meassurements);
 
   mean_transformation =  getTransformation(mean.x, mean.y, mean.z,
                                            mean.roll, mean.pitch, mean.yaw).matrix();

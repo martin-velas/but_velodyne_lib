@@ -84,28 +84,12 @@ public:
   cv::Mat toCvMat() const;
 
   /**!
-   * Compute mean and covariance of multiple sets of move parameters.
+   * Compute mean (set to *this object) and covariance of multiple sets of move parameters.
    *
    * @param measurements [input] parameters of multiple moves
+   * @return covariance matrix of move parameters tx, tx, tz, rx, ry, rz
    */
-  static void getGaussDistributionOf(const std::vector<MoveParameters> &meassurements,
-                                     MoveParameters &output_mean,
-                                     cv::Mat &output_covariance) {
-    output_mean.setZeros();
-    for(std::vector<MoveParameters>::const_iterator m = meassurements.begin();
-          m < meassurements.end(); m++) {
-      output_mean += *m;
-    }
-    output_mean /= meassurements.size();
-
-    output_covariance = cv::Mat::zeros(6, 6, CV_64F);
-    for(std::vector<MoveParameters>::const_iterator m = meassurements.begin();
-              m < meassurements.end(); m++) {
-      cv::Mat diff = (*m - output_mean).toCvMat();
-      output_covariance += diff * diff.t();
-    }
-    output_covariance /= meassurements.size();
-  }
+  cv::Mat setAsAverageFrom(const std::vector<MoveParameters> &meassurements);
 
   /**!
    * Estimate approximation of covariance matrix for pose graph.
