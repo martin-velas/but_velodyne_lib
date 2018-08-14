@@ -1,10 +1,24 @@
 #! /usr/bin/env python
 
 class Edge3D:
-    def __init__(self, src_id, trg_id, dof6):
+    def __init__(self, src_id, trg_id, dof6, inf_matrix_diagonal = None):
         self.srcId = src_id
         self.trgId = trg_id
         self.dof6 = dof6
+        if inf_matrix_diagonal is None:
+            self.inf_matrix_upper_half = [99.1304, -0.869565, -0.869565, -1.73913, -1.73913, -1.73913,
+                                                    99.13040, -0.869565, -1.73913, -1.73913, -1.73913,
+                                                               99.13050, -1.73913, -1.73913, -1.73913,
+                                                                          96.5217, -3.47826, -3.47826,
+                                                                                    96.5217, -3.47826,
+                                                                                             96.52170]
+        else:
+            self.inf_matrix_upper_half = [inf_matrix_diagonal[0], 0.0, 0.0, 0.0, 0.0, 0.0,
+                                               inf_matrix_diagonal[1], 0.0, 0.0, 0.0, 0.0,
+                                                    inf_matrix_diagonal[2], 0.0, 0.0, 0.0,
+                                                         inf_matrix_diagonal[3], 0.0, 0.0,
+                                                              inf_matrix_diagonal[4], 0.0,
+                                                                   inf_matrix_diagonal[5]]
 
     def __gt__(self, other):
         if self.srcId > other.srcId:
@@ -18,12 +32,8 @@ class Edge3D:
         output = "EDGE3 %s %s " % (self.srcId, self.trgId)
         for d in self.dof6:
             output += "%s " % d
-        output += "99.1304 -0.869565 -0.869565 -1.73913 -1.73913 -1.73913 "
-        output +=          "99.13040 -0.869565 -1.73913 -1.73913 -1.73913 "
-        output +=                    "99.13050 -1.73913 -1.73913 -1.73913 "
-        output +=                              "96.5217 -3.47826 -3.47826 "
-        output +=                                       "96.5217 -3.47826 "
-        output +=                                               "96.52170"
+        for m in self.inf_matrix_upper_half:
+            output += "%s " % m
         return output
 
 
@@ -59,6 +69,6 @@ class EdgesGenerator:
         return edges
 
 
-def print_first_vertex(dof):
+def print_first_vertex(dof, inf_matrix_diagonal):
     print "VERTEX3 -1 0 0 0 0 0 0"
-    print Edge3D(-1, 0, dof)
+    print Edge3D(-1, 0, dof, inf_matrix_diagonal)
