@@ -127,7 +127,7 @@ public:
         int maxTimeSpent_ = 20,  // sec
         int iterationsPerSampling_ = 1000,       // (iterationsPerSampling > maxIterations) causes no resampling
         float targetError_ = 0.01,
-        float significantErrorDeviation_ = 0.00001,
+        float significantErrorDeviation_ = 0.0001,
         int historySize_ = 1)
     :
       linesPerCellGenerated(linesPerCellGenerated_),

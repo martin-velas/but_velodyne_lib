@@ -69,7 +69,7 @@ bool parse_arguments(int argc, char **argv,
     vector<Eigen::Affine3f> &src_poses, vector<string> &src_clouds_filenames,
     vector<Eigen::Affine3f> &trg_poses, vector<string> &trg_clouds_filenames,
     SensorsCalibration &calibration,
-    bool &manual) {
+    bool &manual, bool &fail_when_not_converged) {
   string source_poses_file, target_poses_file;
   string source_clouds_list, target_clouds_list;
   string init_transform_filename, calibration_filename;
@@ -101,6 +101,8 @@ bool parse_arguments(int argc, char **argv,
       "Enable manual verification and correction.")
     ("calibration,c", po::value<string>(&calibration_filename)->default_value(""),
         "Calibration file (sensors poses).")
+    ("fail_when_not_converged", po::bool_switch(&fail_when_not_converged),
+        "Fail when the registration did not converged.")
   ;
 
   po::variables_map vm;
@@ -167,13 +169,13 @@ int main(int argc, char** argv) {
   vector<Eigen::Affine3f> src_poses, trg_poses;
   vector<string> src_clouds_filenames, trg_clouds_filenames;
   SensorsCalibration calibration;
-  bool manual;
+  bool manual, fail_when_not_converged;
 
   if (!parse_arguments(argc, argv,
       registration_parameters, pipeline_parameters,
       init_transform,
       src_poses, src_clouds_filenames, trg_poses, trg_clouds_filenames,
-      calibration, manual)) {
+      calibration, manual, fail_when_not_converged)) {
     return EXIT_FAILURE;
   }
 
@@ -188,20 +190,27 @@ int main(int argc, char** argv) {
       trg_lines);
 
   Eigen::Affine3f t;
+  Termination::Reason term_reason;
   if(manual) {
     ManualSubseqRegistration registration(src_lines, trg_lines,
         init_transform,
         pipeline_parameters,
         registration_parameters);
     t = registration.run();
+    term_reason = registration.getTerminationReason();
   } else {
     SubseqRegistration registration(src_lines, trg_lines,
         init_transform,
         pipeline_parameters,
         registration_parameters);
     t = registration.run();
+    term_reason = registration.getTerminationReason();
   }
   KittiUtils::printPose(std::cout, t.matrix());
+
+  if(fail_when_not_converged && term_reason != Termination::ERR_DEVIATION && term_reason != Termination::ERROR) {
+    return EXIT_FAILURE;
+  }
 
   return EXIT_SUCCESS;
 }

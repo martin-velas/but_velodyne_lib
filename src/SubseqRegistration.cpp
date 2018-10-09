@@ -36,6 +36,7 @@ Eigen::Matrix4f SubseqRegistration::registerLineClouds(
     termination.addNewError(error);
     transformation = icl_fitting.getRefinedTransformation();
   }
+  term_reason = termination.why();
   return transformation*initial_transformation;
 }
 

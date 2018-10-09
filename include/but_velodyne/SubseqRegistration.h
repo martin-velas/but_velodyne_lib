@@ -22,12 +22,16 @@ public:
       CollarLinesRegistration::Parameters &registration_params_) :
     src_lines(src_lines_), trg_lines(trg_lines_),
     params(params_), registration_params(registration_params_),
-    estimated_transform(init_transform_) {
+    estimated_transform(init_transform_), term_reason(Termination::NO) {
   }
 
   virtual ~SubseqRegistration() {}
 
   virtual Eigen::Affine3f run();
+
+  Termination::Reason getTerminationReason(void) const {
+    return term_reason;
+  }
 
 protected:
 
@@ -41,6 +45,7 @@ protected:
   LineCloud src_lines, trg_lines;
   CollarLinesRegistrationPipeline::Parameters params;
   CollarLinesRegistration::Parameters registration_params;
+  Termination::Reason term_reason;
 };
 
 class ManualSubseqRegistration : public SubseqRegistration {

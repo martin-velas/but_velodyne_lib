@@ -52,7 +52,8 @@ bool parse_arguments(int argc, char **argv,
                      vector<string> &clouds_to_process,
                      int &frames_cumulated,
                      int &lines_generated,
-                     int &lines_preserved) {
+                     int &lines_preserved,
+                     int &min_frames_dist, int &max_frames_dist) {
   string pose_filename, sensor_poses_filename, skip_filename;
 
   po::options_description desc("Overlap by Collar Lines Matching\n"
@@ -66,6 +67,8 @@ bool parse_arguments(int argc, char **argv,
       ("frames_cumulated,f", po::value<int>(&frames_cumulated)->default_value(10), "frames_cumulated")
       ("lines_generated,g", po::value<int>(&lines_generated)->default_value(2), "lines_generated")
       ("lines_preserved,k", po::value<int>(&lines_preserved)->default_value(1), "lines_preserved (kept)")
+      ("min_frames_dist", po::value<int>(&min_frames_dist)->default_value(0), "min_frames_distance to compute overlap")
+      ("max_frames_dist", po::value<int>(&max_frames_dist)->default_value(10000000), "max_frames_dist to compute overlap")
   ;
   po::variables_map vm;
   po::parsed_options parsed = po::parse_command_line(argc, argv, desc);
@@ -149,10 +152,12 @@ int main(int argc, char** argv) {
   vector<Eigen::Affine3f> poses;
   SensorsCalibration calibration;
   int lines_generated, lines_preserved, frames_cumulated;
+  int min_frames_dist, max_frames_dist;
 
   if(!parse_arguments(argc, argv,
       poses, calibration, filenames, frames_cumulated,
-      lines_generated, lines_preserved)) {
+      lines_generated, lines_preserved,
+      min_frames_dist, max_frames_dist)) {
     return EXIT_FAILURE;
   }
 
@@ -163,18 +168,22 @@ int main(int argc, char** argv) {
   buildLineClouds(sequence, poses, calibration, frames_cumulated,
       lines_generated, lines_preserved, line_clouds, line_trees);
 
-  cv::Mat mean_distances(line_clouds.size(), line_clouds.size(), CV_32FC1);
-  cv::Mat median_distances(line_clouds.size(), line_clouds.size(), CV_32FC1);
-  cv::Mat quarter_distances(line_clouds.size(), line_clouds.size(), CV_32FC1);
+  cv::Mat mean_distances(line_clouds.size(), line_clouds.size(), CV_32FC1, 100.0);
+  cv::Mat median_distances(line_clouds.size(), line_clouds.size(), CV_32FC1, 100.0);
+  cv::Mat quarter_distances(line_clouds.size(), line_clouds.size(), CV_32FC1, 100.0);
   for(int i = 0; i < line_clouds.size(); i++) {
     mean_distances.at<float>(i, i) = 0.0;
     for(int j = 0; j < i; j++) {
+      int frames_distace = abs(i-j)*frames_cumulated;
+      if(frames_distace < min_frames_dist || frames_distace > max_frames_dist) {
+        continue;
+      }
       float mean, median, quarter;
       getDistance(line_clouds[i].line_middles, line_trees[j], mean, median, quarter);
       mean_distances.at<float>(i, j) = mean_distances.at<float>(j, i) = mean;
       median_distances.at<float>(i, j) = median_distances.at<float>(j, i) = median;
       quarter_distances.at<float>(i, j) = quarter_distances.at<float>(j, i) = quarter;
-      cout << i*frames_cumulated << " " << j*frames_cumulated << " "
+      cout << j*frames_cumulated << " " << i*frames_cumulated << " "
           << mean << " " << median << " " << quarter << endl;
     }
   }
