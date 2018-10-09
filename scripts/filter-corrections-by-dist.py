@@ -14,7 +14,7 @@ REF_PT = np.array([[10], [10], [10], [1]])
 corrections = load_poses_corrections(sys.stdin)
 
 for c in corrections:
-    new_pt = c["pose"].M * REF_PT
+    new_pt = np.dot(c["pose"].M, REF_PT)
     dist = np.linalg.norm(new_pt-REF_PT)
     c["dist"] = dist
 

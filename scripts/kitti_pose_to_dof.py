@@ -12,5 +12,4 @@ axis_correction = Odometry([
         1,  0,  0,  0 ])
 
 for o in odometries:
-    #p = axis_correction.inv() * p * axis_correction
     print ("%s "*6)%(o.dof[0], o.dof[1], o.dof[2], o.dof[3], o.dof[4], o.dof[5])

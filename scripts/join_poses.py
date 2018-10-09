@@ -14,7 +14,10 @@ for a in sys.argv[1:]:
 for i,poses in enumerate(pose_sets):
     if len(poses) == 1:
         pose_sets[i] = poses*poses_count
-    assert len(pose_sets[i]) == poses_count
+    poses_i_cnt = len(pose_sets[i])
+    if poses_i_cnt != poses_count:
+        sys.stderr.write("Warning: poses count do not match (%s vs %s)\n" % (poses_i_cnt, poses_count))
+        poses_count = min(poses_count, poses_i_cnt)
 
 for i in range(poses_count):
     output = Odometry()

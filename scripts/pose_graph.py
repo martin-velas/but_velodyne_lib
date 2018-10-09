@@ -67,8 +67,3 @@ class EdgesGenerator:
         edges += self.genEdgesToNewVertex(trg_idx_from, trg_idx_to)
         edges.append(Edge3D(self.max_vertex-1, self.max_vertex, self.reg_pose.dof))
         return edges
-
-
-def print_first_vertex(dof, inf_matrix_diagonal):
-    print "VERTEX3 -1 0 0 0 0 0 0"
-    print Edge3D(-1, 0, dof, inf_matrix_diagonal)

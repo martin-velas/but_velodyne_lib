@@ -48,6 +48,13 @@ def matrix2dof(M):
     dof[5], dof[4], dof[3] = map(lambda x: -x, eulerangles_lib.mat2eulerZYX(R))
     return dof
 
+def kitti_pose_string(matrix):
+    output = ""
+    for i in range(12):
+        output += str(matrix[i / 4, i % 4]) + " "
+    return output[:-1]
+
+
 class Odometry:
     def __init__(self, kitti_pose=[1, 0, 0, 0,
                                      0, 1, 0, 0,
@@ -82,22 +89,19 @@ class Odometry:
 
     def __mul__(self, other):
         out = Odometry()
-        out.M = self.M * other.M
+        out.M = np.dot(self.M, other.M)
         out.setDofFromM()
         return out
 
     def __sub__(self, other):
         out = Odometry()
-        out.M = np.linalg.inv(other.M) * self.M
+        out.M = np.dot(np.linalg.inv(other.M), self.M)
         out.setDofFromM()
         return out
 
     def __str__(self):
-        output = ""
-        for i in range(12):
-            output += str(self.M[i/4, i%4]) + " "
-        return output[:-1]
-    
+        return kitti_pose_string(self.M)
+
     def inv(self):
         inverted = Odometry()
         inverted.M = np.linalg.inv(self.M)
@@ -178,3 +182,10 @@ if __name__ == "__main__":
     print M
     dof = matrix2dof(M)
     print dof
+
+    odom = Odometry().move(dof)
+    t_dof = [2, 2, 2, 0, 0, 0]
+    t_odom = Odometry().move(t_dof)
+    print odom
+    print t_odom
+    print t_odom * odom
