@@ -78,6 +78,20 @@ float get_rand(float maxval);
 
 void invert_indices(const std::vector<int> &labels, std::vector< pcl::PointIndices::Ptr > &inverted_indices);
 
+template <typename PointT>
+void filter_by_range(const pcl::PointCloud<PointT> &input, pcl::PointCloud<PointT> &output, const float range_threshold) {
+  output.resize(input.size());
+  typename pcl::PointCloud<PointT>::iterator out_it = output.begin();
+  for(typename pcl::PointCloud<PointT>::const_iterator p = input.begin(); p < input.end(); p++) {
+    float range = computeRange(*p);
+    if(range < range_threshold) {
+      *out_it = *p;
+      out_it++;
+    }
+  }
+  output.erase(out_it, output.end());
+}
+
 }
 
 #endif /* COMMON_H_ */

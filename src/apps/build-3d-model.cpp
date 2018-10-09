@@ -54,7 +54,8 @@ bool parse_arguments(int argc, char **argv,
                      SensorsCalibration &calibration,
                      vector<string> &clouds_to_process,
                      string &output_file,
-                     vector<bool> &mask) {
+                     vector<bool> &mask,
+                     float &range_threshold) {
   string pose_filename, skip_filename, sensor_poses_filename;
 
   po::options_description desc("Collar Lines Registration of Velodyne scans\n"
@@ -68,6 +69,7 @@ bool parse_arguments(int argc, char **argv,
       ("output_file,o", po::value<string>(&output_file)->required(), "Output PCD file")
       ("skip_file,k", po::value<string>(&skip_filename)->default_value(""), "File with indices to skip")
       ("sensor_poses", po::value<string>(&sensor_poses_filename)->default_value(""), "Sensor poses (calibration).")
+      ("range_threshold,r", po::value<float>(&range_threshold)->default_value(1e10), "Maximal range of the point.")
   ;
   po::variables_map vm;
   po::parsed_options parsed = po::parse_command_line(argc, argv, desc);
@@ -140,14 +142,15 @@ int main(int argc, char** argv) {
   vector<Eigen::Affine3f> poses;
   SensorsCalibration calibration;
   string output_pcd_file;
-  float sampling_ratio;
+  float sampling_ratio, range_threshold;
   vector<bool> mask;
 
   if(!parse_arguments(argc, argv,
       sampling_ratio,
       poses, calibration, filenames,
       output_pcd_file,
-      mask)) {
+      mask,
+      range_threshold)) {
     return EXIT_FAILURE;
   }
 
@@ -163,6 +166,7 @@ int main(int argc, char** argv) {
     VelodyneMultiFrame multiframe = file_sequence.getNext();
     if(mask[frame_i]) {
       multiframe.joinTo(*cloud);
+      filter_by_range(*cloud, *cloud, range_threshold);
       subsample_cloud<PointType>(cloud, sampling_ratio);
       transformPointCloud(*cloud, *cloud, poses[frame_i]);
       for(PointCloud<PointType>::iterator pt = cloud->begin(); pt < cloud->end(); pt++) {

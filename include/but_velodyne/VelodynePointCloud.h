@@ -52,7 +52,8 @@ namespace but_velodyne {
  * @param pt Velodyne 3D point
  * @returns the distance of the point from sensor
  */
-inline float computeRange(const velodyne_pointcloud::VelodynePoint &pt)
+template <typename PointT>
+inline float computeRange(const PointT &pt)
 {
   return sqrt(pt.x * pt.x + pt.y * pt.y + pt.z * pt.z);
 }
