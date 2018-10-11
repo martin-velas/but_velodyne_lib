@@ -36,7 +36,7 @@ def odom_deg_to_rad(odom):
     return odom[0:3] + [odom[i]*math.pi/180.0 for i in range(3, 6)]
 
 def dof2matrix(dof):
-    M = np.eye(4, 4)
+    M = np.matrix(np.eye(4, 4))
     M[:3, :3] = np.transpose(eulerangles_lib.euler2matXYZ(-dof[3], -dof[4], -dof[5]))
     M[0, 3], M[1, 3], M[2, 3] = dof[0], dof[1], dof[2]
     return M
@@ -185,7 +185,20 @@ if __name__ == "__main__":
 
     odom = Odometry().move(dof)
     t_dof = [2, 2, 2, 0, 0, 0]
+
     t_odom = Odometry().move(t_dof)
     print odom
     print t_odom
     print t_odom * odom
+
+    t_odom = Odometry()
+    t_odom.dof = t_dof
+    t_odom.setMFromDof()
+    odom = Odometry()
+    odom.dof = dof
+    odom.setMFromDof()
+    print odom
+    print t_odom
+    print t_odom * odom
+
+    print type(odom.M)
