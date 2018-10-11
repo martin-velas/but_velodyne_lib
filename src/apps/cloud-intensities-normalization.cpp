@@ -54,7 +54,7 @@ using namespace velodyne_pointcloud;
 using namespace but_velodyne;
 namespace po = boost::program_options;
 
-static const float ANGULAR_RES = 0.02;
+static const int DATA_CHANNELS = 2;
 static const float DISTANCE_RES = 0.2;
 
 typedef PointWithSource PointType;
@@ -63,7 +63,6 @@ bool parse_arguments(int argc, char **argv,
                      vector<Eigen::Affine3f> &poses,
                      SensorsCalibration &calibration,
                      string &sum_cloud_filename,
-                     string &normals_filename, string &indices_filename,
                      float &expected_mean, float &expected_std_dev, string &out_filename) {
   string pose_filename, sensor_poses_filename;
 
@@ -74,9 +73,7 @@ bool parse_arguments(int argc, char **argv,
     ("help,h", "produce help message")
     ("pose_file,p", po::value<string>(&pose_filename)->required(), "KITTI poses file.")
     ("sensor_poses,s", po::value<string>(&sensor_poses_filename)->default_value(""), "Sensor poses (calibration).")
-    ("sum_cloud_filename,c", po::value<string>(&sum_cloud_filename)->required(), "Input cloud PDC file.")
-    ("normals_filename,n", po::value<string>(&normals_filename)->required(), "Normals filename.")
-    ("indices_filename,i", po::value<string>(&indices_filename)->required(), "Indices filename.")
+    ("in_filename,i", po::value<string>(&sum_cloud_filename)->required(), "Input cloud PCD file.")
     ("expected_mean,m", po::value<float>(&expected_mean)->default_value(300.0), "Target mean of intensities.")
     ("expected_std_dev,d", po::value<float>(&expected_std_dev)->default_value(1.0), "Target standard deviation of intensities.")
     ("out_filename,o", po::value<string>(&out_filename)->required(), "Output normalized cloud filename.")
@@ -109,23 +106,19 @@ bool parse_arguments(int argc, char **argv,
 
 class BinIndex {
 public:
-  int ring, angle, dist;
+  int ring, dist;
 
-  BinIndex(const int ring_, const int angle_, const int dist_) :
-    ring(ring_), angle(angle_), dist(dist_) {
+  BinIndex(const int ring_, const int dist_) :
+    ring(ring_), dist(dist_) {
   }
 
   bool operator=(const BinIndex &o) const {
-    return this->ring == o.ring && this->angle == o.angle && this->dist == o.dist;
+    return this->ring == o.ring && this->dist == o.dist;
   }
 
   bool operator<(const BinIndex &o) const {
     if(this->ring == o.ring) {
-      if(this->angle == o.angle) {
         return this->dist < o.dist;
-      } else {
-        return this->angle < o.angle;
-      }
     } else {
       return this->ring < o.ring;
     }
@@ -155,7 +148,7 @@ void normalize_intensities(const Mat &data, PointCloud<PointType> &cloud,
   typedef map< BinIndex, vector<float> > GridT;
   GridT desc_grid;
   for(int i = 0; i < data.rows; i++) {
-    BinIndex bin(data.at<int>(i, 0), data.at<int>(i, 1), data.at<int>(i, 2));
+    BinIndex bin(data.at<int>(i, 0), data.at<int>(i, 1));
     desc_grid[bin].push_back(cloud[i].intensity);
   }
 
@@ -172,7 +165,7 @@ void normalize_intensities(const Mat &data, PointCloud<PointType> &cloud,
   }
 
   for(int i = 0; i < data.rows; i++) {
-    BinIndex bin(data.at<int>(i, 0), data.at<int>(i, 1), data.at<int>(i, 2));
+    BinIndex bin(data.at<int>(i, 0), data.at<int>(i, 1));
     cloud[i].intensity = transform_gauss(cloud[i].intensity,
         desc_grid[bin][0], desc_grid[bin][1],
         expected_mean, expected_std_dev);
@@ -186,14 +179,11 @@ int quantize(float value, float resolution) {
 int main(int argc, char** argv) {
 
   vector<Eigen::Affine3f> poses;
-  string sum_cloud_filename;
+  string sum_cloud_filename, out_filename;
   SensorsCalibration calibration;
-  string normals_filename, indices_filename, out_filename;
   float expected_mean, expected_std_dev;
   if(!parse_arguments(argc, argv,
-      poses, calibration,
-      sum_cloud_filename,
-      normals_filename, indices_filename,
+      poses, calibration, sum_cloud_filename,
       expected_mean, expected_std_dev, out_filename)) {
     return EXIT_FAILURE;
   }
@@ -210,29 +200,18 @@ int main(int argc, char** argv) {
   }
   cerr << "Computed " << sum_origin_positions.size() << " origins." << endl;
 
-  cerr << "Loading normals ..." << endl;
-  PointCloud<Normal> subsampled_normals;
-  io::loadPCDFile(normals_filename, subsampled_normals);
-
-  cerr << "Loading indices, labels & subsampling ..." << endl;
-  PointIndices::Ptr indices(new PointIndices);
-  load_vector_from_file(indices_filename, indices->indices);
-
   cerr << "Compute data for normalization ..." << endl;
-  Mat data(indices->indices.size(), 3, CV_32SC1);
+  Mat data(sum_cloud->size(), DATA_CHANNELS, CV_32SC1);
   //Visualizer3D vis;
   PointCloud<PointType>::Ptr vis_cloud(new PointCloud<PointType>);
   *vis_cloud += *sum_cloud;
   subsample_cloud<PointType>(vis_cloud, 0.01);
   //vis.setColor(200, 200, 200).addPointCloud(*vis_cloud);
   //cv::RNG& rng(cv::theRNG());
-  for(int ni = 0; ni < indices->indices.size(); ni++) {
-    int pi = indices->indices[ni];
+  for(int pi = 0; pi < sum_cloud->size(); pi++) {
     PointType pt = sum_cloud->at(pi);
     Eigen::Vector3f pt_to_origin = sum_origin_positions[pi].getVector3fMap() - pt.getVector3fMap();
     float distance = pt_to_origin.norm();
-    Eigen::Vector3f normal = subsampled_normals[ni].getNormalVector3fMap();
-    float angle = acos(pt_to_origin.dot(normal) / (pt_to_origin.norm()*normal.norm()));
 
     /*cout << pt.ring << " " << angle << " " << distance << " " << pt.intensity << endl;
 
@@ -248,18 +227,15 @@ int main(int argc, char** argv) {
       vis.setColor(r, g, b).addArrow(pt_to_origin_line).show();
     }*/
 
-    data.at<int>(ni, 0) = pt.ring;
-    data.at<int>(ni, 1) = quantize(angle, ANGULAR_RES);
-    data.at<int>(ni, 2) = quantize(distance, DISTANCE_RES);
+    data.at<int>(pi, 0) = pt.ring;
+    data.at<int>(pi, 1) = quantize(distance, DISTANCE_RES);
   }
 
   cerr << "Intensities normalization ..." << endl;
-  PointCloud<PointType> subsampled_cloud;
-  extract_indices(sum_cloud, indices, subsampled_cloud);
-  normalize_intensities(data, subsampled_cloud, expected_mean, expected_std_dev);
+  normalize_intensities(data, *sum_cloud, expected_mean, expected_std_dev);
 
   cerr << "Saving output ..." << endl;
-  io::savePCDFileBinary(out_filename, subsampled_cloud);
+  io::savePCDFileBinary(out_filename, *sum_cloud);
 
   return EXIT_SUCCESS;
 }
