@@ -32,13 +32,9 @@
 #include <but_velodyne/KittiUtils.h>
 #include <but_velodyne/point_types.h>
 
-#include <pcl/PCLPointCloud2.h>
 #include <pcl/common/eigen.h>
 #include <pcl/common/transforms.h>
-#include <pcl/filters/voxel_grid.h>
-#include <pcl/filters/random_sample.h>
-#include <pcl/filters/passthrough.h>
-#include <pcl/octree/octree_pointcloud_voxelcentroid.h>
+#include <pcl/kdtree/kdtree_flann.h>
 
 using namespace std;
 using namespace pcl;
@@ -55,7 +51,8 @@ bool parse_arguments(int argc, char **argv,
                      vector<string> &clouds_to_process,
                      string &output_file,
                      vector<bool> &mask,
-                     float &range_threshold) {
+                     float &range_threshold,
+                     float &range_seg_leaf_size, float &range_seg_relative_diff) {
   string pose_filename, skip_filename, sensor_poses_filename;
 
   po::options_description desc("Collar Lines Registration of Velodyne scans\n"
@@ -70,6 +67,8 @@ bool parse_arguments(int argc, char **argv,
       ("skip_file,k", po::value<string>(&skip_filename)->default_value(""), "File with indices to skip")
       ("sensor_poses", po::value<string>(&sensor_poses_filename)->default_value(""), "Sensor poses (calibration).")
       ("range_threshold,r", po::value<float>(&range_threshold)->default_value(1e10), "Maximal range of the point.")
+      ("range_seg_leaf_size", po::value<float>(&range_seg_leaf_size)->default_value(-1.0), "Leaf size for range segmentation (negative = disabled).")
+      ("range_seg_relative_diff", po::value<float>(&range_seg_relative_diff)->default_value(2.0), "Relative difference for range segmentation.")
   ;
   po::variables_map vm;
   po::parsed_options parsed = po::parse_command_line(argc, argv, desc);
@@ -107,32 +106,55 @@ bool parse_arguments(int argc, char **argv,
   return true;
 }
 
-void subsample_cloud2(PointCloud<PointXYZI> &cloud, float leaf_size, int upsampling_ratio) {
-  pcl::PointCloud<pcl::PointXYZRGB>::Ptr rgb_cloud;
-  rgb_cloud = Visualizer3D::colorizeCloud(cloud, true);
-  pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_to_downsample(new pcl::PointCloud<pcl::PointXYZRGB>);
+void subsampleCloud(PointCloud<PointXYZ>::Ptr cloud, float voxel_resolution) {
+  pcl::VoxelGrid<PointXYZ> grid;
+  grid.setLeafSize(voxel_resolution, voxel_resolution, voxel_resolution);
+  grid.setInputCloud(cloud);
+  grid.filter(*cloud);
+}
 
-  for(int i = 0; i < upsampling_ratio; i++) {
-    float offset = leaf_size / upsampling_ratio * i;
-    Eigen::Affine3f t = getTransformation(offset, offset, offset, 0, 0, 0);
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_grid(new pcl::PointCloud<pcl::PointXYZRGB>);
-    transformPointCloud(*rgb_cloud, *cloud_grid, t);
+void range_segmentation(PointCloud<PointType>::ConstPtr input_cloud,
+    const vector<Eigen::Affine3f> &poses,
+    const float leaf_size, const float relative_range_diff,
+    PointCloud<PointType>::Ptr output_cloud, PointCloud<PointType>::Ptr removed_points) {
 
-    pcl::VoxelGrid<PointXYZRGB> grid;
-    grid.setLeafSize(leaf_size, leaf_size, leaf_size);
-    grid.setInputCloud(cloud_grid);
-    grid.filter(*cloud_grid);
+  PointCloud<PointXYZ>::Ptr voxels(new PointCloud<PointXYZ>);
+  copyPointCloud(*input_cloud, *voxels);
+  subsampleCloud(voxels, leaf_size);
 
-    transformPointCloud(*cloud_grid, *cloud_grid, t.inverse());
-    *cloud_to_downsample += *cloud_grid;
+  vector< PointCloud<PointType> > clusters(voxels->size());
+  vector< vector<float> > cluster_ranges(voxels->size());
+  vector<float> cluster_min_range(voxels->size(), INFINITY);
+
+  pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
+  kdtree.setInputCloud(voxels);
+  int K = 1;
+  std::vector<int> pointIdx(K);
+  std::vector<float> pointDist(K);
+
+  for(PointCloud<PointType>::const_iterator pt = input_cloud->begin(); pt < input_cloud->end(); pt++) {
+    pcl::PointXYZ searchPoint(pt->x, pt->y, pt->z);
+    kdtree.nearestKSearch(searchPoint, K, pointIdx, pointDist);
+    const int idx = pointIdx[0];
+    clusters[idx].push_back(*pt);
+    float range = (pt->getVector3fMap() - poses[pt->source % poses.size()].translation()).norm();
+    cluster_ranges[idx].push_back(range);
+    cluster_min_range[idx] = MIN(range, cluster_min_range[idx]);
   }
 
-  cloud.clear();
-  for(pcl::PointCloud<pcl::PointXYZRGB>::iterator pt = cloud_to_downsample->begin(); pt < cloud_to_downsample->end(); pt++) {
-    PointXYZI pt_grey;
-    copyXYZ(*pt, pt_grey);
-    pt_grey.intensity = pt->r / 255.0;
-    cloud.push_back(pt_grey);
+  output_cloud->clear();
+  removed_points->clear();
+  for(int ci = 0; ci < clusters.size(); ci++) {
+    const float min_range = cluster_min_range[ci];
+    for(int pi = 0; pi < clusters[ci].size(); pi++) {
+      const float range = cluster_ranges[ci][pi];
+      const PointType &pt = clusters[ci][pi];
+      if(range < relative_range_diff*min_range) {
+        output_cloud->push_back(pt);
+      } else {
+        removed_points->push_back(pt);
+      }
+    }
   }
 }
 
@@ -143,6 +165,7 @@ int main(int argc, char** argv) {
   SensorsCalibration calibration;
   string output_pcd_file;
   float sampling_ratio, range_threshold;
+  float range_seg_leaf_size, range_seg_relative_diff;
   vector<bool> mask;
 
   if(!parse_arguments(argc, argv,
@@ -150,11 +173,12 @@ int main(int argc, char** argv) {
       poses, calibration, filenames,
       output_pcd_file,
       mask,
-      range_threshold)) {
+      range_threshold,
+      range_seg_leaf_size, range_seg_relative_diff)) {
     return EXIT_FAILURE;
   }
 
-  PointCloud<PointType> sum_cloud;
+  PointCloud<PointType>::Ptr sum_cloud(new PointCloud<PointType>);
   PointCloud<PointType>::Ptr cloud(new PointCloud<PointType>);
   VelodyneFileSequence file_sequence(filenames, calibration);
   for (int frame_i = 0; file_sequence.hasNext(); frame_i++) {
@@ -172,15 +196,21 @@ int main(int argc, char** argv) {
       for(PointCloud<PointType>::iterator pt = cloud->begin(); pt < cloud->end(); pt++) {
         pt->source = pt->source*poses.size() + frame_i;
       }
-      sum_cloud += *cloud;
+      *sum_cloud += *cloud;
       cloud->clear();
     }
   }
 
-  pcl::PointCloud<pcl::PointXYZRGB>::Ptr rgb_cloud;
-  rgb_cloud = Visualizer3D::colorizeCloud(sum_cloud, true);
+  if(range_seg_leaf_size > 0.0) {
+    PointCloud<PointType>::Ptr removed_points(new PointCloud<PointType>);
+    range_segmentation(sum_cloud, poses, range_seg_leaf_size, range_seg_relative_diff, sum_cloud, removed_points);
+    io::savePCDFileBinary(output_pcd_file + ".removed.pcd", *removed_points);
+  }
 
-  io::savePCDFileBinary(output_pcd_file, sum_cloud);
+  pcl::PointCloud<pcl::PointXYZRGB>::Ptr rgb_cloud;
+  rgb_cloud = Visualizer3D::colorizeCloud(*sum_cloud, true);
+
+  io::savePCDFileBinary(output_pcd_file, *sum_cloud);
   io::savePCDFileBinary(output_pcd_file + ".rgb.pcd", *rgb_cloud);
 
   PointCloud<PointXYZ> poses_cloud;
