@@ -1,5 +1,5 @@
 /*
- * Visualization of KITTI poses file.
+ * Overlaps estimation among point clouds for CLS registration.
  *
  * Copyright (C) Brno University of Technology (BUT)
  *
@@ -53,7 +53,8 @@ bool parse_arguments(int argc, char **argv,
                      int &frames_cumulated,
                      int &lines_generated,
                      int &lines_preserved,
-                     int &min_frames_dist, int &max_frames_dist) {
+                     int &min_frames_dist, int &max_frames_dist,
+                     bool &circular) {
   string pose_filename, sensor_poses_filename, skip_filename;
 
   po::options_description desc("Overlap by Collar Lines Matching\n"
@@ -69,6 +70,7 @@ bool parse_arguments(int argc, char **argv,
       ("lines_preserved,k", po::value<int>(&lines_preserved)->default_value(1), "lines_preserved (kept)")
       ("min_frames_dist", po::value<int>(&min_frames_dist)->default_value(0), "min_frames_distance to compute overlap")
       ("max_frames_dist", po::value<int>(&max_frames_dist)->default_value(10000000), "max_frames_dist to compute overlap")
+      ("circular", po::bool_switch(&circular), "The trajectory is considered to be circular.")
   ;
   po::variables_map vm;
   po::parsed_options parsed = po::parse_command_line(argc, argv, desc);
@@ -146,6 +148,15 @@ void getDistance(const PointCloud<PointXYZ> &cloud, const KdTreeFLANN<PointXYZ> 
   out_quarter = distances[distances.size()/4];
 }
 
+int get_frames_distance(const int i, const int j, const int frames_cumulated,
+    const int frames_count, const bool circular) {
+  if(!circular) {
+    return abs(i-j)*frames_cumulated;
+  } else {
+    return MIN(abs(i-j), frames_count-abs(i-j))*frames_cumulated;
+  }
+}
+
 int main(int argc, char** argv) {
 
   vector<string> filenames;
@@ -153,11 +164,12 @@ int main(int argc, char** argv) {
   SensorsCalibration calibration;
   int lines_generated, lines_preserved, frames_cumulated;
   int min_frames_dist, max_frames_dist;
+  bool circular;
 
   if(!parse_arguments(argc, argv,
       poses, calibration, filenames, frames_cumulated,
       lines_generated, lines_preserved,
-      min_frames_dist, max_frames_dist)) {
+      min_frames_dist, max_frames_dist, circular)) {
     return EXIT_FAILURE;
   }
 
@@ -168,26 +180,31 @@ int main(int argc, char** argv) {
   buildLineClouds(sequence, poses, calibration, frames_cumulated,
       lines_generated, lines_preserved, line_clouds, line_trees);
 
+  /**
   cv::Mat mean_distances(line_clouds.size(), line_clouds.size(), CV_32FC1, 100.0);
   cv::Mat median_distances(line_clouds.size(), line_clouds.size(), CV_32FC1, 100.0);
   cv::Mat quarter_distances(line_clouds.size(), line_clouds.size(), CV_32FC1, 100.0);
+   */
   for(int i = 0; i < line_clouds.size(); i++) {
-    mean_distances.at<float>(i, i) = 0.0;
-    for(int j = 0; j < i; j++) {
-      int frames_distace = abs(i-j)*frames_cumulated;
+    //mean_distances.at<float>(i, i) = 0.0;
+    for(int j = i+1; j < line_clouds.size(); j++) {
+      int frames_distace = get_frames_distance(i, j, frames_cumulated, line_clouds.size(), circular);
       if(frames_distace < min_frames_dist || frames_distace > max_frames_dist) {
         continue;
       }
       float mean, median, quarter;
       getDistance(line_clouds[i].line_middles, line_trees[j], mean, median, quarter);
+      /**
       mean_distances.at<float>(i, j) = mean_distances.at<float>(j, i) = mean;
       median_distances.at<float>(i, j) = median_distances.at<float>(j, i) = median;
       quarter_distances.at<float>(i, j) = quarter_distances.at<float>(j, i) = quarter;
-      cout << j*frames_cumulated << " " << i*frames_cumulated << " "
-          << mean << " " << median << " " << quarter << endl;
+       */
+      cout << i*frames_cumulated << " " << j*frames_cumulated << " "
+           << mean << " " << median << " " << quarter << endl;
     }
   }
 
+  /**
   cv::FileStorage fs("distances.yaml", cv::FileStorage::WRITE);
   fs << "mean_distances" << mean_distances;
   fs << "median_distances" << median_distances;
@@ -196,6 +213,7 @@ int main(int argc, char** argv) {
   save_normalized_matrix("mean_distances.png", mean_distances);
   save_normalized_matrix("median_distances.png", median_distances);
   save_normalized_matrix("quarter_distances.png", quarter_distances);
+  **/
 
   return EXIT_SUCCESS;
 }
