@@ -36,6 +36,12 @@
 
 namespace but_velodyne
 {
+
+enum TransformationCumulation {
+  FROM_ORIGIN,
+  FROM_LAST_POSE
+};
+
 /**!
  * Registration of two collar line clouds.
  */
@@ -64,7 +70,7 @@ public:
       MEDIAN_THRESHOLD,         // all matches with distance above median are discarded
       QUARTER_THRESHOLD,
       TENTH_THRESHOLD,
-      PERC_90_THRESHOLD,
+      PERC_99_THRESHOLD,
       VALUE_THRESHOLD,
       MEAN_THRESHOLD,           // threshold = mean
       NO_THRESHOLD              // no thresholding - all matches are preserved
@@ -80,7 +86,9 @@ public:
   public:
     Parameters(
         Threshold distance_threshold_ = MEDIAN_THRESHOLD,
+        float distance_threshold_decay_ = 1.0f,
         float distance_threshold_value_ = NAN,
+        bool normalize_error_by_threshold_ = false,
         Weights weighting_ = NO_WEIGHTS,
         int correnspPerLineMatch_ = 1,
         float lineCorrenspSigma_ = 0.0001,
@@ -88,7 +96,9 @@ public:
         bool estimate_translation_only_ = false,
         bool dont_estimate_roll_pitch_ = false) :
         distance_threshold(distance_threshold_),
+        distance_threshold_decay(distance_threshold_decay_),
         distance_threshold_value(distance_threshold_value_),
+        normalize_error_by_threshold(normalize_error_by_threshold_),
         weighting(weighting_),
         correnspPerLineMatch(correnspPerLineMatch_),
         lineCorrenspSigma(lineCorrenspSigma_),
@@ -97,7 +107,9 @@ public:
         dont_estimate_roll_pitch(dont_estimate_roll_pitch_) {
     }
     Threshold distance_threshold;       /// how is the threshold of line matches distance estimated
+    float distance_threshold_decay;
     float distance_threshold_value;
+    bool normalize_error_by_threshold;
     Weights weighting;                  /// optional weighting of line matches
     int correnspPerLineMatch;           /// [Experimental] how many corresponding points are generated per line match
     float lineCorrenspSigma;            /// [Experimental] deviation of Gaussian noise added to the point correspondences
@@ -123,7 +135,8 @@ public:
     initial_transformation(initial_transformation_),
     params(params_),
     transformation(Eigen::Matrix4f::Identity()),
-    matching_time(0), correnspondences_time(0), tranformation_time(0), error_time(0) {
+    matching_time(0), correnspondences_time(0), tranformation_time(0), error_time(0),
+    refinements_done(0) {
 
     source_kdtree.setInputCloud(source_cloud.line_middles.makeShared());
     this->target_cloud.transform(initial_transformation);
@@ -139,7 +152,8 @@ public:
     params(params_),
     source_kdtree(source_kdtree_),
     transformation(Eigen::Matrix4f::Identity()),
-    matching_time(0), correnspondences_time(0), tranformation_time(0), error_time(0) {
+    matching_time(0), correnspondences_time(0), tranformation_time(0), error_time(0),
+    refinements_done(0) {
 
     this->target_cloud.transform(initial_transformation);
   }
@@ -161,10 +175,7 @@ public:
   /**!
    * @return transformation estimated so far
    */
-  const Eigen::Matrix4f getTransformation() const
-  {
-    return initial_transformation*transformation;
-  }
+  const Eigen::Matrix4f getTransformation(const TransformationCumulation cummulation_type = FROM_LAST_POSE) const;
 
   /**!
    * @return refined transformation
@@ -209,7 +220,10 @@ protected:
 
   float sinOfAngleWithGround(const Eigen::Vector3f &orientation);
 
-  float getMatchesMedian();
+  float thresholdTypeToFraction(void) const;
+
+  float getEffectiveDecay(void) const;
+
   float getMatchesPortion(float ratio);
   float getMatchesMean();
 
@@ -222,6 +236,7 @@ private:
   const Eigen::Matrix4f initial_transformation;
   Eigen::Matrix4f transformation;
   Eigen::VectorXf correspondences_weights;
+  int refinements_done;
 };
 
 } /* namespace but_velodyne */

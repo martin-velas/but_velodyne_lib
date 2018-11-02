@@ -108,6 +108,24 @@ private:
   int index;
 };
 
+class RegistrationOutcome {
+public:
+  RegistrationOutcome(void) : term_reason(Termination::NO), error(-1.0f) {
+  }
+
+  RegistrationOutcome(const Eigen::Affine3f &transformation_, const Termination::Reason term_reason_,
+      const float error_) : transformation(transformation_), term_reason(term_reason_), error(error_) {
+  }
+
+  bool operator<(const RegistrationOutcome &other) {
+    return this->error < other.error;
+  }
+
+  Eigen::Affine3f transformation;
+  Termination::Reason term_reason;
+  float error;
+};
+
 /**!
  * Registration of multiple Velodyne LiDAR point clouds (sequence).
  */
@@ -128,7 +146,9 @@ public:
         int iterationsPerSampling_ = 1000,       // (iterationsPerSampling > maxIterations) causes no resampling
         float targetError_ = 0.01,
         float significantErrorDeviation_ = 0.0001,
-        int historySize_ = 1)
+        int historySize_ = 1,
+        bool pick_by_lowest_error_ = false,
+        int nfolds_ = 1)
     :
       linesPerCellGenerated(linesPerCellGenerated_),
       linesPerCellPreserved(linesPerCellPreserved_),
@@ -138,7 +158,9 @@ public:
       iterationsPerSampling(iterationsPerSampling_),
       targetError(targetError_),
       significantErrorDeviation(significantErrorDeviation_),
-      historySize(historySize_) {
+      historySize(historySize_),
+      pick_by_lowest_error(pick_by_lowest_error_),
+      nfolds(nfolds_) {
     }
 
     int linesPerCellGenerated;  /// how many collar lines are generated per polar bin
@@ -150,6 +172,8 @@ public:
     float targetError;                  /// algorithm is terminated when error is smaller
     float significantErrorDeviation;    /// algorithm is terminated when standard deviation of error is smaller
     int historySize;                    /// number of previous frames used for multi-view approach
+    bool pick_by_lowest_error;
+    int nfolds;
 
     void prepareForLoading(boost::program_options::options_description &options_desc);
 
@@ -198,19 +222,22 @@ protected:
   std::vector<Eigen::Matrix4f> runRegistrationEffective(
       const PolarGridOfClouds::Ptr &target_grid_cloud);
 
-  void printInfo(float time, int iterations, Eigen::Matrix4f t, float error);
+  void printInfo(float time, Eigen::Matrix4f t, float error);
 
   Eigen::Matrix4f registerTwoGrids(const PolarGridOfClouds &source,
                                    const PolarGridOfClouds &target,
                                    const Eigen::Matrix4f &initial_transformation,
-                                   int &iterations,
                                    float &error);
+
+  Eigen::Matrix4f registerLineClouds(const LineCloud &source_line_cloud,
+                                     const LineCloud &target_line_cloud,
+                                     const LineCloud &validation_source_line_cloud,
+                                     const LineCloud &validation_target_line_cloud,
+                                     const Eigen::Matrix4f &initial_transformation,
+                                     Termination &termination, float &final_error);
 
   void updateHistory(const PolarGridOfClouds::Ptr target_polar_grid,
                      Eigen::Matrix4f transformation);
-
-  Eigen::Matrix4f pickBestByError(const PolarGridOfClouds::Ptr target_cloud,
-                                  const vector<Eigen::Matrix4f> &transformations);
 
   void pickBestByAverage(const vector<Eigen::Matrix4f> &transformations,
                          Eigen::Matrix4f &mean_transformation,
@@ -228,6 +255,22 @@ private:
 
   CollarLinesRegistration::Parameters registration_params;
 };
+
+float registerLineClouds(
+    const LineCloud &source, const LineCloud &target,
+    const Eigen::Matrix4f &initial_transformation,
+    CollarLinesRegistration::Parameters registration_params,
+    CollarLinesRegistrationPipeline::Parameters pipeline_params,
+    Eigen::Matrix4f &output_transformation, Termination::Reason &termination_reason);
+
+float registerLineClouds(
+    const LineCloud &source_line_cloud, const LineCloud &target_line_cloud,
+    const LineCloud &validation_source_line_cloud, const LineCloud &validation_target_line_cloud,
+    const Eigen::Matrix4f &initial_transformation,
+    const CollarLinesRegistration::Parameters &registration_params,
+    const CollarLinesRegistrationPipeline::Parameters &pipeline_params,
+    const TransformationCumulation cummulation,
+    Termination &termination, Eigen::Matrix4f &out_transformation);
 
 } /* namespace but_velodyne */
 

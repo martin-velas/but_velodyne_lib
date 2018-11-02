@@ -27,6 +27,7 @@
 #include <boost/circular_buffer.hpp>
 
 #include <but_velodyne/Stopwatch.h>
+#include <but_velodyne/CollarLinesValidation.h>
 
 namespace but_velodyne
 {
@@ -91,6 +92,8 @@ public:
     ERROR,
     TIME,
     ITERATIONS,
+    VALIDATION_ERR_DEVIATION,
+    VALIDATION_ERROR,
     NO
   } Reason;
 
@@ -100,6 +103,10 @@ public:
       return "min_err_deviation";
     case ERROR:
       return "min_error";
+    case VALIDATION_ERR_DEVIATION:
+      return "min_validation_err_deviation";
+    case VALIDATION_ERROR:
+      return "min_validation_error";
     case TIME:
       return "max_time_spent";
     case ITERATIONS:
@@ -107,6 +114,11 @@ public:
     default:
       return "no_reason";
     }
+  }
+
+  static bool is_converged(const Reason reason) {
+    return reason == ERROR || reason == ERR_DEVIATION ||
+        reason == VALIDATION_ERROR || reason == VALIDATION_ERR_DEVIATION;
   }
 
   /**!
@@ -122,7 +134,7 @@ public:
   /**!
    * Add the error from the last algorithm iteration.
    */
-  void addNewError(float error);
+  void addNewError(float error, float validation_error = CollarLinesValidation::UNKNOWN_ERROR);
 
   /**!
    * @return true if algorithm should be terminated
@@ -136,12 +148,15 @@ public:
 private:
   Stopwatch stopwatch;
   ErrorDeviation err_deviation;
+  ErrorDeviation validation_err_deviation;
   const float min_error;
   const float max_time_spent;
   const float max_iterations;
+  const float min_iterations;
   const float min_err_deviation;
 
   float last_error;
+  float validation_last_error;
   int iterations;
   Reason reason;
 };

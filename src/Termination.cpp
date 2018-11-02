@@ -31,22 +31,27 @@ namespace but_velodyne
 
 Termination::Termination(int min_iterations, int max_iterations, float max_time_spent,
             float min_err_deviation, float min_error) :
-              err_deviation(min_iterations), min_error(min_error),
-              max_time_spent(max_time_spent), max_iterations(max_iterations),
-              iterations(0), min_err_deviation(min_err_deviation), reason(NO) {
+              err_deviation(min_iterations), validation_err_deviation(min_iterations),
+              min_error(min_error), max_time_spent(max_time_spent), max_iterations(max_iterations),
+              min_iterations(min_iterations), iterations(0), min_err_deviation(min_err_deviation), reason(NO) {
   stopwatch.restart();
   last_error = INFINITY;
+  validation_last_error = INFINITY;
 }
 
-void Termination::addNewError(float new_error) {
+void Termination::addNewError(float new_error, float validation_error) {
   last_error = new_error;
   err_deviation.add(new_error);
+  validation_last_error = validation_error;
+  validation_err_deviation.add(validation_error);
   iterations++;
 }
 
 bool Termination::operator()() {
 
-  if(iterations >= max_iterations) {
+  if (iterations < min_iterations) {
+    reason = NO;
+  } else if(iterations >= max_iterations) {
     reason = ITERATIONS;
   } else if(stopwatch.elapsed() > max_time_spent) {
     reason = TIME;
@@ -55,14 +60,29 @@ bool Termination::operator()() {
   } else if(last_error < min_error) {
     reason = ERROR;
   } else {
-    reason = NO;
+    if(!isinf(validation_last_error)) {
+      if(!validation_err_deviation.isSignificant(min_err_deviation)) {
+        reason = VALIDATION_ERR_DEVIATION;
+      } else if(validation_last_error < min_error) {
+        reason = VALIDATION_ERROR;
+      } else {
+        reason = NO;
+      }
+    } else {
+      reason = NO;
+    }
   }
 
   if(reason != NO) {
     std::cerr << "Termination after " << stopwatch.elapsed()
         << "[sec], reason: " << reasonToString(reason) <<". Iterations: " << iterations
-        << " err_deviation: " << err_deviation.getDeviation()
-        << " last_error" << last_error << std::endl;
+        << ", err_deviation: " << err_deviation.getDeviation()
+        << ", last_error: " << last_error;
+    if(!isinf(validation_last_error)) {
+      std::cerr << ", validation_err_deviation: " << validation_err_deviation.getDeviation()
+          << ", validation_last_error: " << validation_last_error;
+    }
+    std::cerr << std::endl;
   }
 
   return reason != NO;

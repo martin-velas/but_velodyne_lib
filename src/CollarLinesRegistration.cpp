@@ -79,6 +79,10 @@ std::istream& operator>> (std::istream &in, CollarLinesRegistration::Threshold &
     thresholding = CollarLinesRegistration::TENTH_THRESHOLD;
   } else if (token == "VALUE_THRESHOLD") {
     thresholding = CollarLinesRegistration::VALUE_THRESHOLD;
+  } else if (token == "TENTH_THRESHOLD") {
+    thresholding = CollarLinesRegistration::TENTH_THRESHOLD;
+  } else if (token == "PERC_99_THRESHOLD") {
+    thresholding = CollarLinesRegistration::PERC_99_THRESHOLD;
   } else {
       throw boost::program_options::validation_error(boost::program_options::validation_error::invalid_option_value,
                                                      "lines_preserved_factor_by");
@@ -92,6 +96,10 @@ void CollarLinesRegistration::Parameters::prepareForLoading(po::options_descript
           "How the value of line matching threshold is estimated (mean/median/... of line pairs distance). Possible values: MEDIAN_THRESHOLD|MEAN_THRESHOLD|QUARTER_THRESHOLD|TENTH_THRESHOLD|VALUE_THRESHOLD|NO_THRESHOLD")
       ("matching_threshold_value", po::value<float>(&this->distance_threshold_value)->default_value(this->distance_threshold_value),
           "Value of mathing lines threshold in case of VALUE_THRESHOLD option is used")
+      ("matching_threshold_decay", po::value<float>(&this->distance_threshold_decay)->default_value(this->distance_threshold_decay),
+          "How the amount of matching lines is decaying after each iteration (portion*=decay).")
+      ("normalize_error_by_threshold", po::bool_switch(&this->normalize_error_by_threshold),
+          "Normalize error by the portion of lines taken for registration. Median threshold will cause error/=0.5.")
       ("line_weightning", po::value<CollarLinesRegistration::Weights>(&this->weighting)->default_value(this->weighting),
           "How the weights are assigned to the line matches - prefer vertical lines, close or treat matches as equal. Possible values: DISTANCE_WEIGHTS|VERTICAL_ANGLE_WEIGHTS|NO_WEIGHTS")
       ("shifts_per_match", po::value<int>(&this->correnspPerLineMatch)->default_value(this->correnspPerLineMatch),
@@ -130,6 +138,8 @@ float CollarLinesRegistration::refine() {
   float error = computeError(source_coresp_points, target_coresp_points, refinement);
   error_time += watch.elapsed();
 
+  refinements_done++;
+
   return error;
 }
 
@@ -158,7 +168,12 @@ float CollarLinesRegistration::computeError(
   target_points_transformed = transformation * target_points_transformed;
   MatrixOfPoints difference = source_coresp_points - target_points_transformed.block(0, 0, 3, matches.size()*params.correnspPerLineMatch);
   VectorXf square_distances = difference.cwiseProduct(difference).transpose() * Vector3f::Ones();
-  return (square_distances.cwiseSqrt()).sum() / matches.size()*params.correnspPerLineMatch;
+  float error = (square_distances.cwiseSqrt()).sum() / matches.size()*params.correnspPerLineMatch;
+
+  if(params.normalize_error_by_threshold) {
+    error /= thresholdTypeToFraction()*getEffectiveDecay();
+  }
+  return error;
 }
 
 void CollarLinesRegistration::findClosestMatchesByMiddles() {
@@ -182,26 +197,19 @@ void CollarLinesRegistration::findClosestMatchesByMiddles() {
   }
 
   float effective_threshold;
-    if(params.distance_threshold == MEAN_THRESHOLD) {
-      effective_threshold = getMatchesMean();
-    } else if(params.distance_threshold == MEDIAN_THRESHOLD) {
-      effective_threshold = getMatchesMedian();
-    } else if(params.distance_threshold == QUARTER_THRESHOLD) {
-      effective_threshold = getMatchesPortion(0.25);
-    } else if(params.distance_threshold == TENTH_THRESHOLD) {
-      effective_threshold = getMatchesPortion(0.1);
-    } else if(params.distance_threshold == PERC_90_THRESHOLD) {
-      effective_threshold = getMatchesPortion(0.9);
-    } else if(params.distance_threshold == VALUE_THRESHOLD) {
-      assert(!isnan(params.distance_threshold_value));
-      if(isnan(params.distance_threshold_value)) {
-        cerr << "Warning: distance_threshold_value was not set!" << endl;
-      }
-      effective_threshold = params.distance_threshold_value;
-    } else {
-      assert(params.distance_threshold == NO_THRESHOLD);
-      effective_threshold = INFINITY;
+  if(params.distance_threshold == MEAN_THRESHOLD) {
+    effective_threshold = getMatchesMean();
+  } else if(params.distance_threshold == VALUE_THRESHOLD) {
+    assert(!isnan(params.distance_threshold_value));
+    if(isnan(params.distance_threshold_value)) {
+      cerr << "Warning: distance_threshold_value was not set!" << endl;
     }
+    effective_threshold = params.distance_threshold_value;
+  } else if (params.distance_threshold == NO_THRESHOLD) {
+    effective_threshold = INFINITY;
+  } else {
+    effective_threshold = getMatchesPortion(thresholdTypeToFraction()*getEffectiveDecay());
+  }
   filterMatchesByThreshold(effective_threshold);
 }
 
@@ -217,6 +225,26 @@ void CollarLinesRegistration::filterMatchesByThreshold(const float threshold) {
   }
 }
 
+float CollarLinesRegistration::thresholdTypeToFraction(void) const {
+  switch(params.distance_threshold) {
+  case MEDIAN_THRESHOLD:
+    return 0.5;
+  case QUARTER_THRESHOLD:
+    return 0.25;
+  case TENTH_THRESHOLD:
+    return 0.1;
+  case PERC_99_THRESHOLD:
+    return 0.99;
+  default:
+    cerr << "Warning: uknown distance threshold type!" << endl;
+    return 0.0;
+  }
+}
+
+float CollarLinesRegistration::getEffectiveDecay(void) const {
+  return pow(params.distance_threshold_decay, refinements_done);
+}
+
 float CollarLinesRegistration::getMatchesPortion(float ratio) {
   vector<float> acc(matches.size());
   for(int i = 0; i < matches.size(); i++) {
@@ -224,14 +252,6 @@ float CollarLinesRegistration::getMatchesPortion(float ratio) {
   }
   std::sort(acc.begin(), acc.end());
   return acc[acc.size()*ratio];
-}
-
-float CollarLinesRegistration::getMatchesMedian() {
-  accumulators::accumulator_set<float, accumulators::stats<accumulators::tag::median > > acc;
-  for(vector<DMatch>::iterator m = matches.begin(); m < matches.end(); m++) {
-    acc(m->distance);
-  }
-  return accumulators::median(acc);
 }
 
 float CollarLinesRegistration::getMatchesMean() {
@@ -319,7 +339,8 @@ void CollarLinesRegistration::getWeightingMatrix(WeightsMatrix &weighting_matrix
     return;
   }
 
-  correspondences_weights /= correspondences_weights.sum();
+  float weights_normalization = 1.0 / correspondences_weights.sum();
+  correspondences_weights *= weights_normalization;
 
   assert(weighting_matrix.rows() == correspondences_weights.size());
   assert(weighting_matrix.cols() == correspondences_weights.size());
@@ -436,5 +457,14 @@ void CollarLinesRegistration::showLinesCorrenspondences() {
   visualizer.show();
 }
 
+const Eigen::Matrix4f CollarLinesRegistration::getTransformation(const TransformationCumulation cummulation_type) const {
+  if(cummulation_type == FROM_LAST_POSE) {
+    return initial_transformation*transformation;
+  } else if(cummulation_type == FROM_ORIGIN) {
+    return transformation*initial_transformation;
+  } else {
+    throw invalid_argument("Unknown TransformationCumulation type.");
+  }
+}
 
 } /* namespace but_velodyne */

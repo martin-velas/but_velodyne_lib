@@ -22,9 +22,11 @@
  */
 
 #include <but_velodyne/CollarLinesRegistrationPipeline.h>
+#include <but_velodyne/CollarLinesValidation.h>
 #include <but_velodyne/PoseGraphEdge.h>
 #include <but_velodyne/CollarLinesFilter.h>
 #include <but_velodyne/KittiUtils.h>
+#include <but_velodyne/RegistrationCrossValidation.h>
 
 using namespace std;
 using namespace pcl;
@@ -56,35 +58,104 @@ void CollarLinesRegistrationPipeline::Parameters::prepareForLoading(po::options_
           "If standard deviation of error from last N=min_iterations iterations if below this value - registration is terminated")
       ("history_size,m", po::value<int>(&this->historySize)->default_value(this->historySize),
           "How many previous frames are used for registration (multi-view CLS-M approach described in the paper)")
+      ("pick_by_lowest_error", po::bool_switch(&this->pick_by_lowest_error),
+          "Return solution which yields smallest error (validation error is prefered if available).")
+      ("nfolds", po::value<int>(&this->nfolds)->default_value(this->nfolds),
+          "Repeat registration multiple times, pick the best error.")
   ;
 }
 
 Eigen::Matrix4f CollarLinesRegistrationPipeline::registerTwoGrids(const PolarGridOfClouds &source,
                                                const PolarGridOfClouds &target,
                                                const Eigen::Matrix4f &initial_transformation,
-                                               int &iterations,
-                                               float &error) {
-  iterations = 0;
-  Termination termination(pipeline_params.minIterations, pipeline_params.maxIterations, pipeline_params.maxTimeSpent,
-                          pipeline_params.significantErrorDeviation, pipeline_params.targetError);
-  Eigen::Matrix4f transformation = initial_transformation;
-  while(!termination()) {
+                                               float &final_error) {
+  vector<RegistrationOutcome> nfold_outcomes(pipeline_params.nfolds);
+  for(int fold = 0; fold < pipeline_params.nfolds; fold++) {
     CollarLinesFilter filter(pipeline_params.linesPerCellPreserved);
-    LineCloud source_line_cloud(source, pipeline_params.linesPerCellGenerated, filter);
-    LineCloud target_line_cloud(target, pipeline_params.linesPerCellGenerated, filter);
-
-    CollarLinesRegistration icl_fitting(source_line_cloud, target_line_cloud,
-                                        registration_params, transformation);
-    for(int sampling_it = 0;
-        (sampling_it < pipeline_params.iterationsPerSampling) && !termination();
-        sampling_it++) {
-      error = icl_fitting.refine();
-      termination.addNewError(error);
-      iterations++;
+    Termination termination(pipeline_params.minIterations, pipeline_params.maxIterations, pipeline_params.maxTimeSpent,
+                            pipeline_params.significantErrorDeviation, pipeline_params.targetError);
+    while(!termination()) {
+      LineCloud source_line_cloud(source, pipeline_params.linesPerCellGenerated, filter);
+      LineCloud validation_source_line_cloud(source, pipeline_params.linesPerCellGenerated, filter);
+      LineCloud target_line_cloud(target, pipeline_params.linesPerCellGenerated, filter);
+      LineCloud validation_target_line_cloud(target, pipeline_params.linesPerCellGenerated, filter);
+      nfold_outcomes[fold].transformation = Eigen::Affine3f(registerLineClouds(
+          source_line_cloud, target_line_cloud, validation_source_line_cloud, validation_target_line_cloud,
+          initial_transformation, termination, nfold_outcomes[fold].error));
+      nfold_outcomes[fold].term_reason = termination.why();
     }
-    transformation = icl_fitting.getTransformation();
   }
-  return transformation;
+  RegistrationCrossValidation validation(nfold_outcomes);
+  RegistrationOutcome best_outcome = validation.findBest();
+  final_error = best_outcome.error;
+  return best_outcome.transformation.matrix();
+}
+
+float registerLineClouds(
+    const LineCloud &source, const LineCloud &target,
+    const Eigen::Matrix4f &initial_transformation,
+    CollarLinesRegistration::Parameters registration_params,
+    CollarLinesRegistrationPipeline::Parameters pipeline_params,
+    Eigen::Matrix4f &output_transformation, Termination::Reason &termination_reason) {
+
+  Termination termination(pipeline_params.minIterations, pipeline_params.maxIterations,
+      pipeline_params.maxTimeSpent, pipeline_params.significantErrorDeviation,
+      pipeline_params.targetError);
+  LineCloud dummy_validation_line_cloud;
+
+  float error = registerLineClouds(source, target,
+      dummy_validation_line_cloud, dummy_validation_line_cloud,
+      initial_transformation, registration_params, pipeline_params,
+      FROM_ORIGIN,
+      termination, output_transformation);
+
+  termination_reason = termination.why();
+  return error;
+}
+
+Eigen::Matrix4f CollarLinesRegistrationPipeline::registerLineClouds(const LineCloud &source_line_cloud,
+                                               const LineCloud &target_line_cloud,
+                                               const LineCloud &validation_source_line_cloud,
+                                               const LineCloud &validation_target_line_cloud,
+                                               const Eigen::Matrix4f &initial_transformation,
+                                               Termination &termination, float &final_error) {
+  Eigen::Matrix4f estimated_transformation;
+  final_error = but_velodyne::registerLineClouds(source_line_cloud, target_line_cloud,
+      validation_source_line_cloud, validation_target_line_cloud,
+      initial_transformation, registration_params, pipeline_params,
+      FROM_LAST_POSE,
+      termination, estimated_transformation);
+  return estimated_transformation;
+}
+
+float registerLineClouds(const LineCloud &source_line_cloud, const LineCloud &target_line_cloud,
+                         const LineCloud &validation_source_line_cloud, const LineCloud &validation_target_line_cloud,
+                         const Eigen::Matrix4f &initial_transformation,
+                         const CollarLinesRegistration::Parameters &registration_params,
+                         const CollarLinesRegistrationPipeline::Parameters &pipeline_params,
+                         const TransformationCumulation cummulation,
+                         Termination &termination, Eigen::Matrix4f &out_transformation) {
+  float final_error = INFINITY;
+  float best_validation_error = INFINITY;
+
+  CollarLinesRegistration cls_fitting(source_line_cloud, target_line_cloud,
+                                      registration_params, initial_transformation.matrix());
+  CollarLinesValidation cls_validation(validation_source_line_cloud, validation_target_line_cloud,
+                                      registration_params);
+  for(int sampling_it = 0;
+      (sampling_it < pipeline_params.iterationsPerSampling) && !termination();
+      sampling_it++) {
+    float fitting_error = cls_fitting.refine();
+    Eigen::Matrix4f transformation = cls_fitting.getTransformation(cummulation);
+    float validation_error = cls_validation.computeError(transformation);
+    termination.addNewError(fitting_error, validation_error);
+    if(!pipeline_params.pick_by_lowest_error || validation_error < best_validation_error) {
+      out_transformation = transformation;
+      best_validation_error = validation_error;
+      final_error = fitting_error;
+    }
+  }
+  return final_error;
 }
 
 vector<Eigen::Matrix4f> CollarLinesRegistrationPipeline::runRegistrationEffective(
@@ -95,14 +166,12 @@ vector<Eigen::Matrix4f> CollarLinesRegistrationPipeline::runRegistrationEffectiv
 
   Eigen::Matrix4f transformation = getPrediction();
   vector<Eigen::Matrix4f> results;
-  int iterations = 0;
   for(int i = 0; i < history.size(); i++) {
     int current_iterations;
     float error;
     transformation = registerTwoGrids(*(history[i].getGridCloud()), *target_grid_cloud,
-                                      transformation, current_iterations, error);
-    iterations += current_iterations;
-    printInfo(stopwatch.elapsed(), iterations, transformation, error);
+                                      transformation, error);
+    printInfo(stopwatch.elapsed(), transformation, error);
     results.push_back(transformation);
 
     Eigen::Matrix4f edge_trasform = history[i].getTransformation() * transformation;
@@ -111,30 +180,6 @@ vector<Eigen::Matrix4f> CollarLinesRegistrationPipeline::runRegistrationEffectiv
   }
 
   return results;
-}
-
-Eigen::Matrix4f CollarLinesRegistrationPipeline::pickBestByError(const PolarGridOfClouds::Ptr target_cloud,
-                                              const vector<Eigen::Matrix4f> &transformations) {
-  float best_error = INFINITY;
-  Eigen::Matrix4f best_transform;
-  CollarLinesFilter filter(pipeline_params.linesPerCellPreserved);
-  LineCloud source(*(history.front().getGridCloud()), pipeline_params.linesPerCellGenerated, filter);
-  LineCloud target(*target_cloud, pipeline_params.linesPerCellGenerated, filter);
-  int i = 0;
-  int best_index = -1;
-  for(vector<Eigen::Matrix4f>::const_iterator t = transformations.begin();
-      t < transformations.end(); t++, i++) {
-    CollarLinesRegistration icl_fitting(source, target, registration_params, *t);
-    float error = icl_fitting.computeError();
-    if(error < best_error) {
-      best_error = error;
-      best_transform = *t;
-      best_index = i;
-    }
-    BUT_VELODYNE_LOG << "error of " << i << "th item: " << error << endl << flush;
-  }
-  BUT_VELODYNE_LOG << "picked: " << best_index << "th" << endl << flush;
-  return best_transform;
 }
 
 void CollarLinesRegistrationPipeline::pickBestByAverage(const vector<Eigen::Matrix4f> &transformations,
@@ -204,11 +249,10 @@ Eigen::Matrix4f CollarLinesRegistrationPipeline::getPrediction() {
   return prediction;
 }
 
-void CollarLinesRegistrationPipeline::printInfo(float time, int iterations, Eigen::Matrix4f t, float error) {
+void CollarLinesRegistrationPipeline::printInfo(float time, Eigen::Matrix4f t, float error) {
   BUT_VELODYNE_LOG << std::endl <<
       "TOTAL" << std::endl <<
       " * time: " << time << "s" << std::endl <<
-      " * iterations: " << iterations << std::endl <<
       " * error: " << error << std::endl <<
       "Transformation:" << std::endl << t << std::endl <<
       "*******************************************************************************" <<

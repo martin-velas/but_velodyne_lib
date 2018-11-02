@@ -6,6 +6,7 @@
  */
 
 #include <but_velodyne/SubseqRegistration.h>
+#include <but_velodyne/CollarLinesRegistrationPipeline.h>
 
 #include <pcl/registration/transformation_estimation_svd.h>
 
@@ -25,19 +26,11 @@ Eigen::Matrix4f SubseqRegistration::registerLineClouds(
     const Eigen::Matrix4f &initial_transformation,
     CollarLinesRegistration::Parameters registration_params,
     CollarLinesRegistrationPipeline::Parameters pipeline_params) {
-  Termination termination(pipeline_params.minIterations, pipeline_params.maxIterations,
-      pipeline_params.maxTimeSpent, pipeline_params.significantErrorDeviation,
-      pipeline_params.targetError);
-  CollarLinesRegistration icl_fitting(source, target, registration_params,
-      initial_transformation);
   Eigen::Matrix4f transformation;
-  while (!termination()) {
-    float error = icl_fitting.refine();
-    termination.addNewError(error);
-    transformation = icl_fitting.getRefinedTransformation();
-  }
-  term_reason = termination.why();
-  return transformation*initial_transformation;
+  but_velodyne::registerLineClouds(source, target, initial_transformation,
+      registration_params, pipeline_params,
+      transformation, term_reason);
+  return transformation;
 }
 
 ManualSubseqRegistration::ManualSubseqRegistration(const LineCloud &src_lines_, const LineCloud &trg_lines_,
