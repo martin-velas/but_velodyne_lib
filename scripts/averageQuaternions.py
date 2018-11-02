@@ -95,12 +95,15 @@ def weightedAverageQuaternions(Q, w):
 if __name__ == "__main__":
     poses = load_kitti_poses(sys.stdin)
     quaternions = numpy.zeros((len(poses), 4))
+    positions_sum = numpy.zeros((3,1))
     for i,p in enumerate(poses):
         quaternions[i] = matrix_to_quaternion(p.M)
+        positions_sum = positions_sum + p.M[0:3, 3]
 
     avg = averageQuaternions(quaternions)
 
     o = Odometry()
     o.M = quaternion_to_matrix(avg)
+    o.M[0:3, 3] = (positions_sum / len(poses)).ravel()
     o.setDofFromM()
     print o
