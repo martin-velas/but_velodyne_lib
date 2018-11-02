@@ -37,6 +37,8 @@
 namespace but_velodyne
 {
 
+std::istream& operator>>(std::istream &stream, Eigen::Affine3f &pose);
+
 /**!
  * Auxiliary class for handling KITTI pose files
  */
@@ -65,15 +67,9 @@ public:
     }
 
     while(true) {
-      float r1, r2, r3, r4, r5, r6, r7, r8, r9;
-      float t1, t2, t3;
-      poses_file >> r1 >> r2 >> r3 >> t1 >> r4 >> r5 >> r6 >> t2 >> r7 >> r8 >> r9 >> t3;
-
       Eigen::Affine3f pose = Eigen::Affine3f::Identity();
-      pose.matrix().block(0,0,3,4) <<
-          r1, r2, r3, t1,
-          r4, r5, r6, t2,
-          r7, r8, r9, t3;
+      poses_file >> pose;
+
       if(poses_file.eof()) {
         break;
       } else {

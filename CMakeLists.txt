@@ -54,7 +54,7 @@ src/PointCloudLine.cpp src/PolarGridOfClouds.cpp src/PoseGraphEdge.cpp src/Termi
 src/VelodynePointCloud.cpp src/Visualizer2D.cpp src/Visualizer3D.cpp
 src/VelodyneSpecification.cpp src/CollarLinesFilter.cpp src/GroundDetectionDataGenerator.cpp
 src/EigenUtils.cpp src/GlobalOptimization.cpp src/common.cpp src/Clustering.cpp src/NormalsEstimation.cpp
-src/SubseqRegistration.cpp)
+src/SubseqRegistration.cpp src/KittiUtils.cpp)
 target_include_directories(but_velodyne PUBLIC ${PROJECT_SOURCE_DIR}/include)
 target_link_libraries(but_velodyne ${PCL_LIBRARIES})
 target_link_libraries(but_velodyne ${OpenCV_LIBS})
@@ -192,6 +192,9 @@ target_link_libraries(cloud-intensities-normalization but_velodyne)
 
 add_executable(pick-sources src/apps/pick-sources.cpp)
 target_link_libraries(pick-sources but_velodyne)
+
+add_executable(visualize-corrections src/apps/visualize-corrections.cpp)
+target_link_libraries(visualize-corrections but_velodyne)
 
 ########################## Loops detection/closure: ##########################
 
