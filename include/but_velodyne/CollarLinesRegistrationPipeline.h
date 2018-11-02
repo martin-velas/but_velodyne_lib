@@ -258,6 +258,7 @@ private:
 
 float registerLineClouds(
     const LineCloud &source, const LineCloud &target,
+    const LineCloud &validation_source, const LineCloud &validation_target,
     const Eigen::Matrix4f &initial_transformation,
     CollarLinesRegistration::Parameters registration_params,
     CollarLinesRegistrationPipeline::Parameters pipeline_params,

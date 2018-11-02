@@ -93,6 +93,7 @@ Eigen::Matrix4f CollarLinesRegistrationPipeline::registerTwoGrids(const PolarGri
 
 float registerLineClouds(
     const LineCloud &source, const LineCloud &target,
+    const LineCloud &validation_source, const LineCloud &validation_target,
     const Eigen::Matrix4f &initial_transformation,
     CollarLinesRegistration::Parameters registration_params,
     CollarLinesRegistrationPipeline::Parameters pipeline_params,
@@ -101,10 +102,9 @@ float registerLineClouds(
   Termination termination(pipeline_params.minIterations, pipeline_params.maxIterations,
       pipeline_params.maxTimeSpent, pipeline_params.significantErrorDeviation,
       pipeline_params.targetError);
-  LineCloud dummy_validation_line_cloud;
 
   float error = registerLineClouds(source, target,
-      dummy_validation_line_cloud, dummy_validation_line_cloud,
+      validation_source, validation_target,
       initial_transformation, registration_params, pipeline_params,
       FROM_ORIGIN,
       termination, output_transformation);

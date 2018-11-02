@@ -14,23 +14,35 @@ using namespace pcl;
 
 namespace but_velodyne {
 
-Eigen::Affine3f SubseqRegistration::run() {
-  return Eigen::Affine3f(
-      registerLineClouds(src_lines, trg_lines,
-                         estimated_transform.matrix(),
-                         registration_params, params));
+SubseqRegistration::SubseqRegistration(const LineCloud &src_lines_, const LineCloud &trg_lines_,
+    const Eigen::Affine3f &init_transform_,
+    CollarLinesRegistrationPipeline::Parameters &params_,
+    CollarLinesRegistration::Parameters &registration_params_) :
+  src_lines(src_lines_), trg_lines(trg_lines_),
+  params(params_), registration_params(registration_params_),
+  estimated_transform(init_transform_), term_reason(Termination::NO),
+  validation_src_lines(LineCloud()), validation_trg_lines(LineCloud()) {
 }
 
-Eigen::Matrix4f SubseqRegistration::registerLineClouds(
-    const LineCloud &source, const LineCloud &target,
-    const Eigen::Matrix4f &initial_transformation,
-    CollarLinesRegistration::Parameters registration_params,
-    CollarLinesRegistrationPipeline::Parameters pipeline_params) {
+SubseqRegistration::SubseqRegistration(const LineCloud &src_lines_, const LineCloud &trg_lines_,
+    const LineCloud &validation_src_lines_, const LineCloud &validation_trg_lines_,
+    const Eigen::Affine3f &init_transform_,
+    CollarLinesRegistrationPipeline::Parameters &params_,
+    CollarLinesRegistration::Parameters &registration_params_) :
+  src_lines(src_lines_), trg_lines(trg_lines_),
+  params(params_), registration_params(registration_params_),
+  estimated_transform(init_transform_), term_reason(Termination::NO),
+  validation_src_lines(validation_src_lines_), validation_trg_lines(validation_trg_lines_) {
+}
+
+Eigen::Affine3f SubseqRegistration::run() {
   Eigen::Matrix4f transformation;
-  but_velodyne::registerLineClouds(source, target, initial_transformation,
-      registration_params, pipeline_params,
+  but_velodyne::registerLineClouds(src_lines, trg_lines,
+      validation_src_lines, validation_trg_lines,
+      estimated_transform.matrix(),
+      registration_params, params,
       transformation, term_reason);
-  return transformation;
+  return Eigen::Affine3f(transformation);
 }
 
 ManualSubseqRegistration::ManualSubseqRegistration(const LineCloud &src_lines_, const LineCloud &trg_lines_,
@@ -42,6 +54,23 @@ ManualSubseqRegistration::ManualSubseqRegistration(const LineCloud &src_lines_, 
       init_transform_,
       params_, registration_params_),
   split_idx(src_lines_.line_cloud.size()), visualizer(visualizer_) {
+
+  pclVis = visualizer->getViewer();
+  pclVis->registerPointPickingCallback(&ManualSubseqRegistration::pickPointCallback, *this);
+  pclVis->registerKeyboardCallback(&ManualSubseqRegistration::keyCallback, *this);
+}
+
+ManualSubseqRegistration::ManualSubseqRegistration(const LineCloud &src_lines_, const LineCloud &trg_lines_,
+    const LineCloud &validation_src_lines_, const LineCloud &validation_trg_lines_,
+    const Eigen::Affine3f &init_transform_,
+    CollarLinesRegistrationPipeline::Parameters &params_,
+    CollarLinesRegistration::Parameters &registration_params_,
+    Visualizer3D::Ptr visualizer_) :
+  SubseqRegistration(src_lines_, trg_lines_,
+      validation_src_lines_, validation_trg_lines_,
+      init_transform_,
+      params_, registration_params_),
+  split_idx(src_lines_.line_cloud.size()), visualizer(visualizer_){
 
   pclVis = visualizer->getViewer();
   pclVis->registerPointPickingCallback(&ManualSubseqRegistration::pickPointCallback, *this);
@@ -141,8 +170,13 @@ void ManualSubseqRegistration::estimateManualTransform() {
 void ManualSubseqRegistration::runAutomaticRegistration(CollarLinesRegistration::Threshold th_type) {
   PCL_DEBUG("Running automatic transformation estimation using CLS ...\n");
   registration_params.distance_threshold = th_type;
-  estimated_transform = Eigen::Affine3f(registerLineClouds(src_lines, trg_lines,
-      estimated_transform.matrix(), registration_params, params));
+  Eigen::Matrix4f estimated_matrix;
+  but_velodyne::registerLineClouds(src_lines, trg_lines,
+      validation_src_lines, validation_trg_lines,
+      estimated_transform.matrix(),
+      registration_params, params,
+      estimated_matrix, term_reason);
+  estimated_transform = Eigen::Affine3f(estimated_matrix);
 }
 
 } /* namespace but_velodyne */

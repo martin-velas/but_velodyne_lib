@@ -19,11 +19,13 @@ public:
   SubseqRegistration(const LineCloud &src_lines_, const LineCloud &trg_lines_,
       const Eigen::Affine3f &init_transform_,
       CollarLinesRegistrationPipeline::Parameters &params_,
-      CollarLinesRegistration::Parameters &registration_params_) :
-    src_lines(src_lines_), trg_lines(trg_lines_),
-    params(params_), registration_params(registration_params_),
-    estimated_transform(init_transform_), term_reason(Termination::NO) {
-  }
+      CollarLinesRegistration::Parameters &registration_params_);
+
+  SubseqRegistration(const LineCloud &src_lines_, const LineCloud &trg_lines_,
+      const LineCloud &validation_src_lines_, const LineCloud &validation_trg_lines_,
+      const Eigen::Affine3f &init_transform_,
+      CollarLinesRegistrationPipeline::Parameters &params_,
+      CollarLinesRegistration::Parameters &registration_params_);
 
   virtual ~SubseqRegistration() {}
 
@@ -35,22 +37,24 @@ public:
 
 protected:
 
-  Eigen::Matrix4f registerLineClouds(
-      const LineCloud &source, const LineCloud &target,
-      const Eigen::Matrix4f &initial_transformation,
-      CollarLinesRegistration::Parameters registration_params,
-      CollarLinesRegistrationPipeline::Parameters pipeline_params);
-
   Eigen::Affine3f estimated_transform;
   LineCloud src_lines, trg_lines;
   CollarLinesRegistrationPipeline::Parameters params;
   CollarLinesRegistration::Parameters registration_params;
   Termination::Reason term_reason;
+  LineCloud validation_src_lines, validation_trg_lines;
 };
 
 class ManualSubseqRegistration : public SubseqRegistration {
 public:
   ManualSubseqRegistration(const LineCloud &src_lines_, const LineCloud &trg_lines_,
+      const Eigen::Affine3f &init_transform_,
+      CollarLinesRegistrationPipeline::Parameters &params_,
+      CollarLinesRegistration::Parameters &registration_params_,
+      Visualizer3D::Ptr visualizer_ = Visualizer3D::Ptr(new Visualizer3D));
+
+  ManualSubseqRegistration(const LineCloud &src_lines_, const LineCloud &trg_lines_,
+      const LineCloud &validation_src_lines_, const LineCloud &validation_trg_lines_,
       const Eigen::Affine3f &init_transform_,
       CollarLinesRegistrationPipeline::Parameters &params_,
       CollarLinesRegistration::Parameters &registration_params_,

@@ -179,20 +179,29 @@ int main(int argc, char** argv) {
     return EXIT_FAILURE;
   }
 
-  LineCloud src_lines, trg_lines;
+  LineCloud src_lines, trg_lines, validation_src_lines, validation_trg_lines;
   buildLineCloud(src_clouds_filenames, src_poses,
       calibration,
       pipeline_parameters.linesPerCellGenerated, pipeline_parameters.linesPerCellPreserved,
       src_lines);
+  buildLineCloud(src_clouds_filenames, src_poses,
+      calibration,
+      pipeline_parameters.linesPerCellGenerated, pipeline_parameters.linesPerCellPreserved,
+      validation_src_lines);
   buildLineCloud(trg_clouds_filenames, trg_poses,
       calibration,
       pipeline_parameters.linesPerCellGenerated, pipeline_parameters.linesPerCellPreserved,
       trg_lines);
+  buildLineCloud(trg_clouds_filenames, trg_poses,
+      calibration,
+      pipeline_parameters.linesPerCellGenerated, pipeline_parameters.linesPerCellPreserved,
+      validation_trg_lines);
 
   Eigen::Affine3f t;
   Termination::Reason term_reason;
   if(manual) {
     ManualSubseqRegistration registration(src_lines, trg_lines,
+        validation_src_lines, validation_trg_lines,
         init_transform,
         pipeline_parameters,
         registration_parameters);
@@ -200,6 +209,7 @@ int main(int argc, char** argv) {
     term_reason = registration.getTerminationReason();
   } else {
     SubseqRegistration registration(src_lines, trg_lines,
+        validation_src_lines, validation_trg_lines,
         init_transform,
         pipeline_parameters,
         registration_parameters);
