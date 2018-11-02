@@ -41,6 +41,10 @@ include_directories(EIGEN3_INCLUDE_DIR)
 FIND_PACKAGE(Boost 1.40 COMPONENTS program_options REQUIRED )
 INCLUDE_DIRECTORIES( ${Boost_INCLUDE_DIR} )
 
+# Locate GTest
+find_package(GTest REQUIRED)
+include_directories(${GTEST_INCLUDE_DIRS})
+
 ########################### Library: #########################################
 
 file(GLOB header_files ${CMAKE_CURRENT_SOURCE_DIR}/include/but_velodyne/*.h)
@@ -59,6 +63,14 @@ target_include_directories(but_velodyne PUBLIC ${PROJECT_SOURCE_DIR}/include)
 target_link_libraries(but_velodyne ${PCL_LIBRARIES})
 target_link_libraries(but_velodyne ${OpenCV_LIBS})
 target_link_libraries(but_velodyne ${Boost_LIBRARIES})
+
+########################### Tests: #########################################
+
+file(MAKE_DIRECTORY ${EXECUTABLE_OUTPUT_PATH}/tests)
+
+# Link runTests with what we want to test and the GTest and pthread library
+add_executable(tests/RegistrationCrossValidation-test src/tests/RegistrationCrossValidation-test.cpp)
+target_link_libraries(tests/RegistrationCrossValidation-test ${GTEST_LIBRARIES} pthread but_velodyne)
 
 ########################### Odometry estimation: #############################
 
