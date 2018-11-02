@@ -143,9 +143,6 @@ target_link_libraries(estimate-gmm-ransac-planes but_velodyne)
 add_executable(pcl_labels_viewer src/apps/pcl_labels_viewer)
 target_link_libraries(pcl_labels_viewer but_velodyne)
 
-add_executable(cls-registration-of-picked-frames src/apps/cls-registration-of-picked-frames)
-target_link_libraries(cls-registration-of-picked-frames but_velodyne)
-
 add_executable(pcl_subsample_normals src/apps/pcl_subsample_normals.cpp)
 target_link_libraries(pcl_subsample_normals but_velodyne)
 
