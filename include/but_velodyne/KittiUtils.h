@@ -39,6 +39,8 @@ namespace but_velodyne
 
 std::istream& operator>>(std::istream &stream, Eigen::Affine3f &pose);
 
+std::ostream& operator<<(std::ostream &stream, const Eigen::Affine3f &pose);
+
 /**!
  * Auxiliary class for handling KITTI pose files
  */
@@ -132,12 +134,7 @@ public:
   }
 
 	static void printPose(std::ostream &ofs, const Eigen::Matrix4f &pose) {
-		const Eigen::Matrix4f::Scalar *poseArray = pose.data();
-		ofs << poseArray[0] << " " << poseArray[4] << " " << poseArray[8] << " "
-				<< poseArray[12] << " " << poseArray[1] << " " << poseArray[5] << " "
-				<< poseArray[9] << " " << poseArray[13] << " " << poseArray[2] << " "
-				<< poseArray[6] << " " << poseArray[10] << " " << poseArray[14]
-				<< std::endl;
+	  ofs << Eigen::Affine3f(pose) << std::endl;
 	}
 };
 

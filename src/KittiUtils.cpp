@@ -45,4 +45,12 @@ std::istream& operator>>(std::istream &stream, Eigen::Affine3f &pose) {
   return stream;
 }
 
+std::ostream& operator<<(std::ostream &stream, const Eigen::Affine3f &pose) {
+  const Eigen::Matrix4f::Scalar *poseArray = pose.matrix().data();
+  stream << poseArray[0] << " " << poseArray[4] << " " << poseArray[8] << " " << poseArray[12] << " "
+         << poseArray[1] << " " << poseArray[5] << " " << poseArray[9] << " " << poseArray[13] << " "
+         << poseArray[2] << " " << poseArray[6] << " " << poseArray[10] << " " << poseArray[14];
+  return stream;
+}
+
 } /* namespace but_velodyne */
