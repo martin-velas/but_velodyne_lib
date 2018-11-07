@@ -240,11 +240,6 @@ target_link_libraries(pose-graph-viewer but_velodyne)
 add_executable(cloud-eraser-from-seq src/apps/cloud-eraser-from-seq.cpp)
 target_link_libraries(cloud-eraser-from-seq but_velodyne)
 
-########################## RANSAC registration (visual features): ############
-
-add_executable(manual-registration src/apps/manual-registration.cpp)
-target_link_libraries(manual-registration but_velodyne)
-
 ########################## Moving object detection: ##########################
 
 add_executable(move-detection src/apps/move-detection.cpp)
