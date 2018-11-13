@@ -26,17 +26,41 @@
 
 #include <but_velodyne/Termination.h>
 
+namespace po = boost::program_options;
+
 namespace but_velodyne
 {
 
-Termination::Termination(int min_iterations, int max_iterations, float max_time_spent,
-            float min_err_deviation, float min_error) :
-              err_deviation(min_iterations), validation_err_deviation(min_iterations),
-              min_error(min_error), max_time_spent(max_time_spent), max_iterations(max_iterations),
-              min_iterations(min_iterations), iterations(0), min_err_deviation(min_err_deviation), reason(NO) {
+const float Termination::UNKNOWN_ERROR = INFINITY;
+
+void Termination::Parameters::prepareForLoading(po::options_description &options_desc) {
+  options_desc.add_options()
+    ("min_iterations", po::value<int>(&this->minIterations)->default_value(this->minIterations),
+        "Minimal number of registration iterations (similar to ICP iterations)")
+    ("max_iterations", po::value<int>(&this->maxIterations)->default_value(this->maxIterations),
+        "Maximal number of registration iterations")
+    ("max_time_for_registration", po::value<float>(&this->maxTimeSpent)->default_value(this->maxTimeSpent),
+        "Maximal time for registration [sec]")
+    ("iterations_per_sampling", po::value<int>(&this->iterationsPerSampling)->default_value(this->iterationsPerSampling),
+        "After how many iterations the cloud should be re-sampled by the new collar line segments")
+    ("target_error", po::value<float>(&this->targetError)->default_value(this->targetError),
+        "Minimal error (average distance of line matches) causing termination of registration")
+    ("significant_error_deviation", po::value<float>(&this->significantErrorDeviation)->default_value(this->significantErrorDeviation),
+        "If standard deviation of error from last N=min_iterations iterations if below this value - registration is terminated")
+    ("target_validation_error", po::value<float>(&this->targetValidationError)->default_value(this->targetValidationError),
+        "Minimal validation error (average distance of line matches) causing termination of registration")
+    ("significant_validation_error_deviation", po::value<float>(&this->significantValidationErrorDeviation)->default_value(this->significantValidationErrorDeviation),
+        "If standard deviation of validation error from last N=min_iterations iterations is below this value - registration is terminated")
+  ;
+}
+
+Termination::Termination(const Parameters &term_params_) :
+              term_params(term_params_),
+              err_deviation(term_params_.minIterations), validation_err_deviation(term_params_.minIterations),
+              iterations(0), reason(NO) {
   stopwatch.restart();
-  last_error = INFINITY;
-  validation_last_error = INFINITY;
+  last_error = UNKNOWN_ERROR;
+  validation_last_error = UNKNOWN_ERROR;
 }
 
 void Termination::addNewError(float new_error, float validation_error) {
@@ -49,21 +73,21 @@ void Termination::addNewError(float new_error, float validation_error) {
 
 bool Termination::operator()() {
 
-  if (iterations < min_iterations) {
+  if (iterations < term_params.minIterations) {
     reason = NO;
-  } else if(iterations >= max_iterations) {
+  } else if(iterations >= term_params.maxIterations) {
     reason = ITERATIONS;
-  } else if(stopwatch.elapsed() > max_time_spent) {
+  } else if(stopwatch.elapsed() > term_params.maxTimeSpent) {
     reason = TIME;
-  } else if(!err_deviation.isSignificant(min_err_deviation)) {
+  } else if(!err_deviation.isSignificant(term_params.significantErrorDeviation)) {
     reason = ERR_DEVIATION;
-  } else if(last_error < min_error) {
+  } else if(last_error < term_params.targetError) {
     reason = ERROR;
   } else {
     if(!isinf(validation_last_error)) {
-      if(!validation_err_deviation.isSignificant(min_err_deviation)) {
+      if(!validation_err_deviation.isSignificant(term_params.significantValidationErrorDeviation)) {
         reason = VALIDATION_ERR_DEVIATION;
-      } else if(validation_last_error < min_error) {
+      } else if(validation_last_error < term_params.targetValidationError) {
         reason = VALIDATION_ERROR;
       } else {
         reason = NO;
@@ -88,18 +112,27 @@ bool Termination::operator()() {
   return reason != NO;
 }
 
-float ErrorDeviation::getDeviation() const {
+float ErrorDeviation::getDeviation() {
+  if(computed_deviation_valid) {
+    return computed_deviation;
+  }
   float sum_squares = 0;
   float mean = getMean();
   for(boost::circular_buffer<float>::const_iterator e = last_errors.begin();
       e < last_errors.end(); e++) {
     sum_squares += pow(*e - mean, 2);
   }
-  return sqrt(sum_squares / last_errors.size());
+  computed_deviation = sqrt(sum_squares / last_errors.size());
+  computed_deviation_valid = true;
+  return computed_deviation;
 }
 
 float ErrorDeviation::getMean() const {
   return std::accumulate(last_errors.begin(), last_errors.end(), 0.0) / last_errors.size();
+}
+
+ostream& operator<<(ostream &stream, const Termination::Reason &reason) {
+  return (stream << Termination::reasonToString(reason));
 }
 
 } /* namespace but_velodyne */

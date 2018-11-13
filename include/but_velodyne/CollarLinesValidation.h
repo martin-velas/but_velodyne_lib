@@ -23,8 +23,6 @@ public:
 
   float computeError(const Eigen::Matrix4f &transformation);
 
-  static const float UNKNOWN_ERROR;
-
 private:
 
   const LineCloud src_cloud, trg_cloud;

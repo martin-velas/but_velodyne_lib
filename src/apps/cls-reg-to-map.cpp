@@ -162,9 +162,7 @@ protected:
 
   Eigen::Matrix4f registerLineCloud(const LineCloud &target,
       const Eigen::Matrix4f &initial_transformation) {
-    Termination termination(params.minIterations, params.maxIterations,
-        params.maxTimeSpent, params.significantErrorDeviation,
-        params.targetError);
+    Termination termination(params.term_params);
     Eigen::Matrix4f transformation = initial_transformation;
     while (!termination()) {
       CollarLinesRegistration icl_fitting(lines_map.all_lines, map_kdtree, target,
@@ -206,7 +204,7 @@ bool parse_arguments(int argc, char **argv,
   registration_parameters.prepareForLoading(desc);
   pipeline_parameters.linesPerCellGenerated = 10;
   pipeline_parameters.linesPerCellPreserved = 1;
-  pipeline_parameters.maxIterations = 1000;
+  pipeline_parameters.term_params.maxIterations = 1000;
   pipeline_parameters.prepareForLoading(desc);
   desc.add_options()
     ("help,h", "produce help message")

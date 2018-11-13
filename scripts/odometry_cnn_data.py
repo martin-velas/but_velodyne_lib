@@ -125,7 +125,7 @@ def load_poses_corrections(in_file):
     for line in in_file.readlines():
         tokens = line.split()
         src_i, trg_i = map(int, tokens[0:2])
-        kitti_pose = map(float, tokens[2:])
+        kitti_pose = map(float, tokens[2:14])
         o = Odometry(kitti_pose)
         corrections.append({"src_i":src_i, "trg_i":trg_i, "pose":o})
     return corrections

@@ -5,11 +5,10 @@
  *      Author: Martin Velas (ivelas@fit.vutbr.cz)
  */
 
+#include <but_velodyne/Termination.h>
 #include <but_velodyne/CollarLinesValidation.h>
 
 namespace but_velodyne {
-
-const float CollarLinesValidation::UNKNOWN_ERROR = INFINITY;
 
 CollarLinesValidation::CollarLinesValidation(const LineCloud &src_cloud_, const LineCloud &trg_cloud_,
     const CollarLinesRegistration::Parameters &registration_params_) :
@@ -25,7 +24,7 @@ bool CollarLinesValidation::isCapable(void) const {
 
 float CollarLinesValidation::computeError(const Eigen::Matrix4f &transformation) {
   if(!isCapable()) {
-    return UNKNOWN_ERROR;
+    return Termination::UNKNOWN_ERROR;
   }
   CollarLinesRegistration cls_validation(src_cloud, src_kdtree,
       trg_cloud, registration_params, transformation);

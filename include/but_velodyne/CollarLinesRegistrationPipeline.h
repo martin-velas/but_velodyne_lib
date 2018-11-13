@@ -110,21 +110,33 @@ private:
 
 class RegistrationOutcome {
 public:
-  RegistrationOutcome(void) : term_reason(Termination::NO), error(-1.0f) {
+  RegistrationOutcome(void) : term_reason(Termination::NO),
+    error(Termination::UNKNOWN_ERROR), error_deviation(Termination::UNKNOWN_ERROR),
+    validation_error(Termination::UNKNOWN_ERROR), validation_error_deviation(Termination::UNKNOWN_ERROR) {
   }
 
   RegistrationOutcome(const Eigen::Affine3f &transformation_, const Termination::Reason term_reason_,
-      const float error_) : transformation(transformation_), term_reason(term_reason_), error(error_) {
+      const float error_, const float error_deviation_ = Termination::UNKNOWN_ERROR,
+      const float validation_error_ = Termination::UNKNOWN_ERROR,
+      const float validation_error_deviation_ = Termination::UNKNOWN_ERROR)
+  : transformation(transformation_), term_reason(term_reason_),
+    error(error_), error_deviation(error_deviation_),
+    validation_error(validation_error_), validation_error_deviation(validation_error_deviation_) {
   }
 
   bool operator<(const RegistrationOutcome &other) {
-    return this->error < other.error;
+    if(!isnan(this->validation_error) && !isnan(other.validation_error))
+      return this->validation_error < other.validation_error;
+    else
+      return this->error < other.error;
   }
 
   Eigen::Affine3f transformation;
   Termination::Reason term_reason;
-  float error;
+  float error, error_deviation, validation_error, validation_error_deviation;
 };
+
+ostream& operator<<(ostream &stream, const RegistrationOutcome &outcome);
 
 /**!
  * Registration of multiple Velodyne LiDAR point clouds (sequence).
@@ -140,40 +152,29 @@ public:
     Parameters(
         int linesPerCellGenerated_ = 20,
         int linesPerCellPreserved_ = 5,
-        int minIterations_ = 20,
-        int maxIterations_ = 500,
-        int maxTimeSpent_ = 20,  // sec
-        int iterationsPerSampling_ = 1000,       // (iterationsPerSampling > maxIterations) causes no resampling
-        float targetError_ = 0.01,
-        float significantErrorDeviation_ = 0.0001,
         int historySize_ = 1,
         bool pick_by_lowest_error_ = false,
-        int nfolds_ = 1)
+        int nfolds_ = 1,
+        Termination::Parameters term_params_ = Termination::Parameters(),
+        bool verbose_ = false)
     :
       linesPerCellGenerated(linesPerCellGenerated_),
       linesPerCellPreserved(linesPerCellPreserved_),
-      minIterations(minIterations_),
-      maxIterations(maxIterations_),
-      maxTimeSpent(maxTimeSpent_),
-      iterationsPerSampling(iterationsPerSampling_),
-      targetError(targetError_),
-      significantErrorDeviation(significantErrorDeviation_),
       historySize(historySize_),
       pick_by_lowest_error(pick_by_lowest_error_),
-      nfolds(nfolds_) {
+      nfolds(nfolds_),
+      term_params(term_params_),
+      verbose(verbose_) {
     }
 
     int linesPerCellGenerated;  /// how many collar lines are generated per polar bin
     int linesPerCellPreserved;  /// how many collar lines are preserved within each bin
-    int minIterations;                  /// minimal number of algorithm iterations
-    int maxIterations;                  /// algorithm is terminated after maxIterations is reached
-    int maxTimeSpent;                   /// algorithm is terminated after maxTimeSpent seconds
-    int iterationsPerSampling;          /// point cloud is re-sampled by collar lines after N iterations
-    float targetError;                  /// algorithm is terminated when error is smaller
-    float significantErrorDeviation;    /// algorithm is terminated when standard deviation of error is smaller
     int historySize;                    /// number of previous frames used for multi-view approach
     bool pick_by_lowest_error;
     int nfolds;
+    bool verbose;
+
+    Termination::Parameters term_params;
 
     void prepareForLoading(boost::program_options::options_description &options_desc);
 
@@ -215,6 +216,18 @@ public:
    */
   void output(const Eigen::Matrix4f &transformation);
 
+  void registerTwoGrids(const PolarGridOfClouds &source,
+                        const PolarGridOfClouds &target,
+                        Eigen::Matrix4f initial_transformation,
+                        RegistrationOutcome &output);
+
+  void registerLineClouds(const LineCloud &source_line_cloud,
+                          const LineCloud &target_line_cloud,
+                          const LineCloud &validation_source_line_cloud,
+                          const LineCloud &validation_target_line_cloud,
+                          const Eigen::Matrix4f &initial_transformation,
+                          Termination &termination, RegistrationOutcome &result);
+
 protected:
 
   Eigen::Matrix4f getPrediction();
@@ -223,18 +236,6 @@ protected:
       const PolarGridOfClouds::Ptr &target_grid_cloud);
 
   void printInfo(float time, Eigen::Matrix4f t, float error);
-
-  Eigen::Matrix4f registerTwoGrids(const PolarGridOfClouds &source,
-                                   const PolarGridOfClouds &target,
-                                   const Eigen::Matrix4f &initial_transformation,
-                                   float &error);
-
-  Eigen::Matrix4f registerLineClouds(const LineCloud &source_line_cloud,
-                                     const LineCloud &target_line_cloud,
-                                     const LineCloud &validation_source_line_cloud,
-                                     const LineCloud &validation_target_line_cloud,
-                                     const Eigen::Matrix4f &initial_transformation,
-                                     Termination &termination, float &final_error);
 
   void updateHistory(const PolarGridOfClouds::Ptr target_polar_grid,
                      Eigen::Matrix4f transformation);
@@ -270,8 +271,7 @@ float registerLineClouds(
     const Eigen::Matrix4f &initial_transformation,
     const CollarLinesRegistration::Parameters &registration_params,
     const CollarLinesRegistrationPipeline::Parameters &pipeline_params,
-    const TransformationCumulation cummulation,
-    Termination &termination, Eigen::Matrix4f &out_transformation);
+    Termination &termination, RegistrationOutcome &result);
 
 } /* namespace but_velodyne */
 

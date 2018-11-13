@@ -219,7 +219,8 @@ int main(int argc, char** argv) {
   KittiUtils::printPose(std::cout, t.matrix());
 
   cerr << Termination::reasonToString(term_reason) << endl;
-  if(fail_when_not_converged && term_reason != Termination::ERR_DEVIATION && term_reason != Termination::ERROR) {
+  if(fail_when_not_converged && term_reason != Termination::ERR_DEVIATION && term_reason != Termination::ERROR
+      && term_reason != Termination::VALIDATION_ERROR && term_reason != Termination::VALIDATION_ERR_DEVIATION) {
     return EXIT_FAILURE;
   }
 

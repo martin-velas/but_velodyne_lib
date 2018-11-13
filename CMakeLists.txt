@@ -77,6 +77,9 @@ target_link_libraries(tests/RegistrationCrossValidation-test ${GTEST_LIBRARIES} 
 add_executable(collar-lines-odom src/apps/collar-lines-odom.cpp)
 target_link_libraries(collar-lines-odom but_velodyne)
 
+add_executable(collar-lines-registration src/apps/collar-lines-registration.cpp)
+target_link_libraries(collar-lines-registration but_velodyne)
+
 add_executable(translation-by-mean src/apps/translation-by-mean.cpp)
 target_link_libraries(translation-by-mean but_velodyne)
 

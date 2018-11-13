@@ -102,10 +102,6 @@ void CollarLinesRegistration::Parameters::prepareForLoading(po::options_descript
           "Normalize error by the portion of lines taken for registration. Median threshold will cause error/=0.5.")
       ("line_weightning", po::value<CollarLinesRegistration::Weights>(&this->weighting)->default_value(this->weighting),
           "How the weights are assigned to the line matches - prefer vertical lines, close or treat matches as equal. Possible values: DISTANCE_WEIGHTS|VERTICAL_ANGLE_WEIGHTS|NO_WEIGHTS")
-      ("shifts_per_match", po::value<int>(&this->correnspPerLineMatch)->default_value(this->correnspPerLineMatch),
-          "[Experimental] How many shift vectors (for SVD) are generated per line match - each is amended by small noise")
-      ("shifts_noise_sigma", po::value<float>(&this->lineCorrenspSigma)->default_value(this->lineCorrenspSigma),
-          "[Experimental] Deviation of noise generated for shift vectors (see above)")
       ("translation_only", po::bool_switch(&this->estimate_translation_only),
           "Estimate only the translation (rotation should be presented as the initial pose)")
       ("no_roll_pitch", po::bool_switch(&this->dont_estimate_roll_pitch),
@@ -123,8 +119,8 @@ float CollarLinesRegistration::refine() {
   matching_time += watch.elapsed();
 
   watch.restart();
-  MatrixOfPoints source_coresp_points(size_t(TPoint3D::RowsAtCompileTime), matches.size()*params.correnspPerLineMatch);
-  MatrixOfPoints target_coresp_points(size_t(TPoint3D::RowsAtCompileTime), matches.size()*params.correnspPerLineMatch);
+  MatrixOfPoints source_coresp_points(size_t(TPoint3D::RowsAtCompileTime), matches.size());
+  MatrixOfPoints target_coresp_points(size_t(TPoint3D::RowsAtCompileTime), matches.size());
   getCorrespondingPoints(source_coresp_points, target_coresp_points);
   correnspondences_time += watch.elapsed();
 
@@ -146,10 +142,8 @@ float CollarLinesRegistration::refine() {
 float CollarLinesRegistration::computeError() {
   findClosestMatchesByMiddles();
 
-  MatrixOfPoints source_coresp_points(size_t(TPoint3D::RowsAtCompileTime),
-                                      matches.size()*params.correnspPerLineMatch);
-  MatrixOfPoints target_coresp_points(size_t(TPoint3D::RowsAtCompileTime),
-                                      matches.size()*params.correnspPerLineMatch);
+  MatrixOfPoints source_coresp_points(size_t(TPoint3D::RowsAtCompileTime), matches.size());
+  MatrixOfPoints target_coresp_points(size_t(TPoint3D::RowsAtCompileTime), matches.size());
   getCorrespondingPoints(source_coresp_points, target_coresp_points);
 
   float error = computeError(source_coresp_points, target_coresp_points,
@@ -163,12 +157,12 @@ float CollarLinesRegistration::computeError(
     const Matrix4f &transformation) {
   typedef Eigen::Matrix<TPoint3D::Scalar, TPoint3D::RowsAtCompileTime+1, Eigen::Dynamic> MatrixOfHomogeniousPoints;
   MatrixOfHomogeniousPoints target_points_transformed =
-      MatrixOfHomogeniousPoints::Ones(TPoint3D::RowsAtCompileTime+1, matches.size()*params.correnspPerLineMatch);
-  target_points_transformed.block(0, 0, 3, matches.size()*params.correnspPerLineMatch) = target_coresp_points;
+      MatrixOfHomogeniousPoints::Ones(TPoint3D::RowsAtCompileTime+1, matches.size());
+  target_points_transformed.block(0, 0, 3, matches.size()) = target_coresp_points;
   target_points_transformed = transformation * target_points_transformed;
-  MatrixOfPoints difference = source_coresp_points - target_points_transformed.block(0, 0, 3, matches.size()*params.correnspPerLineMatch);
+  MatrixOfPoints difference = source_coresp_points - target_points_transformed.block(0, 0, 3, matches.size());
   VectorXf square_distances = difference.cwiseProduct(difference).transpose() * Vector3f::Ones();
-  float error = (square_distances.cwiseSqrt()).sum() / matches.size()*params.correnspPerLineMatch;
+  float error = (square_distances.cwiseSqrt()).sum() / matches.size();
 
   if(params.normalize_error_by_threshold) {
     error /= thresholdTypeToFraction()*getEffectiveDecay();
@@ -265,47 +259,34 @@ float CollarLinesRegistration::getMatchesMean() {
 void CollarLinesRegistration::getCorrespondingPoints(
     MatrixOfPoints &source_coresp_points,
     MatrixOfPoints &target_coresp_points) {
-  correspondences_weights = VectorXf(matches.size()*params.correnspPerLineMatch);
+  correspondences_weights = VectorXf(matches.size());
   int index = 0;
-  for(vector<DMatch>::iterator match = matches.begin(); match < matches.end(); match++) {
+  for(vector<DMatch>::iterator match = matches.begin(); match < matches.end(); match++, index++) {
     PointCloudLine source_line = source_cloud.line_cloud[match->trainIdx];
     PointCloudLine target_line = target_cloud.line_cloud[match->queryIdx];
 
     Vector3f source_line_pt, target_line_pt;
     source_line.closestPointsWith(target_line, source_line_pt, target_line_pt);
     RNG &rng = theRNG();
-    for(int i = 0; i < params.correnspPerLineMatch; i++, index++) {
 
-      Vector3f source_line_pt_noisy =
-          source_line_pt + source_line.getOrientationOfSize(rng.gaussian(params.lineCorrenspSigma));
-      Vector3f target_line_pt_noisy =
-          target_line_pt + target_line.getOrientationOfSize(rng.gaussian(params.lineCorrenspSigma));
-
-      if(false) {
-        cerr << "source pt: " << source_line_pt_noisy.matrix() << endl;
-        cerr << "target pt: " << target_line_pt_noisy.matrix() << endl;
-        cerr << "--" << endl;
-      }
-
-      if(!(EigenUtils::allFinite(target_line_pt_noisy) && EigenUtils::allFinite(source_line_pt_noisy))) {
-        source_line_pt_noisy = Vector3f(0,0,0);
-        target_line_pt_noisy = Vector3f(0,0,0);
-      }
-
-      source_coresp_points.block(0, index, TPoint3D::RowsAtCompileTime, 1) = source_line_pt_noisy;
-      target_coresp_points.block(0, index, TPoint3D::RowsAtCompileTime, 1) = target_line_pt_noisy;
-
-      float weight;
-      if(params.weighting == VERTICAL_ANGLE_WEIGHTS) {
-        weight = getVerticalWeight(source_line.orientation, target_line.orientation);
-      } else if(params.weighting == DISTANCE_WEIGHTS) {
-        weight = 1/match->distance;
-      } else {
-        assert(params.weighting == NO_WEIGHTS);
-        weight = 1;
-      }
-      correspondences_weights.data()[index] = weight;
+    if(!(EigenUtils::allFinite(target_line_pt) && EigenUtils::allFinite(source_line_pt))) {
+      source_line_pt = Vector3f(0,0,0);
+      target_line_pt = Vector3f(0,0,0);
     }
+
+    source_coresp_points.block(0, index, TPoint3D::RowsAtCompileTime, 1) = source_line_pt;
+    target_coresp_points.block(0, index, TPoint3D::RowsAtCompileTime, 1) = target_line_pt;
+
+    float weight;
+    if(params.weighting == VERTICAL_ANGLE_WEIGHTS) {
+      weight = getVerticalWeight(source_line.orientation, target_line.orientation);
+    } else if(params.weighting == DISTANCE_WEIGHTS) {
+      weight = 1.0/match->distance;
+    } else {
+      assert(params.weighting == NO_WEIGHTS);
+      weight = 1.0;
+    }
+    correspondences_weights.data()[index] = weight;
   }
 
   /* visualisation:
@@ -335,7 +316,7 @@ float CollarLinesRegistration::sinOfAngleWithGround(const Vector3f &orientation)
 void CollarLinesRegistration::getWeightingMatrix(WeightsMatrix &weighting_matrix) {
   if(correspondences_weights.size() == 0) {
     weighting_matrix.setIdentity();
-    weighting_matrix.diagonal() /= (float)matches.size()*params.correnspPerLineMatch;
+    weighting_matrix.diagonal() /= (float)matches.size();
     return;
   }
 
@@ -457,14 +438,8 @@ void CollarLinesRegistration::showLinesCorrenspondences() {
   visualizer.show();
 }
 
-const Eigen::Matrix4f CollarLinesRegistration::getTransformation(const TransformationCumulation cummulation_type) const {
-  if(cummulation_type == FROM_LAST_POSE) {
-    return initial_transformation*transformation;
-  } else if(cummulation_type == FROM_ORIGIN) {
-    return transformation*initial_transformation;
-  } else {
-    throw invalid_argument("Unknown TransformationCumulation type.");
-  }
+const Eigen::Matrix4f CollarLinesRegistration::getTransformation(void) const {
+  return transformation*initial_transformation;
 }
 
 } /* namespace but_velodyne */

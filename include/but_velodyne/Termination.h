@@ -25,6 +25,7 @@
 #define TERMINATION_H_
 
 #include <boost/circular_buffer.hpp>
+#include <boost/program_options.hpp>
 
 #include <but_velodyne/Stopwatch.h>
 #include <but_velodyne/CollarLinesValidation.h>
@@ -42,7 +43,7 @@ public:
    * @param iterations how many iterations should be considered
    */
   ErrorDeviation(int iterations) :
-    last_errors(iterations) {
+    last_errors(iterations), computed_deviation(-1.0f), computed_deviation_valid(false) {
   }
 
   /**!
@@ -52,17 +53,13 @@ public:
    */
   void add(float error) {
     last_errors.push_back(error);
+    computed_deviation_valid = false;
   }
 
   /**!
    * @return the standard deviation of the error in last N iterations
    */
-  float getDeviation() const;
-
-  /**!
-   * @return the mean error of last N iterations
-   */
-  float getMean() const;
+  float getDeviation();
 
   /**!
    * @return true off the error deviation is over the threshold value
@@ -71,8 +68,18 @@ public:
     return (last_errors.size() != last_errors.capacity()) ||
         (getDeviation() > threshold);
   }
+
+protected:
+
+  /**!
+   * @return the mean error of last N iterations
+   */
+  float getMean() const;
+
 private:
   boost::circular_buffer<float> last_errors;
+  float computed_deviation;
+  bool computed_deviation_valid;
 };
 
 /**!
@@ -86,6 +93,41 @@ private:
 class Termination
 {
 public:
+
+  class Parameters {
+  public:
+    Parameters(
+        int minIterations_ = 20,
+        int maxIterations_ = 500,
+        float maxTimeSpent_ = 20,  // sec
+        int iterationsPerSampling_ = 1000,       // (iterationsPerSampling > maxIterations) causes no resampling
+        float targetError_ = 0.01,
+        float targetValidationError_ = 0.01,
+        float significantErrorDeviation_ = 0.0001,
+        float significantValidationErrorDeviation_ = 0.0001)
+    :
+      targetError(targetError_),
+      targetValidationError(targetValidationError_),
+      maxTimeSpent(maxTimeSpent_),
+      maxIterations(maxIterations_),
+      minIterations(minIterations_),
+      significantErrorDeviation(significantErrorDeviation_),
+      significantValidationErrorDeviation(significantValidationErrorDeviation_),
+      iterationsPerSampling(iterationsPerSampling_) {
+    }
+
+    float targetError;
+    float targetValidationError;
+    float maxTimeSpent;
+    int maxIterations;
+    int minIterations;
+    float significantErrorDeviation;
+    float significantValidationErrorDeviation;
+    int iterationsPerSampling;
+
+    void prepareForLoading(boost::program_options::options_description &options_desc);
+
+  } term_params;
 
   typedef enum {
     ERR_DEVIATION,
@@ -128,13 +170,12 @@ public:
    * @param min_err_deviation minimal standard deviation of the error allowed (computed from multiple iterations of algorithm)
    * @param min_error minimal algorithm error
    */
-  Termination(int min_iterations, int max_iterations, float max_time_spent,
-              float min_err_deviation, float min_error);
+  Termination(const Parameters &term_params_);
 
   /**!
    * Add the error from the last algorithm iteration.
    */
-  void addNewError(float error, float validation_error = CollarLinesValidation::UNKNOWN_ERROR);
+  void addNewError(float error, float validation_error = UNKNOWN_ERROR);
 
   /**!
    * @return true if algorithm should be terminated
@@ -145,21 +186,28 @@ public:
     return reason;
   }
 
+  float getErrorDeviation(void) {
+    return err_deviation.getDeviation();
+  }
+
+  float getValidationErrorDeviation(void) {
+    return validation_err_deviation.getDeviation();
+  }
+
+  static const float UNKNOWN_ERROR;
+
 private:
   Stopwatch stopwatch;
   ErrorDeviation err_deviation;
   ErrorDeviation validation_err_deviation;
-  const float min_error;
-  const float max_time_spent;
-  const float max_iterations;
-  const float min_iterations;
-  const float min_err_deviation;
 
   float last_error;
   float validation_last_error;
   int iterations;
   Reason reason;
 };
+
+ostream& operator<<(ostream &stream, const Termination::Reason &reason);
 
 } /* namespace but_velodyne */
 

@@ -37,11 +37,6 @@
 namespace but_velodyne
 {
 
-enum TransformationCumulation {
-  FROM_ORIGIN,
-  FROM_LAST_POSE
-};
-
 /**!
  * Registration of two collar line clouds.
  */
@@ -90,8 +85,6 @@ public:
         float distance_threshold_value_ = NAN,
         bool normalize_error_by_threshold_ = false,
         Weights weighting_ = NO_WEIGHTS,
-        int correnspPerLineMatch_ = 1,
-        float lineCorrenspSigma_ = 0.0001,
         int nearestNeighbors_ = 1,
         bool estimate_translation_only_ = false,
         bool dont_estimate_roll_pitch_ = false) :
@@ -100,8 +93,6 @@ public:
         distance_threshold_value(distance_threshold_value_),
         normalize_error_by_threshold(normalize_error_by_threshold_),
         weighting(weighting_),
-        correnspPerLineMatch(correnspPerLineMatch_),
-        lineCorrenspSigma(lineCorrenspSigma_),
         nearestNeighbors(nearestNeighbors_),
         estimate_translation_only(estimate_translation_only_),
         dont_estimate_roll_pitch(dont_estimate_roll_pitch_) {
@@ -111,8 +102,6 @@ public:
     float distance_threshold_value;
     bool normalize_error_by_threshold;
     Weights weighting;                  /// optional weighting of line matches
-    int correnspPerLineMatch;           /// [Experimental] how many corresponding points are generated per line match
-    float lineCorrenspSigma;            /// [Experimental] deviation of Gaussian noise added to the point correspondences
     int nearestNeighbors;
     bool estimate_translation_only;
     bool dont_estimate_roll_pitch;
@@ -175,7 +164,7 @@ public:
   /**!
    * @return transformation estimated so far
    */
-  const Eigen::Matrix4f getTransformation(const TransformationCumulation cummulation_type = FROM_LAST_POSE) const;
+  const Eigen::Matrix4f getTransformation(void) const;
 
   /**!
    * @return refined transformation
