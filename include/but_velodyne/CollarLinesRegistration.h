@@ -66,6 +66,7 @@ public:
       QUARTER_THRESHOLD,
       TENTH_THRESHOLD,
       PERC_99_THRESHOLD,
+      PERC_90_THRESHOLD,
       VALUE_THRESHOLD,
       MEAN_THRESHOLD,           // threshold = mean
       NO_THRESHOLD              // no thresholding - all matches are preserved
@@ -87,7 +88,8 @@ public:
         Weights weighting_ = NO_WEIGHTS,
         int nearestNeighbors_ = 1,
         bool estimate_translation_only_ = false,
-        bool dont_estimate_roll_pitch_ = false) :
+        bool dont_estimate_roll_pitch_ = false,
+        bool rejection_by_line_distances_ = false) :
         distance_threshold(distance_threshold_),
         distance_threshold_decay(distance_threshold_decay_),
         distance_threshold_value(distance_threshold_value_),
@@ -95,7 +97,8 @@ public:
         weighting(weighting_),
         nearestNeighbors(nearestNeighbors_),
         estimate_translation_only(estimate_translation_only_),
-        dont_estimate_roll_pitch(dont_estimate_roll_pitch_) {
+        dont_estimate_roll_pitch(dont_estimate_roll_pitch_),
+        rejection_by_line_distances(rejection_by_line_distances_) {
     }
     Threshold distance_threshold;       /// how is the threshold of line matches distance estimated
     float distance_threshold_decay;
@@ -105,6 +108,7 @@ public:
     int nearestNeighbors;
     bool estimate_translation_only;
     bool dont_estimate_roll_pitch;
+    bool rejection_by_line_distances;
 
     void prepareForLoading(boost::program_options::options_description &options_desc);
 

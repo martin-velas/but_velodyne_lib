@@ -83,6 +83,8 @@ std::istream& operator>> (std::istream &in, CollarLinesRegistration::Threshold &
     thresholding = CollarLinesRegistration::TENTH_THRESHOLD;
   } else if (token == "PERC_99_THRESHOLD") {
     thresholding = CollarLinesRegistration::PERC_99_THRESHOLD;
+  } else if (token == "PERC_90_THRESHOLD") {
+    thresholding = CollarLinesRegistration::PERC_90_THRESHOLD;
   } else {
       throw boost::program_options::validation_error(boost::program_options::validation_error::invalid_option_value,
                                                      "lines_preserved_factor_by");
@@ -108,6 +110,8 @@ void CollarLinesRegistration::Parameters::prepareForLoading(po::options_descript
           "Do not estimate the roll and pitch angles (only the heading and the translation)")
       ("nearest_neighbors", po::value<int>(&this->nearestNeighbors)->default_value(this->nearestNeighbors),
         "How many nearest neighbors (matches) are found for each line of source frame.")
+      ("rejection_by_line_distances", po::bool_switch(&this->rejection_by_line_distances),
+          "Line matches are thresholded by the distances of lines. By default, line midpoints are used.")
   ;
 }
 
@@ -174,7 +178,8 @@ void CollarLinesRegistration::findClosestMatchesByMiddles() {
   matches.clear();
 
   for(int target_index = 0; target_index < target_cloud.line_cloud.size(); target_index++) {
-    PointXYZ target_line_middle = target_cloud.line_middles[target_index];
+    const PointCloudLine &target_line = target_cloud.line_cloud[target_index];
+    const PointXYZ &target_line_middle = target_cloud.line_middles[target_index];
 
     int K = params.nearestNeighbors;
     vector<int> closest_index(K);
@@ -185,7 +190,15 @@ void CollarLinesRegistration::findClosestMatchesByMiddles() {
 
     for(int i = 0; i < matches_count; i++) {
       // distance is actually square of real distance
-      DMatch match(target_index, closest_index[i], min_distance[i]);
+      const int source_index = closest_index[i];
+      float distance;
+      if(params.rejection_by_line_distances) {
+        const PointCloudLine &source_line = source_cloud.line_cloud[source_index];
+        distance = target_line.distanceTo(source_line, PointCloudLine::OF_CLOSEST_POINTS);
+      } else {
+        distance = min_distance[i];
+      }
+      DMatch match(target_index, source_index, distance);
       matches.push_back(match);
     }
   }
@@ -229,6 +242,8 @@ float CollarLinesRegistration::thresholdTypeToFraction(void) const {
     return 0.1;
   case PERC_99_THRESHOLD:
     return 0.99;
+  case PERC_90_THRESHOLD:
+    return 0.90;
   default:
     cerr << "Warning: uknown distance threshold type!" << endl;
     return 0.0;
