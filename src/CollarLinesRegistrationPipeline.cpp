@@ -88,6 +88,7 @@ void CollarLinesRegistrationPipeline::registerTwoGrids(const PolarGridOfClouds &
                          initial_transformation, termination, nfold_outcomes[fold]);
       initial_transformation = nfold_outcomes[fold].transformation.matrix();
     }
+    nfold_outcomes[fold].term_reason = termination.why();
   }
   RegistrationCrossValidation validation(nfold_outcomes);
   output = validation.findBest();
@@ -150,10 +151,13 @@ float registerLineClouds(const LineCloud &source_line_cloud, const LineCloud &ta
     current_result.error_deviation = termination.getErrorDeviation();
     current_result.validation_error_deviation = termination.getValidationErrorDeviation();
     if(pipeline_params.verbose) {
-      cerr << current_result << endl;
+      cerr << "Current result: " << current_result << endl;
     }
     if(!pipeline_params.pick_by_lowest_error || validation_error < output_result.validation_error) {
       output_result = current_result;
+      if(pipeline_params.verbose) {
+        cerr << "Was picked as BEST." << endl;
+      }
     }
   }
   output_result.term_reason = termination.why();
