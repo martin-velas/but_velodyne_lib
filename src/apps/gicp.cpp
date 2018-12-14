@@ -13,17 +13,19 @@
 using namespace std;
 using namespace but_velodyne;
 namespace po = boost::program_options;
+using namespace pcl;
 
 bool parse_arguments(int argc, char **argv,
-    string &source_file, string &target_file) {
+    string &ref_file, string &align_file, bool &visualize) {
 
   po::options_description desc("GICP\n"
       "======================================\n"
       " * Allowed options");
   desc.add_options()
     ("help,h", "produce help message")
-    ("source_cloud,s", po::value<string>(&source_file)->required(), "Source point cloud file *.pcd")
-    ("target_cloud,t", po::value<string>(&target_file)->required(), "Target point cloud file *.pcd")
+    ("reference_cloud,r", po::value<string>(&ref_file)->required(), "Reference point cloud file *.pcd")
+    ("aligned_cloud,a", po::value<string>(&align_file)->required(), "Aligned point cloud file *.pcd")
+    ("visualize,v", po::bool_switch(&visualize), "Turn on visualization")
   ;
 
     po::variables_map vm;
@@ -47,27 +49,44 @@ bool parse_arguments(int argc, char **argv,
 
 int main (int argc, char** argv) {
 
-  string src_filename, trg_filename;
-  if(!parse_arguments(argc, argv, src_filename, trg_filename)) {
+  string ref_filename, align_filename;
+  bool visualize;
+  if(!parse_arguments(argc, argv, ref_filename, align_filename, visualize)) {
     return EXIT_FAILURE;
   }
 
-  pcl::PointCloud<pcl::PointXYZ>::Ptr src_cloud (new pcl::PointCloud<pcl::PointXYZ>);
-  pcl::io::loadPCDFile(src_filename, *src_cloud);
-  pcl::PointCloud<pcl::PointXYZ>::Ptr trg_cloud (new pcl::PointCloud<pcl::PointXYZ>);
-  pcl::io::loadPCDFile(trg_filename, *trg_cloud);
+  PointCloud<PointXYZ>::Ptr ref_cloud (new PointCloud<PointXYZ>);
+  io::loadPCDFile(ref_filename, *ref_cloud);
+  PointCloud<PointXYZ>::Ptr align_cloud (new PointCloud<PointXYZ>);
+  io::loadPCDFile(align_filename, *align_cloud);
 
-  pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> gicp;
-  gicp.setInputSource(src_cloud);
-  gicp.setInputTarget(trg_cloud);
-  pcl::PointCloud<pcl::PointXYZ> Final;
-  gicp.align(Final);
-  std::cerr << "has converged:" << gicp.hasConverged() << " score: " <<
-  gicp.getFitnessScore() << std::endl;
+  Visualizer3D::Ptr vis;
+  PointCloud<PointXYZ>::Ptr ref_cloud_subsampled(new PointCloud<PointXYZ>);
+  if(visualize) {
+    *ref_cloud_subsampled += *ref_cloud;
+    subsample_cloud<PointXYZ>(ref_cloud_subsampled, 0.01);
+
+    vis.reset(new Visualizer3D);
+    cerr << "Before" << endl;
+    vis->addPointCloud(*ref_cloud_subsampled)
+        .addPointCloud(*align_cloud).show();
+  }
+
+  GeneralizedIterativeClosestPoint<PointXYZ, PointXYZ> gicp;
+  gicp.setInputSource(align_cloud);
+  gicp.setInputTarget(ref_cloud);
+  gicp.align(*align_cloud);
+  cerr << "GICP has converged: " << gicp.hasConverged() << " score: " << gicp.getFitnessScore() << endl;
 
   Eigen::Matrix4f t = gicp.getFinalTransformation().inverse();
   std::cerr << t << std::endl;
   KittiUtils::printPose(cout, t);
 
-  return (0);
+  if(visualize) {
+    vis->keepOnlyClouds(0)
+        .addPointCloud(*ref_cloud_subsampled)
+        .addPointCloud(*align_cloud).show();
+  }
+
+  return EXIT_SUCCESS;
 }
