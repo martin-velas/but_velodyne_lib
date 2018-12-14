@@ -68,6 +68,7 @@ public:
       PERC_99_THRESHOLD,
       PERC_90_THRESHOLD,
       VALUE_THRESHOLD,
+      PORTION_VALUE_THRESHOLD,
       MEAN_THRESHOLD,           // threshold = mean
       NO_THRESHOLD              // no thresholding - all matches are preserved
   };

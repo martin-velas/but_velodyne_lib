@@ -125,6 +125,12 @@ target_link_libraries(estimate-planar-noise but_velodyne)
 add_executable(overlaping-frames src/apps/overlaping-frames.cpp)
 target_link_libraries(overlaping-frames but_velodyne)
 
+add_executable(overlaping-volumes src/apps/overlaping-volumes.cpp)
+target_link_libraries(overlaping-volumes but_velodyne)
+
+add_executable(overlaping-projections src/apps/overlaping-projections.cpp)
+target_link_libraries(overlaping-projections but_velodyne)
+
 add_executable(print-graph-from-ransac-planes src/apps/print-graph-from-ransac-planes.cpp)
 target_link_libraries(print-graph-from-ransac-planes but_velodyne)
 

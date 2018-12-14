@@ -79,6 +79,8 @@ std::istream& operator>> (std::istream &in, CollarLinesRegistration::Threshold &
     thresholding = CollarLinesRegistration::TENTH_THRESHOLD;
   } else if (token == "VALUE_THRESHOLD") {
     thresholding = CollarLinesRegistration::VALUE_THRESHOLD;
+  } else if (token == "PORTION_VALUE_THRESHOLD") {
+    thresholding = CollarLinesRegistration::PORTION_VALUE_THRESHOLD;
   } else if (token == "TENTH_THRESHOLD") {
     thresholding = CollarLinesRegistration::TENTH_THRESHOLD;
   } else if (token == "PERC_99_THRESHOLD") {
@@ -95,9 +97,9 @@ std::istream& operator>> (std::istream &in, CollarLinesRegistration::Threshold &
 void CollarLinesRegistration::Parameters::prepareForLoading(po::options_description &options_desc) {
   options_desc.add_options()
       ("matching_threshold", po::value<CollarLinesRegistration::Threshold>(&this->distance_threshold)->default_value(this->distance_threshold),
-          "How the value of line matching threshold is estimated (mean/median/... of line pairs distance). Possible values: MEDIAN_THRESHOLD|MEAN_THRESHOLD|QUARTER_THRESHOLD|TENTH_THRESHOLD|VALUE_THRESHOLD|NO_THRESHOLD")
+          "How the value of line matching threshold is estimated (mean/median/... of line pairs distance). Possible values: MEDIAN_THRESHOLD|MEAN_THRESHOLD|PERC_99_THRESHOLD|PERC_90_THRESHOLD|QUARTER_THRESHOLD|TENTH_THRESHOLD|VALUE_THRESHOLD|PORTION_VALUE_THRESHOLD|NO_THRESHOLD")
       ("matching_threshold_value", po::value<float>(&this->distance_threshold_value)->default_value(this->distance_threshold_value),
-          "Value of mathing lines threshold in case of VALUE_THRESHOLD option is used")
+          "Value of mathing lines threshold in case of VALUE_THRESHOLD or PORTION_VALUE_THRESHOLD option is used")
       ("matching_threshold_decay", po::value<float>(&this->distance_threshold_decay)->default_value(this->distance_threshold_decay),
           "How the amount of matching lines is decaying after each iteration (portion*=decay).")
       ("normalize_error_by_threshold", po::bool_switch(&this->normalize_error_by_threshold),
@@ -244,6 +246,8 @@ float CollarLinesRegistration::thresholdTypeToFraction(void) const {
     return 0.99;
   case PERC_90_THRESHOLD:
     return 0.90;
+  case PORTION_VALUE_THRESHOLD:
+    return params.distance_threshold_value;
   default:
     cerr << "Warning: uknown distance threshold type!" << endl;
     return 0.0;
