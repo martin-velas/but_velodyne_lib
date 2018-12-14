@@ -51,7 +51,8 @@ bool parse_arguments(int argc, char **argv,
                      CollarLinesRegistration::Parameters &registration_parameters,
                      CollarLinesRegistrationPipeline::Parameters &pipeline_parameters,
                      SensorsCalibration &calibration, Eigen::Affine3f &init_transform,
-                     PolarGridOfClouds::Ptr &src_grid, PolarGridOfClouds::Ptr &trg_grid) {
+                     VelodyneMultiFrame::Ptr &src_frame, VelodyneMultiFrame::Ptr &trg_frame,
+                     bool &visualization) {
   string sensors_pose_file, init_poses_file;
 
   po::options_description desc("Collar Lines Registration of Velodyne scans\n"
@@ -71,6 +72,8 @@ bool parse_arguments(int argc, char **argv,
         "Extrinsic calibration parameters, when multiple Velodyne LiDARs are used")
     ("init_poses", po::value<string>(&init_poses_file)->default_value(""),
         "Initial poses of the frames.")
+    ("visualize", po::bool_switch(&visualization),
+        "Run visualization")
   ;
 
   po::variables_map vm;
@@ -110,11 +113,10 @@ bool parse_arguments(int argc, char **argv,
     return false;
   }
   vector<string> src_clouds(clouds_to_process.begin(), clouds_to_process.begin()+calibration.sensorsCount());
-  VelodyneMultiFrame src_frame(src_clouds, calibration);
-  src_grid.reset(new PolarGridOfClouds(src_frame.clouds, calibration));
+  src_frame.reset(new VelodyneMultiFrame(src_clouds, calibration));
+
   vector<string> trg_clouds(clouds_to_process.begin()+calibration.sensorsCount(), clouds_to_process.end());
-  VelodyneMultiFrame trg_frame(trg_clouds, calibration);
-  trg_grid.reset(new PolarGridOfClouds(trg_frame.clouds, calibration));
+  trg_frame.reset(new VelodyneMultiFrame(trg_clouds, calibration));
 
   return true;
 }
@@ -128,10 +130,11 @@ int main(int argc, char** argv) {
   CollarLinesRegistrationPipeline::Parameters pipeline_parameters;
   SensorsCalibration calibration;
   Eigen::Affine3f init_transform;
-  PolarGridOfClouds::Ptr src_grid, trg_grid;
+  VelodyneMultiFrame::Ptr src_frame, trg_frame;
+  bool visualization;
 
   if (!parse_arguments(argc, argv, registration_parameters, pipeline_parameters,
-      calibration, init_transform, src_grid, trg_grid)) {
+      calibration, init_transform, src_frame, trg_frame, visualization)) {
     return EXIT_FAILURE;
   }
 
@@ -140,9 +143,28 @@ int main(int argc, char** argv) {
   CollarLinesRegistrationPipeline registration(null_estimator, null_file,
       pipeline_parameters, registration_parameters);
 
+  PolarGridOfClouds src_grid(src_frame->clouds, calibration);
+  PolarGridOfClouds trg_grid(trg_frame->clouds, calibration);
+
+  Visualizer3D::Ptr vis;
+  PointCloud<PointXYZ> src_cloud, trg_cloud;
+  if(visualization) {
+    vis.reset(new Visualizer3D);
+    src_frame->joinTo(src_cloud);
+    trg_frame->joinTo(trg_cloud);
+    vis->setColor(255, 0, 0).addPointCloud(src_cloud)
+        .setColor(0, 0, 255).addPointCloud(trg_cloud, init_transform.matrix()).show();
+  }
+
   RegistrationOutcome result;
-  registration.registerTwoGrids(*src_grid, *trg_grid, init_transform.matrix(), result);
+  registration.registerTwoGrids(src_grid, trg_grid, init_transform.matrix(), result);
   cout << result << endl;
+
+  if(visualization) {
+    vis->keepOnlyClouds(0)
+        .setColor(255, 0, 0).addPointCloud(src_cloud)
+        .setColor(0, 0, 255).addPointCloud(trg_cloud, result.transformation.matrix()).show();
+  }
 
   return EXIT_SUCCESS;
 }

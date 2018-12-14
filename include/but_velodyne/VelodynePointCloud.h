@@ -462,6 +462,8 @@ private:
 class VelodyneMultiFrame {
 public:
 
+  typedef boost::shared_ptr<VelodyneMultiFrame> Ptr;
+
   VelodyneMultiFrame(const std::vector<std::string> &filenames_,
       const SensorsCalibration &calibration_,
       bool transform_pcd_files_ = false);
