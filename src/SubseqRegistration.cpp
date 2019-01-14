@@ -53,7 +53,7 @@ ManualSubseqRegistration::ManualSubseqRegistration(const LineCloud &src_lines_, 
   SubseqRegistration(src_lines_, trg_lines_,
       init_transform_,
       params_, registration_params_),
-  split_idx(src_lines_.line_cloud.size()), visualizer(visualizer_) {
+  split_idx(src_lines_.size()), visualizer(visualizer_) {
 
   pclVis = visualizer->getViewer();
   pclVis->registerPointPickingCallback(&ManualSubseqRegistration::pickPointCallback, *this);
@@ -70,7 +70,7 @@ ManualSubseqRegistration::ManualSubseqRegistration(const LineCloud &src_lines_, 
       validation_src_lines_, validation_trg_lines_,
       init_transform_,
       params_, registration_params_),
-  split_idx(src_lines_.line_cloud.size()), visualizer(visualizer_){
+  split_idx(src_lines_.size()), visualizer(visualizer_){
 
   pclVis = visualizer->getViewer();
   pclVis->registerPointPickingCallback(&ManualSubseqRegistration::pickPointCallback, *this);
@@ -107,15 +107,15 @@ void ManualSubseqRegistration::pickPointCallback(const pcl::visualization::Point
 
 void ManualSubseqRegistration::setDataToVisualizer() {
   PointCloud<PointXYZRGB>::Ptr sum_cloud(new PointCloud<PointXYZRGB>);
-  *sum_cloud += *Visualizer3D::colorizeCloud(src_lines.line_middles, 255, 0, 0);
+  *sum_cloud += *Visualizer3D::colorizeCloud(*src_lines.getMiddles(), 255, 0, 0);
   PointCloud<PointXYZ> trg_cloud_transformed;
-  transformPointCloud(trg_lines.line_middles, trg_cloud_transformed, estimated_transform);
+  transformPointCloud(*src_lines.getMiddles(), trg_cloud_transformed, estimated_transform);
   *sum_cloud += *Visualizer3D::colorizeCloud(trg_cloud_transformed, 0, 0, 255);
   pclVis->removeAllShapes();
   pclVis->removeAllPointClouds();
   visualizer->addColorPointCloud(sum_cloud);
   for(int i = 0; i < src_indices.size(); i++) {
-    visualizer->addArrow(PointCloudLine(src_lines.line_middles[src_indices[i]],
+    visualizer->addArrow(PointCloudLine(src_lines[src_indices[i]].middle,
                                        trg_cloud_transformed[trg_indices[i]]));
   }
   if(src_indices.size() < trg_indices.size()) {
@@ -159,8 +159,8 @@ void ManualSubseqRegistration::estimateManualTransform() {
   if(src_indices.size() > 2) {
     pcl::registration::TransformationEstimationSVD<pcl::PointXYZ, pcl::PointXYZ> tfe;
     Eigen::Matrix4f t;
-    tfe.estimateRigidTransformation(trg_lines.line_middles, trg_indices,
-        src_lines.line_middles, src_indices, t);
+    tfe.estimateRigidTransformation(*trg_lines.getMiddles(), trg_indices,
+        *src_lines.getMiddles(), src_indices, t);
     estimated_transform = Eigen::Affine3f(t);
   } else {
     PCL_WARN("Unable to estimate transformation with less than 3 matches - skipping.\n");

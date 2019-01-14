@@ -179,9 +179,9 @@ float CollarLinesRegistration::computeError(
 void CollarLinesRegistration::findClosestMatchesByMiddles() {
   matches.clear();
 
-  for(int target_index = 0; target_index < target_cloud.line_cloud.size(); target_index++) {
-    const PointCloudLine &target_line = target_cloud.line_cloud[target_index];
-    const PointXYZ &target_line_middle = target_cloud.line_middles[target_index];
+  for(int target_index = 0; target_index < target_cloud.size(); target_index++) {
+    const PointCloudLine &target_line = target_cloud[target_index].line;
+    const PointXYZ &target_line_middle = target_cloud[target_index].middle;
 
     int K = params.nearestNeighbors;
     vector<int> closest_index(K);
@@ -195,7 +195,7 @@ void CollarLinesRegistration::findClosestMatchesByMiddles() {
       const int source_index = closest_index[i];
       float distance;
       if(params.rejection_by_line_distances) {
-        const PointCloudLine &source_line = source_cloud.line_cloud[source_index];
+        const PointCloudLine &source_line = source_cloud[source_index].line;
         distance = target_line.distanceTo(source_line, PointCloudLine::OF_CLOSEST_POINTS);
       } else {
         distance = min_distance[i];
@@ -281,8 +281,8 @@ void CollarLinesRegistration::getCorrespondingPoints(
   correspondences_weights = VectorXf(matches.size());
   int index = 0;
   for(vector<DMatch>::iterator match = matches.begin(); match < matches.end(); match++, index++) {
-    PointCloudLine source_line = source_cloud.line_cloud[match->trainIdx];
-    PointCloudLine target_line = target_cloud.line_cloud[match->queryIdx];
+    PointCloudLine source_line = source_cloud[match->trainIdx].line;
+    PointCloudLine target_line = target_cloud[match->queryIdx].line;
 
     Vector3f source_line_pt, target_line_pt;
     source_line.closestPointsWith(target_line, source_line_pt, target_line_pt);
@@ -431,8 +431,8 @@ void CollarLinesRegistration::showLinesCorrenspondences() {
   float min_distance = INFINITY;
   float max_distance = -1;
   for(vector<DMatch>::iterator m = matches.begin(); m < matches.end(); m++) {
-    PointCloudLine source_line = source_cloud.line_cloud[m->trainIdx];
-    PointCloudLine target_line = target_cloud.line_cloud[m->queryIdx];
+    PointCloudLine source_line = source_cloud[m->trainIdx].line;
+    PointCloudLine target_line = target_cloud[m->queryIdx].line;
     float distance = source_line.distanceTo(target_line, PointCloudLine::OF_CLOSEST_POINTS);
     matches_in_plane.push_back(DMatch(m->queryIdx, m->trainIdx, distance));
     min_distance = MIN(min_distance, distance);
@@ -441,16 +441,16 @@ void CollarLinesRegistration::showLinesCorrenspondences() {
 
   Visualizer3D visualizer;
   for(vector<DMatch>::iterator m = matches_in_plane.begin(); m < matches_in_plane.end(); m++) {
-    PointCloudLine source_line = source_cloud.line_cloud[m->trainIdx];
-    PointCloudLine target_line = target_cloud.line_cloud[m->queryIdx];
+    PointCloudLine source_line = source_cloud[m->trainIdx].line;
+    PointCloudLine target_line = target_cloud[m->queryIdx].line;
     float distance = (m->distance-min_distance)/(max_distance-min_distance);    // [0;1]
     visualizer.addLine(source_line, distance, 0.0, 0.0);
     visualizer.addLine(target_line, 0.0, distance, 0.0);
   }
 
   for(vector<DMatch>::iterator m = rejected_matches.begin(); m < rejected_matches.end(); m++) {
-    PointCloudLine source_line = source_cloud.line_cloud[m->trainIdx];
-    PointCloudLine target_line = target_cloud.line_cloud[m->queryIdx];
+    PointCloudLine source_line = source_cloud[m->trainIdx].line;
+    PointCloudLine target_line = target_cloud[m->queryIdx].line;
     visualizer.addLine(source_line, 1.0, 1.0, 1.0);
     visualizer.addLine(target_line, 1.0, 1.0, 1.0);
   }

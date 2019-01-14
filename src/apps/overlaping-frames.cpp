@@ -119,7 +119,7 @@ void buildLineClouds(VelodyneFileSequence &cloud_sequence,
       line_cloud.transform(poses[frame_i+superframe_i*frames_cumulated].matrix());
       line_clouds[superframe_i] += line_cloud;
     }
-    line_trees[superframe_i].setInputCloud(line_clouds[superframe_i].line_middles.makeShared());
+    line_trees[superframe_i].setInputCloud(line_clouds[superframe_i].getMiddles());
   }
 }
 
@@ -193,7 +193,7 @@ int main(int argc, char** argv) {
         continue;
       }
       float mean, median, quarter;
-      getDistance(line_clouds[i].line_middles, line_trees[j], mean, median, quarter);
+      getDistance(*line_clouds[i].getMiddles(), line_trees[j], mean, median, quarter);
       /**
       mean_distances.at<float>(i, j) = mean_distances.at<float>(j, i) = mean;
       median_distances.at<float>(i, j) = median_distances.at<float>(j, i) = median;

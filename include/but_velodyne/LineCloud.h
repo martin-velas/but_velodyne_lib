@@ -45,6 +45,40 @@ public:
 
   typedef boost::shared_ptr<LineCloud> Ptr;
 
+  class PointCloudLineWithMiddleAndOrigin {
+  public:
+    PointCloudLineWithMiddleAndOrigin(const PointCloudLine &line_, const pcl::PointXYZ &middle_, const int sensor_id_) :
+      line(line_), middle(middle_), sensor_id(sensor_id_) {
+    }
+
+    PointCloudLine line;
+    pcl::PointXYZ middle;
+    int sensor_id;
+  };
+
+  typedef std::vector<PointCloudLineWithMiddleAndOrigin>::iterator iterator;
+  typedef std::vector<PointCloudLineWithMiddleAndOrigin>::const_iterator const_iterator;
+
+  const_iterator begin(void) const {
+    return data.begin();
+  }
+
+  iterator begin(void) {
+    return data.begin();
+  }
+
+  const_iterator end(void) const {
+    return data.end();
+  }
+
+  iterator end(void) {
+    return data.end();
+  }
+
+  iterator erase(iterator it) {
+    return this->data.erase(it);
+  }
+
   /**!
    * Initialize empty line cloud.
    */
@@ -63,13 +97,12 @@ public:
             const int lines_per_cell_pair_generated,
             CollarLinesFilter &filter_);
 
-  pcl::PointCloud<pcl::PointXYZ>::Ptr generateDenseCloud(const int points_per_cell, const int cell_count) const;
+  PointCloudLineWithMiddleAndOrigin& operator [](int idx) {
+      return data[idx];
+  }
 
-  /**!
-   * @return all lines
-   */
-  const std::vector<PointCloudLine>& getLines() const {
-    return line_cloud;
+  PointCloudLineWithMiddleAndOrigin operator [](int idx) const {
+      return data[idx];
   }
 
   /**!
@@ -87,29 +120,20 @@ public:
    */
   void transform(const Eigen::Matrix4f &transformation);
 
-  std::vector<PointCloudLine> line_cloud;       ///! collar line segments
-  pcl::PointCloud<pcl::PointXYZ> line_middles;  ///! midpoints of line segments
-
   inline LineCloud& operator +=(const LineCloud& other) {
-    this->line_cloud.insert(this->line_cloud.end(), other.line_cloud.begin(), other.line_cloud.end());
-    this->line_middles.insert(this->line_middles.end(), other.line_middles.begin(), other.line_middles.end());
+    this->data.insert(this->data.end(), other.data.begin(), other.data.end());
     return *this;
   }
 
-  void push_back(const PointCloudLine &line);
+  void push_back(const PointCloudLine &line, const int sensor_id);
 
-  void save(const std::string &filename) const;
-
-  void load(const std::string &filename);
-
-  pcl::PointCloud<pcl::PointXYZ>::Ptr encode(void) const;
-
-  void decodeFrom(const pcl::PointCloud<pcl::PointXYZ> &cloud);
+  void push_back(const std::vector<PointCloudLine> &lines, const int sensor_id);
 
   int size(void) const {
-    assert(line_cloud.size() == line_middles.size());
-    return line_cloud.size();
+    return this->data.size();
   }
+
+  pcl::PointCloud<pcl::PointXYZ>::Ptr getMiddles(void) const;
 
 protected:
   void generateLineCloudFromCell(const PolarGridOfClouds &polar_grid,
@@ -127,6 +151,8 @@ protected:
 private:
   static cv::RNG& rng;
   CollarLinesFilter filter;
+
+  std::vector<PointCloudLineWithMiddleAndOrigin> data;       ///! collar line segments
 };
 
 } /* namespace but_velodyne */

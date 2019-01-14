@@ -14,7 +14,7 @@ CollarLinesValidation::CollarLinesValidation(const LineCloud &src_cloud_, const 
     const CollarLinesRegistration::Parameters &registration_params_) :
         src_cloud(src_cloud_), trg_cloud(trg_cloud_), registration_params(registration_params_) {
   if(src_cloud.size() != 0) {
-    src_kdtree.setInputCloud(src_cloud.line_middles.makeShared());
+    src_kdtree.setInputCloud(src_cloud.getMiddles());
   }
 }
 

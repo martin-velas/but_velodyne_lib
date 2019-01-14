@@ -132,7 +132,7 @@ public:
     matching_time(0), correnspondences_time(0), tranformation_time(0), error_time(0),
     refinements_done(0) {
 
-    source_kdtree.setInputCloud(source_cloud.line_middles.makeShared());
+    source_kdtree.setInputCloud(source_cloud.getMiddles());
     this->target_cloud.transform(initial_transformation);
   }
 

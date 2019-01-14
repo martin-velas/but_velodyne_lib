@@ -100,23 +100,6 @@ bool parse_arguments(int argc, char **argv,
   return true;
 }
 
-void getClusters(const LineCloud &lines, const vector<int> &indices, const int K, const vector<int> &origins,
-    vector<LineCloud> &clustersLines, vector< PointCloud<PointXYZ> > &clustersMiddles, vector< vector<int> > &clustersOrigins) {
-  clustersLines.resize(K);
-  clustersMiddles.resize(K);
-  clustersOrigins.resize(K);
-  vector<int> shuffled(indices.size());
-  for(int i = 0; i < indices.size(); i++) {
-    shuffled[i] = i;
-  }
-  random_shuffle(shuffled.begin(), shuffled.end());
-  for(vector<int>::iterator i = shuffled.begin(); i < shuffled.end(); i++) {
-    clustersLines[indices[*i]].push_back(lines.line_cloud[*i]);
-    clustersMiddles[indices[*i]].push_back(lines.line_middles[*i]);
-    clustersOrigins[indices[*i]].push_back(origins[*i]);
-  }
-}
-
 void colorByClusters(const PointCloud<PointXYZI>::Ptr subsampled_cloud,
     const vector<int> &cluster_indices, const vector<float> &cluster_probs, PointCloud<PointXYZI> &sum_cloud) {
   pcl::search::KdTree<pcl::PointXYZI> index;

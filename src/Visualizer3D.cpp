@@ -177,15 +177,17 @@ Visualizer3D& Visualizer3D::addLines(const std::vector<PointCloudLine> &lines,
 }
 
 Visualizer3D& Visualizer3D::addLines(const std::vector<PointCloudLine> &lines) {
-  for (vector<PointCloudLine>::const_iterator l = lines.begin(); l < lines.end(); l++)
-  {
+  for (vector<PointCloudLine>::const_iterator l = lines.begin(); l < lines.end(); l++) {
     addLine(*l);
   }
   return *this;
 }
 
 Visualizer3D& Visualizer3D::addLines(const LineCloud &lineCloud) {
-  return addLines(lineCloud.getLines());
+  for (int i = 0; i < lineCloud.size(); i++) {
+    addLine(lineCloud[i].line);
+  }
+  return *this;
 }
 
 void Visualizer3D::saveSnapshot(const std::string &filename) {
@@ -193,7 +195,7 @@ void Visualizer3D::saveSnapshot(const std::string &filename) {
 }
 
 Visualizer3D& Visualizer3D::addSenzor(PointXYZ position) {
-  string name = "senzor";
+  string name = "sensor";
   float radius = 1.5;
   viewer->removeShape(name);
   position.y = -2 * radius;

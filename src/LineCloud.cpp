@@ -49,72 +49,30 @@ LineCloud::LineCloud(const PolarGridOfClouds &polar_grid,
                                   CellId(polar, ring, sensor_idx),
                                   lines_per_cell_pair_generated,
                                   lines_among_cells);
-        line_cloud.insert(line_cloud.end(),
-                          lines_among_cells.begin(), lines_among_cells.end());
-        for(vector<PointCloudLine>::iterator line = lines_among_cells.begin();
-            line < lines_among_cells.end();
-            line++) {
-          Eigen::Vector3f middle = line->middle();
-          line_middles.push_back(PointXYZ(middle.x(), middle.y(), middle.z()));
-        }
+        this->push_back(lines_among_cells, sensor_idx);
       }
     }
   }
 }
 
-void LineCloud::save(const std::string &filename) const {
-  PointCloud<PointXYZ>::Ptr encoded_cloud = this->encode();
-  io::savePCDFileBinary(filename, *encoded_cloud);
-}
-
-void LineCloud::load(const std::string &filename) {
-  PointCloud<PointXYZ> encoded_cloud;
-  io::loadPCDFile(filename, encoded_cloud);
-  this->decodeFrom(encoded_cloud);
-}
-
-pcl::PointCloud<pcl::PointXYZ>::Ptr LineCloud::encode(void) const {
-  PointCloud<PointXYZ>::Ptr encoded_cloud(new PointCloud<PointXYZ>(line_cloud.size(), 2));
-  for(int i = 0; i < line_cloud.size(); i++) {
-    const PointCloudLine &l = line_cloud[i];
-    encoded_cloud->at(i, 0).getVector3fMap() = l.point;
-    encoded_cloud->at(i, 1).getVector3fMap() = l.point + l.orientation;
-  }
-  return encoded_cloud;
-}
-
-void LineCloud::decodeFrom(const pcl::PointCloud<pcl::PointXYZ> &cloud) {
-  assert(cloud.height == 2);
-  for(int i = 0; i < cloud.width; i++) {
-    PointCloudLine l(cloud.at(i,0), cloud.at(i,1));
-    this->push_back(l);
-  }
-}
-
-void LineCloud::push_back(const PointCloudLine &line) {
-  line_cloud.push_back(line);
+void LineCloud::push_back(const PointCloudLine &line, const int sensor_id) {
   Eigen::Vector3f middle = line.middle();
-  line_middles.push_back(PointXYZ(middle.x(), middle.y(), middle.z()));
+  PointCloudLineWithMiddleAndOrigin new_line(line, PointXYZ(middle.x(), middle.y(), middle.z()), sensor_id);
+  data.push_back(new_line);
 }
 
-pcl::PointCloud<pcl::PointXYZ>::Ptr LineCloud::generateDenseCloud(const int points_per_cell, const int cell_count) const {
+void LineCloud::push_back(const vector<PointCloudLine> &lines, const int sensor_id) {
+  for(vector<PointCloudLine>::const_iterator l = lines.begin(); l < lines.end(); l++) {
+    this->push_back(*l, sensor_id);
+  }
+}
 
-  pcl::PointCloud<pcl::PointXYZ>::Ptr generated_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-  int points_generated = cell_count*points_per_cell;
-  int points_per_line = points_generated / line_cloud.size();
-  points_generated = points_per_line * line_cloud.size();
-  generated_cloud->resize(points_generated);
-  int cloud_index = 0;
-
-   for(std::vector<PointCloudLine>::const_iterator line = line_cloud.begin(); line < line_cloud.end(); line++) {
-     float max_factor = line->orientation.norm();
-     for(int i = 0; i < points_per_line; i++) {
-       float factor = rng.uniform(0.0f, max_factor);
-       Eigen::Vector3f new_point = line->point + line->getOrientationOfSize(factor);
-       generated_cloud->points[cloud_index++].getVector3fMap() = new_point;
-     }
-   }
-  return generated_cloud;
+pcl::PointCloud<pcl::PointXYZ>::Ptr LineCloud::getMiddles(void) const {
+  pcl::PointCloud<pcl::PointXYZ>::Ptr middles(new pcl::PointCloud<pcl::PointXYZ>);
+  for(std::vector<PointCloudLineWithMiddleAndOrigin>::const_iterator l = data.begin(); l < data.end(); l++) {
+    middles->push_back(l->middle);
+  }
+  return middles;
 }
 
 void LineCloud::generateLineCloudAmongCells(const PolarGridOfClouds &polar_grid,
@@ -174,21 +132,25 @@ vector<CellId> LineCloud::getTargetCells(const CellId &source_cell, int total_po
   return target_cells;
 }
 
-void LineCloud::transform(const Eigen::Matrix4f &transformation, LineCloud &output) const {
-  output.line_cloud.clear();
-  for(std::vector<PointCloudLine>::const_iterator line = line_cloud.begin();
-      line < line_cloud.end(); line++) {
-    output.line_cloud.push_back(line->transform(transformation));
+void LineCloud::transform(const Eigen::Matrix4f &t_matrix, LineCloud &output) const {
+  output.data.clear();
+  Eigen::Affine3f transformation(t_matrix);
+  for(int i = 0; i < this->size(); i++) {
+    PointCloudLineWithMiddleAndOrigin new_line(
+        data[i].line.transform(t_matrix),
+        transformPoint(data[i].middle, transformation),
+        data[i].sensor_id);
+    output.data.push_back(new_line);
   }
-  pcl::transformPointCloud(line_middles, output.line_middles, transformation);
 }
 
-void LineCloud::transform(const Eigen::Matrix4f &transformation) {
-  for(std::vector<PointCloudLine>::iterator line = line_cloud.begin();
-      line < line_cloud.end(); line++) {
-    *line = line->transform(transformation);
+void LineCloud::transform(const Eigen::Matrix4f &t_matrix) {
+  Eigen::Affine3f transformation(t_matrix);
+  for(std::vector<PointCloudLineWithMiddleAndOrigin>::iterator lineWithMidAndOrigin = data.begin();
+      lineWithMidAndOrigin < data.end(); lineWithMidAndOrigin++) {
+    lineWithMidAndOrigin->line = lineWithMidAndOrigin->line.transform(t_matrix);
+    lineWithMidAndOrigin->middle = pcl::transformPoint(lineWithMidAndOrigin->middle, transformation);
   }
-  pcl::transformPointCloud(line_middles, line_middles, transformation);
 }
 
 } /* namespace but_velodyne */

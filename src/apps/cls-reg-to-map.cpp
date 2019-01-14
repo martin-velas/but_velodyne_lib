@@ -58,18 +58,18 @@ class LineCloudsWithTimeAndQuality {
 
 public:
   PointCloud<pcl::PointXYZ>::Ptr getMiddlesPtr(void) {
-    return all_lines.line_middles.makeShared();
+    return all_lines.getMiddles();
   }
 
   int size(void) {
-    return all_lines.line_cloud.size();
+    return all_lines.size();
   }
 
   void add(const LineCloud &lines) {
     prune();
     all_lines += lines;
-    frame_sizes.push_back(lines.line_cloud.size());
-    cerr << "all: " << all_lines.line_cloud.size() << "; new: " << lines.line_cloud.size() << endl;
+    frame_sizes.push_back(lines.size());
+    cerr << "all: " << all_lines.size() << "; new: " << lines.size() << endl;
   }
 
 protected:
@@ -78,17 +78,14 @@ protected:
     int coutn_so_far = 0;
     for(int si = 0; si < frame_sizes.size(); si++) {
       if(si > frame_sizes.size() - FRAMES_TO_PRUNE) {
-        vector<PointCloudLine>::iterator line_it = all_lines.line_cloud.begin() + coutn_so_far;
-        PointCloud<PointXYZ>::iterator middles_it = all_lines.line_middles.begin() + coutn_so_far;
+        LineCloud::iterator line_it = all_lines.begin() + coutn_so_far;
         int removed = 0;
         for(int li = 0; li < frame_sizes[si]; li++) {
           if(cv::theRNG().uniform(0,2) != 0) {
-            line_it = all_lines.line_cloud.erase(line_it);
-            middles_it = all_lines.line_middles.erase(middles_it);
+            line_it = all_lines.erase(line_it);
             removed++;
           } else {
             line_it++;
-            middles_it++;
           }
         }
         frame_sizes[si] -= removed;
@@ -141,7 +138,7 @@ public:
     PointCloud<PointXYZ> target_cloud_vis;
     multiframe.joinTo(target_cloud_vis);
     vis->keepOnlyClouds(0).setColor(200,0,200).addPointCloud(target_cloud_vis, init_pose)
-        .setColor(150,150,150).addPointCloud(lines_map.all_lines.line_middles).show();
+        .setColor(150,150,150).addPointCloud(*lines_map.all_lines.getMiddles()).show();
     if(!indexed) {
       buildKdTree();
     }

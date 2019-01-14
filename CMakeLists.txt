@@ -107,9 +107,6 @@ target_link_libraries(gicp but_velodyne)
 add_executable(transform-pcd src/apps/transform-pcd.cpp)
 target_link_libraries(transform-pcd but_velodyne)
 
-add_executable(print-graph-from-cls-clusters src/apps/print-graph-from-cls-clusters.cpp)
-target_link_libraries(print-graph-from-cls-clusters but_velodyne)
-
 add_executable(cluster-velodyne-points src/apps/cluster-velodyne-points.cpp)
 target_link_libraries(cluster-velodyne-points but_velodyne)
 
@@ -196,9 +193,6 @@ target_link_libraries(normalize-intensity but_velodyne)
 add_executable(show-registration-in-seq src/apps/show-registration-in-seq.cpp)
 target_link_libraries(show-registration-in-seq but_velodyne)
 
-add_executable(visualize-global-graph src/apps/visualize-global-graph.cpp)
-target_link_libraries(visualize-global-graph but_velodyne)
-
 add_executable(visualize-part-clouds src/apps/visualize-part-clouds.cpp)
 target_link_libraries(visualize-part-clouds but_velodyne)
 
@@ -251,9 +245,6 @@ target_link_libraries(cloud-eraser-from-seq but_velodyne)
 
 ########################## Moving object detection: ##########################
 
-add_executable(move-detection src/apps/move-detection.cpp)
-target_link_libraries(move-detection but_velodyne)
-
 add_executable(ground-det-labeling src/apps/ground-det-labeling.cpp)
 target_link_libraries(ground-det-labeling but_velodyne)
 
@@ -289,7 +280,6 @@ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/but_velodyne-config.cmake" "${CMAKE_C
 install(
 TARGETS but_velodyne collar-lines-odom show-kitti-poses show_correspondences extract-vfh
     find-loops-vfh verify-loops register-loops slampp-solution-to-poses
-    move-detection
 RUNTIME DESTINATION bin/
 LIBRARY DESTINATION lib/
 INCLUDES DESTINATION include/
