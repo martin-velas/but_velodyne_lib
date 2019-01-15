@@ -114,6 +114,8 @@ void CollarLinesRegistration::Parameters::prepareForLoading(po::options_descript
         "How many nearest neighbors (matches) are found for each line of source frame.")
       ("rejection_by_line_distances", po::bool_switch(&this->rejection_by_line_distances),
           "Line matches are thresholded by the distances of lines. By default, line midpoints are used.")
+      ("dont_extend_segments", po::bool_switch(&this->dont_extend_segments),
+          "Do not extent the CLS into infinite lines - correspondences outside segments are discarted.")
   ;
 }
 
@@ -220,15 +222,30 @@ void CollarLinesRegistration::findClosestMatchesByMiddles() {
     effective_threshold = getMatchesPortion(thresholdTypeToFraction()*getEffectiveDecay());
   }
   filterMatchesByThreshold(effective_threshold);
+
+  if(params.dont_extend_segments) {
+    for(vector<DMatch>::iterator m = matches.begin(); m < matches.end();) {
+      const PointCloudLine &source_line = source_cloud[m->trainIdx].line;
+      const PointCloudLine &target_line = target_cloud[m->queryIdx].line;
+
+      Vector3f source_line_pt, target_line_pt;
+      if(source_line.closestPointsWith(target_line, source_line_pt, target_line_pt)) {
+        m++;
+      } else {
+        m = matches.erase(m);
+        rejected_matches.push_back(*m);
+      }
+    }
+  }
 }
 
 void CollarLinesRegistration::filterMatchesByThreshold(const float threshold) {
-  vector<DMatch> old_matches = matches;
-  matches.clear();
-  for(vector<DMatch>::iterator m = old_matches.begin(); m < old_matches.end(); m++) {
+  rejected_matches.clear();
+  for(vector<DMatch>::iterator m = matches.begin(); m < matches.end();) {
     if(m->distance < threshold) {
-      matches.push_back(*m);
+      m++;
     } else {
+      m = matches.erase(m);
       rejected_matches.push_back(*m);
     }
   }

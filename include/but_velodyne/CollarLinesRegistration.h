@@ -90,7 +90,8 @@ public:
         int nearestNeighbors_ = 1,
         bool estimate_translation_only_ = false,
         bool dont_estimate_roll_pitch_ = false,
-        bool rejection_by_line_distances_ = false) :
+        bool rejection_by_line_distances_ = false,
+        bool dont_extend_segments_ = false) :
         distance_threshold(distance_threshold_),
         distance_threshold_decay(distance_threshold_decay_),
         distance_threshold_value(distance_threshold_value_),
@@ -99,7 +100,8 @@ public:
         nearestNeighbors(nearestNeighbors_),
         estimate_translation_only(estimate_translation_only_),
         dont_estimate_roll_pitch(dont_estimate_roll_pitch_),
-        rejection_by_line_distances(rejection_by_line_distances_) {
+        rejection_by_line_distances(rejection_by_line_distances_),
+        dont_extend_segments(dont_extend_segments_) {
     }
     Threshold distance_threshold;       /// how is the threshold of line matches distance estimated
     float distance_threshold_decay;
@@ -110,6 +112,7 @@ public:
     bool estimate_translation_only;
     bool dont_estimate_roll_pitch;
     bool rejection_by_line_distances;
+    bool dont_extend_segments;
 
     void prepareForLoading(boost::program_options::options_description &options_desc);
 
