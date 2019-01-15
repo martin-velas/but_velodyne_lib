@@ -228,6 +228,10 @@ public:
                           const Eigen::Matrix4f &initial_transformation,
                           Termination &termination, RegistrationOutcome &result);
 
+  const std::vector<CLSMatch>& getLastMatches(void) const {
+    return last_matches;
+  }
+
 protected:
 
   Eigen::Matrix4f getPrediction();
@@ -255,6 +259,8 @@ private:
   ostream &graph_file;
 
   CollarLinesRegistration::Parameters registration_params;
+
+  std::vector<CLSMatch> last_matches;
 };
 
 float registerLineClouds(
@@ -271,7 +277,7 @@ float registerLineClouds(
     const Eigen::Matrix4f &initial_transformation,
     const CollarLinesRegistration::Parameters &registration_params,
     const CollarLinesRegistrationPipeline::Parameters &pipeline_params,
-    Termination &termination, RegistrationOutcome &result);
+    Termination &termination, RegistrationOutcome &result, std::vector<CLSMatch> &matches);
 
 } /* namespace but_velodyne */
 

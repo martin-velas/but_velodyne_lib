@@ -105,10 +105,11 @@ float registerLineClouds(
   Termination termination(pipeline_params.term_params);
 
   RegistrationOutcome result;
+  std::vector<CLSMatch> matches;
   float error = registerLineClouds(source, target,
       validation_source, validation_target,
       initial_transformation, registration_params, pipeline_params,
-      termination, result);
+      termination, result, matches);
   output_transformation = result.transformation.matrix();
 
   termination_reason = termination.why();
@@ -124,7 +125,7 @@ void CollarLinesRegistrationPipeline::registerLineClouds(const LineCloud &source
   but_velodyne::registerLineClouds(source_line_cloud, target_line_cloud,
       validation_source_line_cloud, validation_target_line_cloud,
       initial_transformation, registration_params, pipeline_params,
-      termination, result);
+      termination, result, last_matches);
 }
 
 float registerLineClouds(const LineCloud &source_line_cloud, const LineCloud &target_line_cloud,
@@ -132,7 +133,7 @@ float registerLineClouds(const LineCloud &source_line_cloud, const LineCloud &ta
                          const Eigen::Matrix4f &initial_transformation,
                          const CollarLinesRegistration::Parameters &registration_params,
                          const CollarLinesRegistrationPipeline::Parameters &pipeline_params,
-                         Termination &termination, RegistrationOutcome &output_result) {
+                         Termination &termination, RegistrationOutcome &output_result, std::vector<CLSMatch> &matches) {
   CollarLinesRegistration cls_fitting(source_line_cloud, target_line_cloud,
                                       registration_params, initial_transformation.matrix());
   CollarLinesValidation cls_validation(validation_source_line_cloud, validation_target_line_cloud,
@@ -161,6 +162,8 @@ float registerLineClouds(const LineCloud &source_line_cloud, const LineCloud &ta
     }
   }
   output_result.term_reason = termination.why();
+  matches.clear();
+  cls_fitting.getLastMatches(matches);
   return output_result.error;
 }
 

@@ -52,7 +52,7 @@ bool parse_arguments(int argc, char **argv,
                      CollarLinesRegistrationPipeline::Parameters &pipeline_parameters,
                      SensorsCalibration &calibration, Eigen::Affine3f &init_transform,
                      VelodyneMultiFrame::Ptr &src_frame, VelodyneMultiFrame::Ptr &trg_frame,
-                     bool &visualization) {
+                     bool &visualization, string &matches_output) {
   string sensors_pose_file, init_poses_file;
 
   po::options_description desc("Collar Lines Registration of Velodyne scans\n"
@@ -74,6 +74,8 @@ bool parse_arguments(int argc, char **argv,
         "Initial poses of the frames.")
     ("visualize", po::bool_switch(&visualization),
         "Run visualization")
+    ("matches_output", po::value<string>(&matches_output)->default_value(""),
+        "Save matches of CLS to this file")
   ;
 
   po::variables_map vm;
@@ -132,9 +134,10 @@ int main(int argc, char** argv) {
   Eigen::Affine3f init_transform;
   VelodyneMultiFrame::Ptr src_frame, trg_frame;
   bool visualization;
+  string matches_output_fn;
 
   if (!parse_arguments(argc, argv, registration_parameters, pipeline_parameters,
-      calibration, init_transform, src_frame, trg_frame, visualization)) {
+      calibration, init_transform, src_frame, trg_frame, visualization, matches_output_fn)) {
     return EXIT_FAILURE;
   }
 
@@ -159,6 +162,21 @@ int main(int argc, char** argv) {
   RegistrationOutcome result;
   registration.registerTwoGrids(src_grid, trg_grid, init_transform.matrix(), result);
   cout << result << endl;
+
+  if(!matches_output_fn.empty()) {
+    vector<CLSMatch> matches = registration.getLastMatches();
+    cerr << "Matches: " << matches.size() << endl;
+    ofstream matches_stream(matches_output_fn.c_str());
+    for(vector<CLSMatch>::iterator m = matches.begin(); m < matches.end(); m++) {
+      PointXYZ src_pt = transformPoint(m->src, calibration.ofSensor(m->src_sensor_id).inverse());
+      PointXYZ trg_pt = transformPoint(m->trg, calibration.ofSensor(m->trg_sensor_id).inverse());
+      matches_stream <<
+          m->src_sensor_id << " " <<
+          src_pt.x << " " << src_pt.y << " " << src_pt.z << " " <<
+          m->trg_sensor_id << " " <<
+          trg_pt.x << " " << trg_pt.y << " " << trg_pt.z << " " << endl;
+    }
+  }
 
   if(visualization) {
     vis->keepOnlyClouds(0)

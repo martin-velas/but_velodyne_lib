@@ -133,13 +133,13 @@ float CollarLinesRegistration::refine() {
   correnspondences_time += watch.elapsed();
 
   watch.restart();
-  Eigen::Matrix4f refinement = computeTransformationWeighted(source_coresp_points, target_coresp_points);
-  target_cloud.transform(refinement);
-  transformation = refinement * transformation;
+  last_refinement = computeTransformationWeighted(source_coresp_points, target_coresp_points);
+  target_cloud.transform(last_refinement);
+  transformation = last_refinement * transformation;
   tranformation_time += watch.elapsed();
 
   watch.restart();
-  float error = computeError(source_coresp_points, target_coresp_points, refinement);
+  float error = computeError(source_coresp_points, target_coresp_points, last_refinement);
   error_time += watch.elapsed();
 
   refinements_done++;
@@ -176,6 +176,15 @@ float CollarLinesRegistration::computeError(
     error /= thresholdTypeToFraction()*getEffectiveDecay();
   }
   return error;
+}
+
+const void CollarLinesRegistration::getLastMatches(std::vector<CLSMatch> &out_matches) const {
+  out_matches = last_point_matches;
+  Eigen::Affine3f untransform(last_refinement.inverse() * transformation * initial_transformation);
+  untransform = untransform.inverse();
+  for(vector<CLSMatch>::iterator m = out_matches.begin(); m < out_matches.end(); m++) {
+    m->trg = transformPoint(m->trg, untransform);
+  }
 }
 
 void CollarLinesRegistration::findClosestMatchesByMiddles() {
@@ -297,6 +306,7 @@ void CollarLinesRegistration::getCorrespondingPoints(
     MatrixOfPoints &target_coresp_points) {
   correspondences_weights = VectorXf(matches.size());
   int index = 0;
+  last_point_matches.clear();
   for(vector<DMatch>::iterator match = matches.begin(); match < matches.end(); match++, index++) {
     PointCloudLine source_line = source_cloud[match->trainIdx].line;
     PointCloudLine target_line = target_cloud[match->queryIdx].line;
@@ -312,6 +322,9 @@ void CollarLinesRegistration::getCorrespondingPoints(
 
     source_coresp_points.block(0, index, TPoint3D::RowsAtCompileTime, 1) = source_line_pt;
     target_coresp_points.block(0, index, TPoint3D::RowsAtCompileTime, 1) = target_line_pt;
+
+    last_point_matches.push_back(CLSMatch(source_line_pt, source_cloud[match->trainIdx].sensor_id,
+        target_line_pt, target_cloud[match->queryIdx].sensor_id));
 
     float weight;
     if(params.weighting == VERTICAL_ANGLE_WEIGHTS) {

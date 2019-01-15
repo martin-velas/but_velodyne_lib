@@ -37,6 +37,19 @@
 namespace but_velodyne
 {
 
+class CLSMatch {
+public:
+  CLSMatch(const Eigen::Vector3f &src_pt, const int src_sensor_id_,
+      const Eigen::Vector3f &trg_pt, const int trg_sensor_id_) :
+    src_sensor_id(src_sensor_id_), trg_sensor_id(trg_sensor_id_) {
+    src.getVector3fMap() = src_pt;
+    trg.getVector3fMap() = trg_pt;
+  }
+
+  pcl::PointXYZ src, trg;
+  int src_sensor_id, trg_sensor_id;
+};
+
 /**!
  * Registration of two collar line clouds.
  */
@@ -192,6 +205,8 @@ public:
    */
   float computeError();
 
+  const void getLastMatches(std::vector<CLSMatch> &out_matches) const;
+
   // time counters measuring how much the each step of registration process costs
   float matching_time, correnspondences_time, tranformation_time, error_time;
 
@@ -231,9 +246,11 @@ private:
   std::vector<cv::DMatch> matches;
   std::vector<cv::DMatch> rejected_matches;
   const Eigen::Matrix4f initial_transformation;
+  Eigen::Matrix4f last_refinement;
   Eigen::Matrix4f transformation;
   Eigen::VectorXf correspondences_weights;
   int refinements_done;
+  std::vector<CLSMatch> last_point_matches;
 };
 
 } /* namespace but_velodyne */
