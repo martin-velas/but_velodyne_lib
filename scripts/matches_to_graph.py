@@ -2,8 +2,6 @@
 
 import argparse
 import sys
-from odometry_cnn_data import load_kitti_poses
-from pose_graph import Edge3D
 
 
 def get_graph_index(pose_index, poses_cnt, sensor_index):
