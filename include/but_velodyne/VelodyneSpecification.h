@@ -27,6 +27,7 @@
 #include <iostream>
 #include <map>
 #include <cmath>
+#include <stdexcept>
 
 namespace but_velodyne {
 
