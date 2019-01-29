@@ -109,7 +109,7 @@ void ManualSubseqRegistration::setDataToVisualizer() {
   PointCloud<PointXYZRGB>::Ptr sum_cloud(new PointCloud<PointXYZRGB>);
   *sum_cloud += *Visualizer3D::colorizeCloud(*src_lines.getMiddles(), 255, 0, 0);
   PointCloud<PointXYZ> trg_cloud_transformed;
-  transformPointCloud(*src_lines.getMiddles(), trg_cloud_transformed, estimated_transform);
+  transformPointCloud(*trg_lines.getMiddles(), trg_cloud_transformed, estimated_transform);
   *sum_cloud += *Visualizer3D::colorizeCloud(trg_cloud_transformed, 0, 0, 255);
   pclVis->removeAllShapes();
   pclVis->removeAllPointClouds();
