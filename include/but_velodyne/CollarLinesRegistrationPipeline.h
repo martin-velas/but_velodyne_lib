@@ -124,7 +124,7 @@ public:
     validation_error(validation_error_), validation_error_deviation(validation_error_deviation_) {
   }
 
-  bool operator<(const RegistrationOutcome &other) {
+  bool operator<(const RegistrationOutcome &other) const {
     if(!isnan(this->validation_error) && !isnan(other.validation_error))
       return this->validation_error < other.validation_error;
     else
