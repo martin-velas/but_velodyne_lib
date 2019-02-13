@@ -172,9 +172,6 @@ target_link_libraries(show_correspondences but_velodyne)
 add_executable(kitti-viewer src/apps/kitti-viewer.cpp)
 target_link_libraries(kitti-viewer but_velodyne)
 
-add_executable(cloud-eraser src/apps/cloud-eraser.cpp)
-target_link_libraries(cloud-eraser but_velodyne)
-
 add_executable(build-3d-model src/apps/build-3d-model.cpp)
 target_link_libraries(build-3d-model but_velodyne)
 
