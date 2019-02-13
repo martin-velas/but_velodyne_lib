@@ -51,7 +51,6 @@ bool parse_arguments(int argc, char **argv,
                      SensorsCalibration &calibration,
                      vector<string> &clouds_to_process,
                      int &frames_dist, bool &circular,
-                     float &depth_quantile,
                      float &depth_relative_tolerance, float &depth_absolute_tolerance,
                      bool &visualize) {
   string pose_filename, sensor_poses_filename;
@@ -66,12 +65,8 @@ bool parse_arguments(int argc, char **argv,
     ("sensor_poses,s", po::value<string>(&sensor_poses_filename)->default_value(""), "Sensors calibration file.")
     ("frames_dist", po::value<int>(&frames_dist)->required(), "Frames distance to compute overlap")
     ("circular", po::bool_switch(&circular), "The trajectory is considered to be circular.")
-    ("depth_quantile", po::value<float>(&depth_quantile)->default_value(0.0),
-        "Quantile of depth within the bin (0.5 for median, 0.0 for minimum, 1.0 for maximum.")
-    ("depth_relative_tolerance", po::value<float>(&depth_relative_tolerance)->default_value(0.1),
-        "Relative tolerance of the depth in Z-buffer.")
-    ("depth_absolute_tolerance", po::value<float>(&depth_absolute_tolerance)->default_value(0.3),
-        "Absolute tolerance of the depth in Z-buffer.")
+    ("depth_relative_tolerance", po::value<float>(&depth_relative_tolerance)->default_value(0.1), "Relative tolerance of the depth in Z-buffer.")
+    ("depth_absolute_tolerance", po::value<float>(&depth_absolute_tolerance)->default_value(0.3), "Absolute tolerance of the depth in Z-buffer.")
     ("visualize", po::bool_switch(&visualize), "Run visualization.")
   ;
   po::variables_map vm;
@@ -104,20 +99,10 @@ bool parse_arguments(int argc, char **argv,
 const float DEG_TO_RAD = M_PI / 180.0;
 const float RAD_TO_DEG = 180.0 / M_PI;
 
-const float EPS = 0.0001;
-const float AZIMUTHAL_RANGE = 360.0;
-const float POLAR_RANGE = 180.0;
-
-float keepInRange(const float value, const float min, const float max, const float eps) {
-  return MIN( MAX(value, min+eps), max-eps );
-}
-
 void pointToSpherical(const PointXYZ &pt, float &azimuth, float &polar, float &range) {
   azimuth = std::atan2(pt.z, pt.x) * RAD_TO_DEG;
-  azimuth = keepInRange(azimuth, -AZIMUTHAL_RANGE/2, AZIMUTHAL_RANGE/2, EPS);
   float horizontal_range = sqrt(pt.x * pt.x + pt.z * pt.z);
   polar = atan(-pt.y / horizontal_range) * RAD_TO_DEG;
-  polar = keepInRange(polar, -POLAR_RANGE/2, POLAR_RANGE/2, EPS);
   range = pt.getVector3fMap().norm();
 }
 
@@ -132,30 +117,14 @@ class SphericalZbuffer {
 public:
   typedef boost::shared_ptr<SphericalZbuffer> Ptr;
 
-  SphericalZbuffer(const PointCloud<PointXYZ> &cloud_,
-      const int azimuthal_bins_, const int polar_bins_, const float depth_quantile) :
+  SphericalZbuffer(const PointCloud<PointXYZ> &cloud_, const int azimuthal_bins_, const int polar_bins_) :
       azimuthal_bins(azimuthal_bins_), polar_bins(polar_bins_),
       azimuthal_resolution(AZIMUTHAL_RANGE / azimuthal_bins_), polar_resolution(POLAR_RANGE / polar_bins_),
-      depths(azimuthal_bins_*polar_bins_) {
-    vector< vector<float> > depth_sets(azimuthal_bins*polar_bins);
+      depths(azimuthal_bins_*polar_bins_, INFINITY) {
     for(PointCloud<PointXYZ>::const_iterator pt = cloud_.begin(); pt < cloud_.end(); pt++) {
       float azimuth, polar, range;
       pointToSpherical(*pt, azimuth, polar, range);
-      int idx = getIndex(azimuth, polar);
-      if(idx >= depth_sets.size()) {
-        cerr << azimuth << " " << polar << endl;
-        cerr << idx << " " << depth_sets.size() << endl;
-      }
-      depth_sets[idx].push_back(range);
-    }
-
-    for(int i = 0; i < depths.size(); i++) {
-      if(depth_sets[i].size() < 5) {
-        depths[i] = -1;
-      } else {
-        sort(depth_sets[i].begin(), depth_sets[i].end());
-        depths[i] = depth_sets[i][depth_sets[i].size()*depth_quantile];
-      }
+      setDepth(azimuth, polar, MIN(range, getDepth(azimuth, polar)));
     }
   }
 
@@ -192,7 +161,7 @@ public:
     float azimuth, polar_angle, range;
     pointToSpherical(point, azimuth, polar_angle, range);
     const float zdepth = this->getDepth(azimuth, polar_angle);
-    return (zdepth*(1.0 + depth_relative_tolerance) + depth_relative_tolerance) > range;
+    return !isinf(zdepth) && (zdepth*(1.0 + depth_relative_tolerance) + depth_relative_tolerance) > range;
   }
 
   void addToVisualizer(Visualizer3D &visualizer, const PointCloud<PointXYZ> &src_cloud,
@@ -240,6 +209,9 @@ protected:
   }
 
 private:
+  static const float AZIMUTHAL_RANGE = 360.0;
+  static const float POLAR_RANGE = 180.0;
+
   const int azimuthal_bins, polar_bins;
   const float azimuthal_resolution, polar_resolution;
   vector<float> depths;
@@ -260,11 +232,11 @@ int main(int argc, char** argv) {
   SensorsCalibration calibration;
   int expected_frames_dist;
   bool circular;
-  float depth_quantile, depth_relative_tolerance, depth_absolute_tolerance;
+  float depth_relative_tolerance, depth_absolute_tolerance;
   bool visualize;
 
   if(!parse_arguments(argc, argv,
-      poses, calibration, filenames, expected_frames_dist, circular, depth_quantile,
+      poses, calibration, filenames, expected_frames_dist, circular,
       depth_relative_tolerance, depth_absolute_tolerance, visualize)) {
     return EXIT_FAILURE;
   }
@@ -280,7 +252,7 @@ int main(int argc, char** argv) {
         PointCloud<PointXYZ> src_cloud;
         src_frame.joinTo(src_cloud);
         transformPointCloud(src_cloud, src_cloud, Eigen::Affine3f(poses[i].rotation()));
-        SphericalZbuffer src_zbuffer(src_cloud, 72, 36, depth_quantile);
+        SphericalZbuffer src_zbuffer(src_cloud, 72, 36);
 
         VelodyneMultiFrame trg_frame = sequence[j];
         PointCloud<PointXYZ> trg_cloud;
@@ -298,9 +270,9 @@ int main(int argc, char** argv) {
           points_within = src_zbuffer.containsPoints(trg_cloud, depth_relative_tolerance, depth_absolute_tolerance,
               within, rest);
           vis->keepOnlyClouds(0)
-              .setColor(0, 0, 0).addPointCloud(src_cloud)
-              .setColor(0, 200, 0).addPointCloud(within)
-              .setColor(255, 0, 0).addPointCloud(rest)
+              .setColor(0, 200, 0).addPointCloud(src_cloud)
+              .setColor(255, 0, 0).addPointCloud(within)
+              .setColor(0, 0, 255).addPointCloud(rest)
               .setColor(255, 0, 255);
           src_zbuffer.addToVisualizer(*vis, src_cloud, depth_relative_tolerance, depth_absolute_tolerance);
         } else {
