@@ -180,7 +180,7 @@ int main(int argc, char** argv) {
     PointXYZ position;
     position.getVector3fMap() = poses[i].translation();
     position.z -= 0.2;
-    visualizer.getViewer()->addText3D(stamp.str(), position, 0.03, 200, 0, 200, visualizer.getId("text"));
+    //visualizer.getViewer()->addText3D(stamp.str(), position, 0.03, 200, 0, 200, visualizer.getId("text"));
   }
 
   visualizer.show();
