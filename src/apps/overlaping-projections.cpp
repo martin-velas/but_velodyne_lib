@@ -136,7 +136,7 @@ public:
       const int azimuthal_bins_, const int polar_bins_, const float depth_quantile) :
       azimuthal_bins(azimuthal_bins_), polar_bins(polar_bins_),
       azimuthal_resolution(AZIMUTHAL_RANGE / azimuthal_bins_), polar_resolution(POLAR_RANGE / polar_bins_),
-      depths(azimuthal_bins_*polar_bins_) {
+      depths(azimuthal_bins_*polar_bins_), visited(azimuthal_bins_*polar_bins_, false) {
     vector< vector<float> > depth_sets(azimuthal_bins*polar_bins);
     for(PointCloud<PointXYZ>::const_iterator pt = cloud_.begin(); pt < cloud_.end(); pt++) {
       float azimuth, polar, range;
@@ -149,12 +149,14 @@ public:
       depth_sets[idx].push_back(range);
     }
 
+    cells_occupied = 0;
     for(int i = 0; i < depths.size(); i++) {
       if(depth_sets[i].size() < 5) {
         depths[i] = -1;
       } else {
         sort(depth_sets[i].begin(), depth_sets[i].end());
         depths[i] = depth_sets[i][depth_sets[i].size()*depth_quantile];
+        cells_occupied++;
       }
     }
   }
@@ -164,7 +166,7 @@ public:
   }
 
   size_t containsPoints(const PointCloud<PointXYZ> &cloud,
-      const float depth_relative_tolerance, const float depth_absolute_tolerance) const {
+      const float depth_relative_tolerance, const float depth_absolute_tolerance) {
     size_t result = 0;
     for(PointCloud<PointXYZ>::const_iterator pt = cloud.begin(); pt < cloud.end(); pt++) {
       if(this->containsPoint(*pt, depth_relative_tolerance, depth_absolute_tolerance)) {
@@ -176,7 +178,7 @@ public:
 
   size_t containsPoints(const PointCloud<PointXYZ> &cloud,
       const float depth_relative_tolerance, const float depth_absolute_tolerance,
-      PointCloud<PointXYZ> &overlap, PointCloud<PointXYZ> &rest) const {
+      PointCloud<PointXYZ> &overlap, PointCloud<PointXYZ> &rest) {
     for(PointCloud<PointXYZ>::const_iterator pt = cloud.begin(); pt < cloud.end(); pt++) {
       if(this->containsPoint(*pt, depth_relative_tolerance, depth_absolute_tolerance)) {
         overlap.push_back(*pt);
@@ -188,9 +190,10 @@ public:
   }
 
   bool containsPoint(const PointXYZ &point,
-    const float depth_relative_tolerance, const float depth_absolute_tolerance) const {
+    const float depth_relative_tolerance, const float depth_absolute_tolerance) {
     float azimuth, polar_angle, range;
     pointToSpherical(point, azimuth, polar_angle, range);
+    this->visit(azimuth, polar_angle);
     const float zdepth = this->getDepth(azimuth, polar_angle);
     return (zdepth*(1.0 + depth_relative_tolerance) + depth_relative_tolerance) > range;
   }
@@ -209,9 +212,23 @@ public:
     visualizer.addPointCloud(vis_cloud);
   }
 
+  float visitedPortion(void) const {
+    int visited_cnt = 0;
+    for(int i = 0; i < visited.size(); i++) {
+      if(visited[i] && depths[i] > 0) {
+        visited_cnt++;
+      }
+    }
+    return (float(visited_cnt)) / cells_occupied;
+  }
+
 protected:
   void setDepth(const float azimuth, const float polar_angle, const float depth) {
     depths[getIndex(azimuth, polar_angle)] = depth;
+  }
+
+  void visit(const float azimuth, const float polar_angle) {
+    visited[getIndex(azimuth, polar_angle)] = true;
   }
 
   int getIndex(const float azimuth, const float polar_angle) const {
@@ -243,6 +260,8 @@ private:
   const int azimuthal_bins, polar_bins;
   const float azimuthal_resolution, polar_resolution;
   vector<float> depths;
+  vector<bool> visited;
+  int cells_occupied;
 };
 
 int get_frames_distance(const int i, const int j, const int frames_count, const bool circular) {
@@ -251,6 +270,10 @@ int get_frames_distance(const int i, const int j, const int frames_count, const 
   } else {
     return MIN(abs(i-j), frames_count-abs(i-j));
   }
+}
+
+float harmonic_avg(const float a, const float b) {
+  return 2.0*a*b/(a+b);
 }
 
 int main(int argc, char** argv) {
@@ -307,7 +330,10 @@ int main(int argc, char** argv) {
           points_within = src_zbuffer.containsPoints(trg_cloud, depth_relative_tolerance, depth_absolute_tolerance);
         }
 
-        cout << i << " " << j << " " << (float (points_within)) / trg_cloud.size() << endl;
+        float visited_portion = src_zbuffer.visitedPortion();
+        float points_within_portion = (float (points_within)) / trg_cloud.size();
+
+        cout << i << " " << j << " " << harmonic_avg(visited_portion, points_within_portion) << endl;
 
         if(visualize) {
           vis->show();
