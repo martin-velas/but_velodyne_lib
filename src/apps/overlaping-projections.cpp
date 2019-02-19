@@ -30,6 +30,7 @@
 
 #include <but_velodyne/Visualizer3D.h>
 #include <but_velodyne/KittiUtils.h>
+#include <but_velodyne/Overlap.h>
 
 #include <pcl/PCLPointCloud2.h>
 #include <pcl/common/eigen.h>
@@ -53,6 +54,7 @@ bool parse_arguments(int argc, char **argv,
                      int &frames_dist, bool &circular,
                      float &depth_quantile,
                      float &depth_relative_tolerance, float &depth_absolute_tolerance,
+                     bool &average_with_zbuffer_occupancy,
                      bool &visualize) {
   string pose_filename, sensor_poses_filename;
 
@@ -73,6 +75,8 @@ bool parse_arguments(int argc, char **argv,
     ("depth_absolute_tolerance", po::value<float>(&depth_absolute_tolerance)->default_value(0.3),
         "Absolute tolerance of the depth in Z-buffer.")
     ("visualize", po::bool_switch(&visualize), "Run visualization.")
+    ("average_with_zbuffer_occupancy", po::bool_switch(&average_with_zbuffer_occupancy),
+        "Average with nuber of occupied cells in the Z-buffer.")
   ;
   po::variables_map vm;
   po::parsed_options parsed = po::parse_command_line(argc, argv, desc);
@@ -101,169 +105,6 @@ bool parse_arguments(int argc, char **argv,
   return true;
 }
 
-const float DEG_TO_RAD = M_PI / 180.0;
-const float RAD_TO_DEG = 180.0 / M_PI;
-
-const float EPS = 0.0001;
-const float AZIMUTHAL_RANGE = 360.0;
-const float POLAR_RANGE = 180.0;
-
-float keepInRange(const float value, const float min, const float max, const float eps) {
-  return MIN( MAX(value, min+eps), max-eps );
-}
-
-void pointToSpherical(const PointXYZ &pt, float &azimuth, float &polar, float &range) {
-  azimuth = std::atan2(pt.z, pt.x) * RAD_TO_DEG;
-  azimuth = keepInRange(azimuth, -AZIMUTHAL_RANGE/2, AZIMUTHAL_RANGE/2, EPS);
-  float horizontal_range = sqrt(pt.x * pt.x + pt.z * pt.z);
-  polar = atan(-pt.y / horizontal_range) * RAD_TO_DEG;
-  polar = keepInRange(polar, -POLAR_RANGE/2, POLAR_RANGE/2, EPS);
-  range = pt.getVector3fMap().norm();
-}
-
-void sphericalToPoint(const float azimuth, const float polar, const float range, PointXYZ &pt) {
-  pt.y = - sin(polar*DEG_TO_RAD)*range;
-  float horizontal_range = cos(polar*DEG_TO_RAD)*range;
-  pt.z = sin(azimuth*DEG_TO_RAD)*horizontal_range;
-  pt.x = cos(azimuth*DEG_TO_RAD)*horizontal_range;
-}
-
-class SphericalZbuffer {
-public:
-  typedef boost::shared_ptr<SphericalZbuffer> Ptr;
-
-  SphericalZbuffer(const PointCloud<PointXYZ> &cloud_,
-      const int azimuthal_bins_, const int polar_bins_, const float depth_quantile) :
-      azimuthal_bins(azimuthal_bins_), polar_bins(polar_bins_),
-      azimuthal_resolution(AZIMUTHAL_RANGE / azimuthal_bins_), polar_resolution(POLAR_RANGE / polar_bins_),
-      depths(azimuthal_bins_*polar_bins_), visited(azimuthal_bins_*polar_bins_, false) {
-    vector< vector<float> > depth_sets(azimuthal_bins*polar_bins);
-    for(PointCloud<PointXYZ>::const_iterator pt = cloud_.begin(); pt < cloud_.end(); pt++) {
-      float azimuth, polar, range;
-      pointToSpherical(*pt, azimuth, polar, range);
-      int idx = getIndex(azimuth, polar);
-      if(idx >= depth_sets.size()) {
-        cerr << azimuth << " " << polar << endl;
-        cerr << idx << " " << depth_sets.size() << endl;
-      }
-      depth_sets[idx].push_back(range);
-    }
-
-    cells_occupied = 0;
-    for(int i = 0; i < depths.size(); i++) {
-      if(depth_sets[i].size() < 5) {
-        depths[i] = -1;
-      } else {
-        sort(depth_sets[i].begin(), depth_sets[i].end());
-        depths[i] = depth_sets[i][depth_sets[i].size()*depth_quantile];
-        cells_occupied++;
-      }
-    }
-  }
-
-  float getDepth(const float azimuth, const float polar_angle) const {
-    return depths[getIndex(azimuth, polar_angle)];
-  }
-
-  size_t containsPoints(const PointCloud<PointXYZ> &cloud,
-      const float depth_relative_tolerance, const float depth_absolute_tolerance) {
-    size_t result = 0;
-    for(PointCloud<PointXYZ>::const_iterator pt = cloud.begin(); pt < cloud.end(); pt++) {
-      if(this->containsPoint(*pt, depth_relative_tolerance, depth_absolute_tolerance)) {
-        result++;
-      }
-    }
-    return result;
-  }
-
-  size_t containsPoints(const PointCloud<PointXYZ> &cloud,
-      const float depth_relative_tolerance, const float depth_absolute_tolerance,
-      PointCloud<PointXYZ> &overlap, PointCloud<PointXYZ> &rest) {
-    for(PointCloud<PointXYZ>::const_iterator pt = cloud.begin(); pt < cloud.end(); pt++) {
-      if(this->containsPoint(*pt, depth_relative_tolerance, depth_absolute_tolerance)) {
-        overlap.push_back(*pt);
-      } else {
-        rest.push_back(*pt);
-      }
-    }
-    return overlap.size();
-  }
-
-  bool containsPoint(const PointXYZ &point,
-    const float depth_relative_tolerance, const float depth_absolute_tolerance) {
-    float azimuth, polar_angle, range;
-    pointToSpherical(point, azimuth, polar_angle, range);
-    this->visit(azimuth, polar_angle);
-    const float zdepth = this->getDepth(azimuth, polar_angle);
-    return (zdepth*(1.0 + depth_relative_tolerance) + depth_relative_tolerance) > range;
-  }
-
-  void addToVisualizer(Visualizer3D &visualizer, const PointCloud<PointXYZ> &src_cloud,
-      const float depth_relative_tolerance = 0.0, const float depth_absolute_tolerance = 0.0) const {
-    PointCloud<PointXYZ> vis_cloud;
-    vis_cloud.resize(src_cloud.size());
-    for(int i = 0; i < src_cloud.size(); i++) {
-      float azimuth, polar_angle, range;
-      pointToSpherical(src_cloud[i], azimuth, polar_angle, range);
-      sphericalToPoint(azimuth, polar_angle,
-          this->getDepth(azimuth, polar_angle)*(1.0 + depth_relative_tolerance) + depth_absolute_tolerance,
-          vis_cloud[i]);
-    }
-    visualizer.addPointCloud(vis_cloud);
-  }
-
-  float visitedPortion(void) const {
-    int visited_cnt = 0;
-    for(int i = 0; i < visited.size(); i++) {
-      if(visited[i] && depths[i] > 0) {
-        visited_cnt++;
-      }
-    }
-    return (float(visited_cnt)) / cells_occupied;
-  }
-
-protected:
-  void setDepth(const float azimuth, const float polar_angle, const float depth) {
-    depths[getIndex(azimuth, polar_angle)] = depth;
-  }
-
-  void visit(const float azimuth, const float polar_angle) {
-    visited[getIndex(azimuth, polar_angle)] = true;
-  }
-
-  int getIndex(const float azimuth, const float polar_angle) const {
-    int aidx = floor((azimuth+AZIMUTHAL_RANGE/2.0) / azimuthal_resolution);
-    int pidx = floor((polar_angle+POLAR_RANGE/2.0) / polar_resolution);
-
-    int result = MIN(aidx, azimuthal_bins-1) * polar_bins + MIN(pidx, polar_bins-1);
-
-    if(result >= depths.size() || result < 0) {
-      cerr << "WARNING - SPHERICAL BINS OVERFLOW!!!" << endl;
-      cerr << "azimuthal_bins: " << azimuthal_bins << endl;
-      cerr << "polar_bins: " << polar_bins << endl;
-      cerr << "azimuthal_resolution: " << azimuthal_resolution << endl;
-      cerr << "polar_resolution: " << polar_resolution << endl;
-
-      cerr << "azimuth: " << azimuth << endl;
-      cerr << "polar_angle: " << polar_angle << endl;
-
-      cerr << "aidx: " << aidx << endl;
-      cerr << "pidx: " << pidx << endl;
-      cerr << "result: " << result << endl;
-      cerr << "--------------------" << endl;
-    }
-
-    return int(aidx) * polar_bins + int(pidx);
-  }
-
-private:
-  const int azimuthal_bins, polar_bins;
-  const float azimuthal_resolution, polar_resolution;
-  vector<float> depths;
-  vector<bool> visited;
-  int cells_occupied;
-};
-
 int get_frames_distance(const int i, const int j, const int frames_count, const bool circular) {
   if(!circular) {
     return abs(i-j);
@@ -273,7 +114,11 @@ int get_frames_distance(const int i, const int j, const int frames_count, const 
 }
 
 float harmonic_avg(const float a, const float b) {
-  return 2.0*a*b/(a+b);
+  if(-0.0001 < a+b && a+b < 0.0001) {
+    return 0;
+  } else {
+    return 2.0*a*b/(a+b);
+  }
 }
 
 int main(int argc, char** argv) {
@@ -284,11 +129,12 @@ int main(int argc, char** argv) {
   int expected_frames_dist;
   bool circular;
   float depth_quantile, depth_relative_tolerance, depth_absolute_tolerance;
-  bool visualize;
+  bool visualize, average_with_zbuffer_occupancy;
 
   if(!parse_arguments(argc, argv,
       poses, calibration, filenames, expected_frames_dist, circular, depth_quantile,
-      depth_relative_tolerance, depth_absolute_tolerance, visualize)) {
+      depth_relative_tolerance, depth_absolute_tolerance,
+      average_with_zbuffer_occupancy, visualize)) {
     return EXIT_FAILURE;
   }
 
@@ -300,26 +146,26 @@ int main(int argc, char** argv) {
       int frames_distace = get_frames_distance(i, j, sequence.size(), circular);
       if(frames_distace == expected_frames_dist) {
         VelodyneMultiFrame src_frame = sequence[i];
-        PointCloud<PointXYZ> src_cloud;
+        PointCloud<VelodynePoint> src_cloud;
         src_frame.joinTo(src_cloud);
         transformPointCloud(src_cloud, src_cloud, Eigen::Affine3f(poses[i].rotation()));
-        SphericalZbuffer src_zbuffer(src_cloud, 72, 36, depth_quantile);
+        SphericalZbuffer src_zbuffer(src_cloud, 180, 90, depth_quantile);
 
         VelodyneMultiFrame trg_frame = sequence[j];
-        PointCloud<PointXYZ> trg_cloud;
+        PointCloud<VelodynePoint> trg_cloud;
         trg_frame.joinTo(trg_cloud);
         transformPointCloud(trg_cloud, trg_cloud, Eigen::Affine3f(poses[j].rotation()));
         Eigen::Vector3f translation = poses[j].translation() - poses[i].translation();
         transformPointCloud(trg_cloud, trg_cloud, translation, Eigen::Quaternionf::Identity());
 
-        size_t points_within;
+        PointCloud<VelodynePoint> within, rest;
+        size_t points_within = src_zbuffer.containsPoints(trg_cloud, depth_relative_tolerance, depth_absolute_tolerance,
+            within, rest);
+
         if(visualize) {
           if(!vis) {
             vis.reset(new Visualizer3D);
           }
-          PointCloud<PointXYZ> within, rest;
-          points_within = src_zbuffer.containsPoints(trg_cloud, depth_relative_tolerance, depth_absolute_tolerance,
-              within, rest);
           vis->keepOnlyClouds(0)
               .setColor(0, 0, 0).addPointCloud(src_cloud)
               .setColor(0, 200, 0).addPointCloud(within)
@@ -330,10 +176,16 @@ int main(int argc, char** argv) {
           points_within = src_zbuffer.containsPoints(trg_cloud, depth_relative_tolerance, depth_absolute_tolerance);
         }
 
-        float visited_portion = src_zbuffer.visitedPortion();
+        float overlap;
         float points_within_portion = (float (points_within)) / trg_cloud.size();
+        if(average_with_zbuffer_occupancy) {
+          float visited_portion = src_zbuffer.visitedPortion();
+          overlap = harmonic_avg(visited_portion, points_within_portion);
+        } else {
+          overlap = points_within_portion;
+        }
 
-        cout << i << " " << j << " " << harmonic_avg(visited_portion, points_within_portion) << endl;
+        cout << i << " " << j << " " << overlap << endl;
 
         if(visualize) {
           vis->show();
