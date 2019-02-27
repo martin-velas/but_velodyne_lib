@@ -194,12 +194,12 @@ void CollarLinesRegistration::findClosestMatchesByMiddles() {
     const PointCloudLine &target_line = target_cloud[target_index].line;
     const PointXYZ &target_line_middle = target_cloud[target_index].middle;
 
-    int K = params.nearestNeighbors;
+    const int K = params.nearestNeighbors;
     vector<int> closest_index(K);
     vector<float> min_distance(K);
     int matches_count = source_kdtree.
         nearestKSearch(target_line_middle, K, closest_index, min_distance);
-    assert(matches_count == 1);
+    assert(matches_count == K);
 
     for(int i = 0; i < matches_count; i++) {
       // distance is actually square of real distance
@@ -207,10 +207,22 @@ void CollarLinesRegistration::findClosestMatchesByMiddles() {
       float distance;
       if(params.rejection_by_line_distances) {
         const PointCloudLine &source_line = source_cloud[source_index].line;
-        distance = target_line.distanceTo(source_line, PointCloudLine::OF_CLOSEST_POINTS);
+        Eigen::Vector3f distance_vec = target_line.distanceVectorFrom(source_line);
+        const Eigen::Vector3f source_normal = source_cloud[source_index].normal;
+        const Eigen::Vector3f target_normal = target_cloud[target_index].normal;
+        if(distance_vec.hasNaN()) {
+          distance = 10e6;
+        } else if(!source_normal.isZero() && !target_normal.isZero()) {
+          const Eigen::Vector3f normal = (source_normal + target_normal) * 0.5;
+          const Eigen::Vector3f projection_to_normal = (normal.dot(distance_vec) / distance_vec.norm())*normal;
+          distance = (distance_vec - projection_to_normal).norm();
+        } else {
+          distance = distance_vec.norm();
+        }
       } else {
         distance = min_distance[i];
       }
+
       DMatch match(target_index, source_index, distance);
       matches.push_back(match);
     }

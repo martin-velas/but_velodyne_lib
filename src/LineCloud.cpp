@@ -35,6 +35,49 @@ namespace but_velodyne
 {
 cv::RNG& LineCloud::rng(cv::theRNG());
 
+Eigen::Vector3f estimate_normal(const PointCloudLine &line, const vector<Eigen::Vector3f> &points) {
+  Eigen::Vector3f normal_sum(0, 0, 0);
+  const Eigen::Vector3f to_origin = line.middle();
+  for(vector<Eigen::Vector3f>::const_iterator p = points.begin(); p < points.end(); p++) {
+    Eigen::Vector3f normal = line.orientation.cross(*p-line.point);
+    if(normal.dot(to_origin) > 0) { // orientation to sensor
+      normal = -normal;
+    }
+    normal_sum += normal;
+  }
+  if(!normal_sum.isZero()) {
+    normal_sum.normalize();
+  }
+  return normal_sum;
+}
+
+void estimate_normals(const vector<PointCloudLine> &lines, vector<Eigen::Vector3f> &normals) {
+  if(lines.size() == 1) {
+    normals.push_back(Eigen::Vector3f::Zero());
+  } else {
+    for(int line_i = 0; line_i < lines.size(); line_i++) {
+      vector<Eigen::Vector3f> cell_points;
+      for(int pair_i = 0; pair_i < lines.size(); pair_i++) {
+        if(line_i != pair_i) {
+          cell_points.push_back(lines[pair_i].point);
+          cell_points.push_back(lines[pair_i].point + lines[pair_i].orientation);
+        }
+      }
+      normals.push_back(estimate_normal(lines[line_i], cell_points));
+    }
+  }
+}
+
+LineCloud::PointCloudLineWithMiddleAndOrigin LineCloud::PointCloudLineWithMiddleAndOrigin::transform(
+    const Eigen::Affine3f &t) const {
+  return PointCloudLineWithMiddleAndOrigin (
+    this->line.transform(t.matrix()),
+    transformPoint(this->middle, t),
+    this->sensor_id,
+    t.rotation() * this->normal
+  );
+}
+
 LineCloud::LineCloud(const PolarGridOfClouds &polar_grid,
                      const int lines_per_cell_pair_generated,
                      CollarLinesFilter &filter_) :
@@ -49,21 +92,28 @@ LineCloud::LineCloud(const PolarGridOfClouds &polar_grid,
                                   CellId(polar, ring, sensor_idx),
                                   lines_per_cell_pair_generated,
                                   lines_among_cells);
-        this->push_back(lines_among_cells, sensor_idx);
+        vector<Eigen::Vector3f> normals;
+        estimate_normals(lines_among_cells, normals);
+        this->push_back(lines_among_cells, sensor_idx, normals);
       }
     }
   }
 }
 
-void LineCloud::push_back(const PointCloudLine &line, const int sensor_id) {
+void LineCloud::push_back(const PointCloudLine &line, const int sensor_id,
+    const Eigen::Vector3f &normal) {
   Eigen::Vector3f middle = line.middle();
-  PointCloudLineWithMiddleAndOrigin new_line(line, PointXYZ(middle.x(), middle.y(), middle.z()), sensor_id);
+  PointCloudLineWithMiddleAndOrigin new_line(line, PointXYZ(middle.x(), middle.y(), middle.z()), sensor_id, normal);
   data.push_back(new_line);
 }
 
-void LineCloud::push_back(const vector<PointCloudLine> &lines, const int sensor_id) {
+void LineCloud::push_back(const vector<PointCloudLine> &lines, const int sensor_id,
+    const std::vector<Eigen::Vector3f> &normals) {
+  int i = 0;
   for(vector<PointCloudLine>::const_iterator l = lines.begin(); l < lines.end(); l++) {
-    this->push_back(*l, sensor_id);
+    Eigen::Vector3f normal = !normals.empty() ? normals[i] : Eigen::Vector3f::Zero();
+    this->push_back(*l, sensor_id, normal);
+    i++;
   }
 }
 
@@ -135,21 +185,15 @@ vector<CellId> LineCloud::getTargetCells(const CellId &source_cell, int total_po
 void LineCloud::transform(const Eigen::Matrix4f &t_matrix, LineCloud &output) const {
   output.data.clear();
   Eigen::Affine3f transformation(t_matrix);
-  for(int i = 0; i < this->size(); i++) {
-    PointCloudLineWithMiddleAndOrigin new_line(
-        data[i].line.transform(t_matrix),
-        transformPoint(data[i].middle, transformation),
-        data[i].sensor_id);
-    output.data.push_back(new_line);
+  for(vector<PointCloudLineWithMiddleAndOrigin>::const_iterator l = data.begin(); l < data.end(); l++) {
+    output.data.push_back(l->transform(transformation));
   }
 }
 
 void LineCloud::transform(const Eigen::Matrix4f &t_matrix) {
   Eigen::Affine3f transformation(t_matrix);
-  for(std::vector<PointCloudLineWithMiddleAndOrigin>::iterator lineWithMidAndOrigin = data.begin();
-      lineWithMidAndOrigin < data.end(); lineWithMidAndOrigin++) {
-    lineWithMidAndOrigin->line = lineWithMidAndOrigin->line.transform(t_matrix);
-    lineWithMidAndOrigin->middle = pcl::transformPoint(lineWithMidAndOrigin->middle, transformation);
+  for(vector<PointCloudLineWithMiddleAndOrigin>::iterator l = data.begin(); l < data.end(); l++) {
+    *l = l->transform(transformation);
   }
 }
 

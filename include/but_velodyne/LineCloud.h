@@ -47,13 +47,17 @@ public:
 
   class PointCloudLineWithMiddleAndOrigin {
   public:
-    PointCloudLineWithMiddleAndOrigin(const PointCloudLine &line_, const pcl::PointXYZ &middle_, const int sensor_id_) :
-      line(line_), middle(middle_), sensor_id(sensor_id_) {
+    PointCloudLineWithMiddleAndOrigin(const PointCloudLine &line_, const pcl::PointXYZ &middle_,
+        const int sensor_id_, const Eigen::Vector3f &normal_ = Eigen::Vector3f::Zero()) :
+      line(line_), middle(middle_), sensor_id(sensor_id_), normal(normal_) {
     }
+
+    PointCloudLineWithMiddleAndOrigin transform(const Eigen::Affine3f &t) const;
 
     PointCloudLine line;
     pcl::PointXYZ middle;
     int sensor_id;
+    Eigen::Vector3f normal;
   };
 
   typedef std::vector<PointCloudLineWithMiddleAndOrigin>::iterator iterator;
@@ -125,9 +129,11 @@ public:
     return *this;
   }
 
-  void push_back(const PointCloudLine &line, const int sensor_id);
+  void push_back(const PointCloudLine &line, const int sensor_id,
+      const Eigen::Vector3f &normal /*= Eigen::Vector3f::Zero()*/);
 
-  void push_back(const std::vector<PointCloudLine> &lines, const int sensor_id);
+  void push_back(const std::vector<PointCloudLine> &lines, const int sensor_id,
+      const std::vector<Eigen::Vector3f> &normals /*= std::vector<Eigen::Vector3f>()*/);
 
   int size(void) const {
     return this->data.size();

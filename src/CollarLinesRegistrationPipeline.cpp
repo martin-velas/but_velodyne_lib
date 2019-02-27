@@ -75,8 +75,9 @@ void CollarLinesRegistrationPipeline::registerTwoGrids(const PolarGridOfClouds &
   vector<RegistrationOutcome> nfold_outcomes(pipeline_params.nfolds);
   for(int fold = 0; fold < pipeline_params.nfolds; fold++) {
     CollarLinesFilter registration_filter(pipeline_params.linesPerCellPreserved);
-    CollarLinesFilter validation_filter(1);
-    int validation_lines_generated = ceil(pipeline_params.linesPerCellGenerated / pipeline_params.linesPerCellPreserved);
+    const int MIN_LINES_PER_CELL = 2;
+    CollarLinesFilter validation_filter(MIN_LINES_PER_CELL);
+    int validation_lines_generated = MIN_LINES_PER_CELL*ceil(pipeline_params.linesPerCellGenerated / pipeline_params.linesPerCellPreserved);
     Termination termination(pipeline_params.term_params);
     while(!termination()) {
       // resampling:
