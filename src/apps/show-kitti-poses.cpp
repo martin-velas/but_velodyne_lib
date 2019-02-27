@@ -80,21 +80,18 @@ void addVelodynePcl(Visualizer3D &vis, const VelodynePointCloud &cloud) {
 bool parse_arguments(int argc, char **argv,
                      vector<Eigen::Affine3f> &poses,
                      vector<string> &clouds_to_process,
-                     vector<bool> &mask,
-                     vector<double> &times,
-                     bool &show_axis) {
-  string pose_filename, skip_filename, times_filename;
+                     SensorsCalibration &calibration,
+                     bool &index_by_cloud_name) {
+  string pose_filename, calibration_filename;
 
-  po::options_description desc("Collar Lines Registration of Velodyne scans\n"
+  po::options_description desc("Poses and point clouds visualization\n"
       "======================================\n"
-      " * Reference(s): Velas et al, ICRA 2016\n"
       " * Allowed options");
   desc.add_options()
-      ("help,h", "produce help message")
-      ("pose_file,p", po::value<string>(&pose_filename)->required(), "KITTI poses file.")
-      ("skip_file,s", po::value<string>(&skip_filename)->default_value(""), "File with indidces to skip.")
-      ("times_file,t", po::value<string>(&times_filename)->default_value(""), "File with timestamps for poses.")
-      ("axis,a", po::value<bool>(&show_axis)->default_value(true), "Show frame axis.")
+    ("help,h", "produce help message")
+    ("pose_file,p", po::value<string>(&pose_filename)->required(), "KITTI poses file.")
+    ("calibration,c", po::value<string>(&calibration_filename)->default_value(""), "Velodynes calibration file.")
+    ("index_by_cloud_name,i", po::bool_switch(&index_by_cloud_name), "Get cloud index from filename.")
   ;
   po::variables_map vm;
   po::parsed_options parsed = po::parse_command_line(argc, argv, desc);
@@ -114,14 +111,11 @@ bool parse_arguments(int argc, char **argv,
 
   poses = KittiUtils::load_kitti_poses(pose_filename);
 
-  mask.resize(poses.size(), true);
-  ifstream skip_file(skip_filename.c_str());
-  string line;
-  while(getline(skip_file, line)) {
-    mask[atoi(line.c_str())] = false;
+  if(calibration_filename.empty()) {
+    calibration = SensorsCalibration();
+  } else {
+    calibration = SensorsCalibration(calibration_filename);
   }
-
-  load_vector_from_file(times_filename, times);
 
   return true;
 }
@@ -129,61 +123,32 @@ bool parse_arguments(int argc, char **argv,
 int main(int argc, char** argv) {
 
   vector<Eigen::Affine3f> poses;
-  vector<bool> mask;
-  vector<double> times;
   vector<string> clouds_fnames;
-  bool show_axis;
-  if(!parse_arguments(argc, argv, poses, clouds_fnames, mask, times, show_axis)) {
+  SensorsCalibration calibration;
+  bool index_by_cloud_name;
+  if(!parse_arguments(argc, argv, poses, clouds_fnames, calibration, index_by_cloud_name)) {
     return EXIT_FAILURE;
   }
 
   Visualizer3D visualizer;
-  VelodynePointCloud cloud;
-  VelodynePointCloud sum_cloud;
+  visualizer.setColor(255, 0, 0);
+  visualizer.setColor(0, 0, 255);
 
-  PointXYZ senzor(0,0,0);
-  for(int i = 0; i < clouds_fnames.size(); i++) {
-    if(mask[i]) {
-      /*if(i%10 != 0) {
-        continue;
-      }*/
-      VelodynePointCloud::fromFile(clouds_fnames[i], cloud, false);
-      transformPointCloud(cloud, cloud, poses[0].inverse()*poses[i]);
-      sum_cloud += cloud;
-      visualizer.keepOnlyClouds(0);
-      addVelodynePcl(visualizer, sum_cloud);
-    }
-  }
-
-  vector<Eigen::Affine3f> poses_to_vis;
-  vector<Eigen::Affine3f> poses_to_skip;
-  for(int i = 0; i < poses.size(); i++) {
-    if(mask[i]) {
-      poses_to_vis.push_back(poses[i]);
+  VelodyneFileSequence sequence(clouds_fnames, calibration);
+  for (int frame_i = 0; sequence.hasNext(); frame_i++) {
+    VelodyneMultiFrame multiframe = sequence.getNext();
+    VelodynePointCloud cloud;
+    multiframe.joinTo(cloud);
+    int pose_i;
+    if(index_by_cloud_name) {
+      pose_i = KittiUtils::kittiNameToIndex(multiframe.filenames.front());
     } else {
-      poses_to_skip.push_back(poses[i]);
+      pose_i = frame_i;
     }
+    visualizer.addPointCloud(cloud, poses[pose_i].matrix());
   }
 
-  if(!show_axis) {
-    visualizer.getViewer()->removeAllCoordinateSystems();
-  }
-
-  visualizer
-    .addPoses(poses_to_vis, 0.3)
-    .setColor(200, 50, 50).addPosesDots(poses_to_vis)
-    .setColor(10, 10, 255).addPosesDots(poses_to_skip);
-
-  for(int i = 0; i < times.size(); i++) {
-    stringstream stamp;
-    stamp << times[i] - times[0];
-    PointXYZ position;
-    position.getVector3fMap() = poses[i].translation();
-    position.z -= 0.2;
-    //visualizer.getViewer()->addText3D(stamp.str(), position, 0.03, 200, 0, 200, visualizer.getId("text"));
-  }
-
-  visualizer.show();
+  visualizer.addPoses(poses, 0.2).show();
 
   return EXIT_SUCCESS;
 }

@@ -54,6 +54,7 @@ bool parse_arguments(int argc, char **argv,
                      VelodyneMultiFrame::Ptr &src_frame, VelodyneMultiFrame::Ptr &trg_frame,
                      bool &visualization, string &matches_output) {
   string sensors_pose_file, init_poses_file;
+  bool index_by_cloud_name;
 
   po::options_description desc("Collar Lines Registration of Velodyne scans\n"
       "======================================\n"
@@ -76,6 +77,9 @@ bool parse_arguments(int argc, char **argv,
         "Run visualization")
     ("matches_output", po::value<string>(&matches_output)->default_value(""),
         "Save matches of CLS to this file")
+    ("index_by_cloud_name", po::bool_switch(&index_by_cloud_name),
+        "Get cloud index from filename.")
+
   ;
 
   po::variables_map vm;
@@ -92,26 +96,20 @@ bool parse_arguments(int argc, char **argv,
       return false;
   }
 
+  if (vm.count("help")) {
+      std::cerr << desc << std::endl;
+      return false;
+  }
+
   if(sensors_pose_file.empty()) {
     calibration = SensorsCalibration();
   } else {
     calibration = SensorsCalibration(sensors_pose_file);
   }
 
-  vector<Eigen::Affine3f> init_poses = KittiUtils::load_kitti_poses(init_poses_file);
-  if(init_poses.size() != 2) {
-    cerr << "ERROR, expected exactly two initial poses." << endl;
-    return false;
-  }
-  init_transform = init_poses[0].inverse() * init_poses[1];
-
-  if (vm.count("help")) {
-      std::cerr << desc << std::endl;
-      return false;
-  }
-
   if (clouds_to_process.size() != 2*calibration.sensorsCount()) {
-    cerr << "ERROR, expected " << 2*calibration.sensorsCount() << " point clouds" << endl;
+    cerr << "ERROR, expected " << 2*calibration.sensorsCount() << " point clouds, found " <<
+        clouds_to_process.size() << endl;
     return false;
   }
   vector<string> src_clouds(clouds_to_process.begin(), clouds_to_process.begin()+calibration.sensorsCount());
@@ -119,6 +117,19 @@ bool parse_arguments(int argc, char **argv,
 
   vector<string> trg_clouds(clouds_to_process.begin()+calibration.sensorsCount(), clouds_to_process.end());
   trg_frame.reset(new VelodyneMultiFrame(trg_clouds, calibration));
+
+  vector<Eigen::Affine3f> init_poses = KittiUtils::load_kitti_poses(init_poses_file);
+  if(init_poses.size() != 2 && !index_by_cloud_name) {
+    cerr << "ERROR, expected exactly two initial poses." << endl;
+    return false;
+  } else if(index_by_cloud_name) {
+    int src_i = KittiUtils::kittiNameToIndex(src_clouds.front());
+    int trg_i = KittiUtils::kittiNameToIndex(trg_clouds.front());
+    cerr << "Using initial transformation: poses[" << src_i << "]^-1 * poses[" << trg_i << "]" << endl;
+    init_transform = init_poses[src_i].inverse() * init_poses[trg_i];
+  } else {
+    init_transform = init_poses[0].inverse() * init_poses[1];
+  }
 
   return true;
 }
@@ -181,7 +192,8 @@ int main(int argc, char** argv) {
   if(visualization) {
     vis->keepOnlyClouds(0)
         .setColor(255, 0, 0).addPointCloud(src_cloud)
-        .setColor(0, 0, 255).addPointCloud(trg_cloud, result.transformation.matrix()).show();
+        .setColor(0, 0, 255).addPointCloud(trg_cloud, result.transformation.matrix())
+        .addPoses(vector<Eigen::Affine3f>(1, init_transform)).show();
   }
 
   return EXIT_SUCCESS;
