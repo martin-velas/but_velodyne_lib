@@ -34,6 +34,8 @@
 #include <pcl/common/eigen.h>
 #include <pcl/common/transforms.h>
 
+#include <boost/filesystem.hpp>
+
 namespace but_velodyne
 {
 
@@ -131,6 +133,11 @@ public:
     }
     ss << suffix;
     return ss.str();
+  }
+
+  static size_t kittiNameToIndex(const std::string &fn) {
+    boost::filesystem::path cloud_fn(fn);
+    return atoi(cloud_fn.filename().c_str());
   }
 
 	static void printPose(std::ostream &ofs, const Eigen::Matrix4f &pose) {
