@@ -51,7 +51,8 @@ bool parse_arguments(int argc, char **argv,
                      vector<Eigen::Affine3f> &poses,
                      SensorsCalibration &calibration,
                      vector<string> &clouds_to_process,
-                     int &frames_dist, bool &circular,
+                     int &source_index,
+                     int &frames_dist, int &max_frames_dist, bool &circular,
                      float &depth_quantile,
                      float &depth_relative_tolerance, float &depth_absolute_tolerance,
                      bool &average_with_zbuffer_occupancy,
@@ -66,7 +67,9 @@ bool parse_arguments(int argc, char **argv,
     ("help,h", "produce help message")
     ("pose_file,p", po::value<string>(&pose_filename)->required(), "KITTI poses file.")
     ("sensor_poses,s", po::value<string>(&sensor_poses_filename)->default_value(""), "Sensors calibration file.")
-    ("frames_dist", po::value<int>(&frames_dist)->required(), "Frames distance to compute overlap")
+    ("src_idx", po::value<int>(&source_index)->default_value(-1), "Source index, if not set, all clouds are considered as source")
+    ("frames_dist", po::value<int>(&frames_dist)->default_value(1), "Frames distance (minimal of max is set) to compute overlap")
+    ("max_frames_dist", po::value<int>(&max_frames_dist)->default_value(-1), "Maximal frames distance. If not set, frames_dist is used.")
     ("circular", po::bool_switch(&circular), "The trajectory is considered to be circular.")
     ("depth_quantile", po::value<float>(&depth_quantile)->default_value(0.0),
         "Quantile of depth within the bin (0.5 for median, 0.0 for minimum, 1.0 for maximum.")
@@ -102,6 +105,10 @@ bool parse_arguments(int argc, char **argv,
     calibration = SensorsCalibration(sensor_poses_filename);
   }
 
+  if(max_frames_dist < 0) {
+    max_frames_dist = frames_dist;
+  }
+
   return true;
 }
 
@@ -126,14 +133,15 @@ int main(int argc, char** argv) {
   vector<string> filenames;
   vector<Eigen::Affine3f> poses;
   SensorsCalibration calibration;
-  int expected_frames_dist;
+  int source_index;
+  int expected_frames_dist, max_frames_dist;
   bool circular;
   float depth_quantile, depth_relative_tolerance, depth_absolute_tolerance;
   bool visualize, average_with_zbuffer_occupancy;
 
   if(!parse_arguments(argc, argv,
-      poses, calibration, filenames, expected_frames_dist, circular, depth_quantile,
-      depth_relative_tolerance, depth_absolute_tolerance,
+      poses, calibration, filenames, source_index, expected_frames_dist, max_frames_dist, circular,
+      depth_quantile, depth_relative_tolerance, depth_absolute_tolerance,
       average_with_zbuffer_occupancy, visualize)) {
     return EXIT_FAILURE;
   }
@@ -142,14 +150,18 @@ int main(int argc, char** argv) {
   Visualizer3D::Ptr vis;
 
   for(int i = 0; i < sequence.size(); i++) {
+    if(source_index >= 0) {
+      i = source_index;
+    }
+    VelodyneMultiFrame src_frame = sequence[i];
+    PointCloud<VelodynePoint> src_cloud;
+    src_frame.joinTo(src_cloud);
+    transformPointCloud(src_cloud, src_cloud, Eigen::Affine3f(poses[i].rotation()));
+    SphericalZbuffer src_zbuffer(src_cloud, 180, 90, depth_quantile);
+
     for(int j = i+1; j < sequence.size(); j++) {
       int frames_distace = get_frames_distance(i, j, sequence.size(), circular);
-      if(frames_distace == expected_frames_dist) {
-        VelodyneMultiFrame src_frame = sequence[i];
-        PointCloud<VelodynePoint> src_cloud;
-        src_frame.joinTo(src_cloud);
-        transformPointCloud(src_cloud, src_cloud, Eigen::Affine3f(poses[i].rotation()));
-        SphericalZbuffer src_zbuffer(src_cloud, 180, 90, depth_quantile);
+      if(expected_frames_dist <= frames_distace && frames_distace <= max_frames_dist) {
 
         VelodyneMultiFrame trg_frame = sequence[j];
         PointCloud<VelodynePoint> trg_cloud;
@@ -158,11 +170,11 @@ int main(int argc, char** argv) {
         Eigen::Vector3f translation = poses[j].translation() - poses[i].translation();
         transformPointCloud(trg_cloud, trg_cloud, translation, Eigen::Quaternionf::Identity());
 
-        PointCloud<VelodynePoint> within, rest;
-        size_t points_within = src_zbuffer.containsPoints(trg_cloud, depth_relative_tolerance, depth_absolute_tolerance,
-            within, rest);
-
+        size_t points_within;
         if(visualize) {
+          PointCloud<VelodynePoint> within, rest;
+          points_within = src_zbuffer.containsPoints(trg_cloud, depth_relative_tolerance, depth_absolute_tolerance,
+                                                     within, rest);
           if(!vis) {
             vis.reset(new Visualizer3D);
           }
@@ -191,6 +203,9 @@ int main(int argc, char** argv) {
           vis->show();
         }
       }
+    }
+    if(source_index >= 0) {
+      break;
     }
   }
 
