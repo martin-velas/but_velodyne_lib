@@ -45,73 +45,92 @@ using namespace velodyne_pointcloud;
 using namespace but_velodyne;
 namespace po = boost::program_options;
 
-int main(int argc, char** argv) {
+class Edge {
 
-  string clouds_dir;
-  SensorsCalibration calibration;
-  if(argc > 2) {
-    clouds_dir = argv[1];
-    calibration = SensorsCalibration(argv[2]);
+public:
+
+  Edge(const int src_, const int trg_, const Eigen::Affine3f &t_) :
+    src(src_), trg(trg_) , t(t_) {
   }
+
+  Edge(void) :
+    src(-1), trg(-1) {
+  }
+
+  int dist(void) {
+    return abs(trg-src);
+  }
+
+  int src, trg;
+  Eigen::Affine3f t;
+};
+
+const int BATCH_SIZE = 1000;
+
+int main(int argc, char** argv) {
 
   string line;
   vector<Eigen::Affine3f> poses;
   poses.push_back(Eigen::Affine3f::Identity());
-  int expected_index = 1;
-  Visualizer3D vis;
-  vis.getViewer()->setBackgroundColor(0, 0, 0);
-  bool poses_added = false;
-  cv::RNG &rng = cv::theRNG();
+  Edge loop;
+  bool loop_found = false;
+  vector<Edge> edges;
   while(getline(cin, line)) {
     int src_i, trg_i;
     float tx, ty, tz, rx, ry, rz;
     sscanf(line.c_str(), "EDGE3 %d %d %f %f %f %f %f %f", &src_i, &trg_i, &tx, &ty, &tz, &rx, &ry, &rz);
-    printf("EDGE3 %d %d %f %f %f %f %f %f\n", src_i, trg_i, tx, ty, tz, rx, ry, rz);
     Eigen::Affine3f t = getTransformation(tx, ty, tz, rx, ry, rz);
-    if(trg_i == expected_index && src_i == (expected_index-1)) {
-      poses.push_back(poses.back()*t);
-      expected_index++;
-    } else {
-      if(!poses_added) {
-        vis.setColor(50, 200, 200).addPosesDots(poses);
-        poses_added = true;
-      }
-      cerr << "Loop " << src_i << " -> " << trg_i << endl;
-      if(src_i >= poses.size() || trg_i >= poses.size()) {
-        cerr << "  WARGING: there are only " << poses.size() << " poses in graph - skipping" << endl;
-      } else {
-        if((abs(src_i-trg_i) > 10 && (src_i+trg_i)%50 == 0)) {
-          const PointXYZ &src = KittiUtils::positionFromPose(poses[src_i]);
-          PointXYZ src_transformed = KittiUtils::positionFromPose(poses[src_i]*t);
-          const PointXYZ &trg = KittiUtils::positionFromPose(poses[trg_i]);
-          PointCloudLine loop(trg, src);
-          PointCloudLine expectation(trg, src_transformed);
-          uchar r = rng(256);
-          uchar g = rng(256);
-          uchar b = rng(256);
-          vis.setColor(b, g, r).addLine(loop).setColor(b, g, r).addArrow(expectation);
+    Edge edge(src_i, trg_i, t);
 
-          if(!clouds_dir.empty()) {
-            PointCloud<PointXYZ> src_cloud, trg_cloud;
-            vector<string> src_filenames, trg_filenames;
-            src_filenames.push_back(clouds_dir + "/" + KittiUtils::getKittiFrameName(src_i, ".pcd", 1));
-            src_filenames.push_back(clouds_dir + "/" + KittiUtils::getKittiFrameName(src_i, ".pcd", 2));
-            VelodyneMultiFrame src_frame(src_filenames, calibration);
-            src_frame.joinTo(src_cloud);
-            trg_filenames.push_back(clouds_dir + "/" + KittiUtils::getKittiFrameName(trg_i, ".pcd", 1));
-            trg_filenames.push_back(clouds_dir + "/" + KittiUtils::getKittiFrameName(trg_i, ".pcd", 2));
-            VelodyneMultiFrame trg_frame(trg_filenames, calibration);
-            trg_frame.joinTo(trg_cloud);
-            vis.setColor(200, 50, 50).addPointCloud(src_cloud, poses[src_i].matrix());
-            vis.setColor(50, 50, 200).addPointCloud(trg_cloud, poses[trg_i].matrix());
-            vis.setColor(50, 200, 50).addPointCloud(trg_cloud, (poses[src_i]*t).matrix());
-          }
-          if((src_i+trg_i)%500 == 0) {
-            vis.show();
-          }
-        }
+    if(edge.dist() == 1) {
+      if(poses.size() == edge.trg) {
+        poses.push_back(poses[edge.src]*edge.t);
+      } else {
+        PCL_ERROR(("Increasing order broken, line: " + line).c_str());
+        return EXIT_FAILURE;
+      }
+    } else {
+      if(!loop_found) {
+        loop_found = true;
+        loop = edge;
+      } else {
+        edges.push_back(edge);
       }
     }
+  }
+
+  Visualizer3D vis;
+  vis.getViewer()->setBackgroundColor(0, 0, 0);
+
+  PointCloudLine loop_arrow(poses[loop.src].translation(),
+      poses[loop.trg].translation() - poses[loop.src].translation());
+
+  int edge_idx = 0;
+  while(edge_idx < edges.size()) {
+    vis.getViewer()->removeAllShapes();
+    vis.keepOnlyClouds(0);
+    vis.addPosesDots(poses);
+    vis.addArrow(loop_arrow);
+    PointCloud<PointXYZRGB>::Ptr trg_points(new PointCloud<PointXYZRGB>);
+    for(int i = 0; i < BATCH_SIZE && edge_idx < edges.size(); i++, edge_idx++) {
+      const Edge &e = edges[edge_idx];
+      Eigen::Affine3f correction = e.t.inverse() * poses[e.src].inverse() * poses[e.trg];
+      PointXYZ src_pt, trg_pt_original, trg_pt_moved;
+      src_pt.getVector3fMap() = poses[e.src].translation();
+      trg_pt_original.getVector3fMap() = (poses[e.trg]).translation();
+      trg_pt_moved.getVector3fMap() = (poses[e.src]*e.t).translation();
+      //PointCloudLine connection(src_pt, trg_pt_original);
+      PointCloudLine arrow(trg_pt_original, trg_pt_moved);
+      float r = vis.rngF();
+      float g = vis.rngF();
+      float b = vis.rngF();
+      //vis.addLine(connection, r, g, b);
+      vis.addLine(arrow, r, g, b);
+      PointXYZRGB colot_trg_pt(r*256, g*256, b*256);
+      copyXYZ(trg_pt_moved, colot_trg_pt);
+      trg_points->push_back(colot_trg_pt);
+    }
+    vis.addColorPointCloud(trg_points).show();
   }
 
   return EXIT_SUCCESS;
