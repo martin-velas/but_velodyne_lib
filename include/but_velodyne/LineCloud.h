@@ -130,10 +130,10 @@ public:
   }
 
   void push_back(const PointCloudLine &line, const int sensor_id,
-      const Eigen::Vector3f &normal /*= Eigen::Vector3f::Zero()*/);
+      const Eigen::Vector3f &normal);
 
   void push_back(const std::vector<PointCloudLine> &lines, const int sensor_id,
-      const std::vector<Eigen::Vector3f> &normals /*= std::vector<Eigen::Vector3f>()*/);
+      const std::vector<Eigen::Vector3f> &normals);
 
   int size(void) const {
     return this->data.size();
