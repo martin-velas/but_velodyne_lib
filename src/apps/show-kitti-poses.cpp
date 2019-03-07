@@ -81,7 +81,8 @@ bool parse_arguments(int argc, char **argv,
                      vector<Eigen::Affine3f> &poses,
                      vector<string> &clouds_to_process,
                      SensorsCalibration &calibration,
-                     bool &index_by_cloud_name) {
+                     bool &index_by_cloud_name,
+                     bool &color_by_phase) {
   string pose_filename, calibration_filename;
 
   po::options_description desc("Poses and point clouds visualization\n"
@@ -92,6 +93,7 @@ bool parse_arguments(int argc, char **argv,
     ("pose_file,p", po::value<string>(&pose_filename)->required(), "KITTI poses file.")
     ("calibration,c", po::value<string>(&calibration_filename)->default_value(""), "Velodynes calibration file.")
     ("index_by_cloud_name,i", po::bool_switch(&index_by_cloud_name), "Get cloud index from filename.")
+    ("color_by_phase", po::bool_switch(&color_by_phase), "Color clouds by rotor phase.")
   ;
   po::variables_map vm;
   po::parsed_options parsed = po::parse_command_line(argc, argv, desc);
@@ -125,8 +127,9 @@ int main(int argc, char** argv) {
   vector<Eigen::Affine3f> poses;
   vector<string> clouds_fnames;
   SensorsCalibration calibration;
-  bool index_by_cloud_name;
-  if(!parse_arguments(argc, argv, poses, clouds_fnames, calibration, index_by_cloud_name)) {
+  bool index_by_cloud_name, color_by_phase;
+  if(!parse_arguments(argc, argv, poses, clouds_fnames, calibration,
+      index_by_cloud_name, color_by_phase)) {
     return EXIT_FAILURE;
   }
 
@@ -145,7 +148,11 @@ int main(int argc, char** argv) {
     } else {
       pose_i = frame_i;
     }
-    visualizer.addPointCloud(cloud, poses[pose_i].matrix());
+    if(color_by_phase) {
+      visualizer.addColorPointCloud(Visualizer3D::colorizeCloudByPhase(cloud), poses[pose_i].matrix());
+    } else {
+      visualizer.addPointCloud(cloud, poses[pose_i].matrix());
+    }
   }
 
   visualizer.addPoses(poses, 0.2).show();
