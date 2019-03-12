@@ -179,9 +179,6 @@ target_link_libraries(build-3d-model but_velodyne)
 add_executable(threshold-intensity src/apps/threshold-intensity.cpp)
 target_link_libraries(threshold-intensity but_velodyne)
 
-add_executable(hor-align-and-defile src/apps/hor-align-and-defile.cpp)
-target_link_libraries(hor-align-and-defile but_velodyne)
-
 add_executable(hor-align-from-ground-normal src/apps/hor-align-from-ground-normal.cpp)
 target_link_libraries(hor-align-from-ground-normal but_velodyne)
 
@@ -216,9 +213,6 @@ target_link_libraries(find-loops-vfh but_velodyne)
 
 add_executable(verify-loops src/apps/verify-loops.cpp)
 target_link_libraries(verify-loops but_velodyne)
-
-add_executable(register-loops src/apps/register-loops.cpp)
-target_link_libraries(register-loops but_velodyne)
 
 add_executable(slampp-solution-to-poses src/apps/slampp-solution-to-poses.cpp)
 target_link_libraries(slampp-solution-to-poses but_velodyne)
@@ -277,7 +271,7 @@ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/but_velodyne-config.cmake" "${CMAKE_C
 
 install(
 TARGETS but_velodyne collar-lines-odom show-kitti-poses show_correspondences extract-vfh
-    find-loops-vfh verify-loops register-loops slampp-solution-to-poses
+    find-loops-vfh verify-loops slampp-solution-to-poses
 RUNTIME DESTINATION bin/
 LIBRARY DESTINATION lib/
 INCLUDES DESTINATION include/
