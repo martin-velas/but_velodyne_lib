@@ -249,7 +249,7 @@ Visualizer3D& Visualizer3D::addPosesDots(const vector<Eigen::Affine3f> &poses, i
 
 Visualizer3D& Visualizer3D::addPoses(const vector<Eigen::Affine3f> &poses, float axis_size, int viewport) {
   for(vector<Eigen::Affine3f>::const_iterator p = poses.begin(); p < poses.end(); p++) {
-    this->getViewer()->addCoordinateSystem(axis_size, *p, viewport);
+    this->getViewer()->addCoordinateSystem(axis_size, *p, getId("cs"), viewport);
   }
   return *this;
 }
