@@ -159,6 +159,9 @@ target_link_libraries(sync-velodyne-clouds but_velodyne)
 add_executable(calibrate-imu-velodyne-by-normals src/apps/calibrate-imu-velodyne-by-normals.cpp)
 target_link_libraries(calibrate-imu-velodyne-by-normals but_velodyne)
 
+add_executable(calibrate-imu-velodyne-evolution src/apps/calibrate-imu-velodyne-evolution.cpp)
+target_link_libraries(calibrate-imu-velodyne-evolution but_velodyne)
+
 add_executable(get-ranges src/apps/get-ranges.cpp)
 target_link_libraries(get-ranges but_velodyne)
 
