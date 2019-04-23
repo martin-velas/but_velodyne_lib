@@ -208,9 +208,6 @@ target_link_libraries(visualize-corrections but_velodyne)
 add_executable(extract-vfh src/apps/extract-vfh.cpp)
 target_link_libraries(extract-vfh but_velodyne)
 
-add_executable(find-loops-vfh src/apps/find-loops-vfh.cpp)
-target_link_libraries(find-loops-vfh but_velodyne)
-
 add_executable(verify-loops src/apps/verify-loops.cpp)
 target_link_libraries(verify-loops but_velodyne)
 
@@ -271,7 +268,7 @@ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/but_velodyne-config.cmake" "${CMAKE_C
 
 install(
 TARGETS but_velodyne collar-lines-odom show-kitti-poses show_correspondences extract-vfh
-    find-loops-vfh verify-loops slampp-solution-to-poses
+    verify-loops slampp-solution-to-poses
 RUNTIME DESTINATION bin/
 LIBRARY DESTINATION lib/
 INCLUDES DESTINATION include/
