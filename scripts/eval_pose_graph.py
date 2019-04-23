@@ -6,6 +6,7 @@ import argparse
 from odometry_cnn_data import Odometry
 from collections import defaultdict
 import numpy as np
+import json
 
 
 class EdgeKey:
@@ -32,6 +33,12 @@ class EdgeKey:
     def __hash__(self):
         return self.srcIdx*1000000 + self.trgIdx
 
+    def increasing(self):
+        return self.srcIdx <= self.trgIdx
+
+    def swap(self):
+        return EdgeKey(self.trgIdx, self.srcIdx)
+
 
 def vertex_in_range(vertex, start, end, vertices_cnt, circular):
     if not circular or (end - start) < vertices_cnt/2:
@@ -49,43 +56,38 @@ def compute_connectivity(edges, verticles_cnt, circular):
     return connectivity
 
 
-class GraphEnvelope:
+class Graph:
     maxDepth = 4
     allPaths = []
 
-    def __init__(self, start_idx, end_idx, all_edges, vertices_cnt, circular):
-        self.start = start_idx
-        self.end = end_idx
+    def __init__(self, all_edges):
         self.edges = defaultdict(list)
-        self.verticesCnt = vertices_cnt
+        self.verticesCnt = -1
         for e in all_edges.keys():
-            if self.hasOverlapWith(e, circular) and (e.srcIdx != self.start or e.trgIdx != self.end):
-                self.edges[e.srcIdx].append(e.trgIdx)
-                self.edges[e.trgIdx].append(e.srcIdx)
-
-    def hasOverlapWith(self, edge, circular):
-        return vertex_in_range(edge.srcIdx, self.start, self.end, self.verticesCnt, circular) or \
-               vertex_in_range(edge.trgIdx, self.start, self.end, self.verticesCnt, circular)
+            self.verticesCnt = max([e.srcIdx, e.trgIdx, self.verticesCnt])
+            self.edges[e.srcIdx].append(e.trgIdx)
+            self.edges[e.trgIdx].append(e.srcIdx)
+        self.verticesCnt += 1
 
     def empty(self):
         return len(self.edges) == 0
 
-    def findPaths(self):
+    def findPaths(self, edge):
         self.allPaths = []
         visited = [False]*self.verticesCnt
-        self.findPathsRecursive(self.start, visited, [])
+        self.findPathsRecursive(edge.srcIdx, edge.trgIdx, visited, [])
         return self.allPaths
 
-    def findPathsRecursive(self, current, visited, path):
+    def findPathsRecursive(self, current, target, visited, path):
         visited[current] = True
         path.append(current)
 
-        if current == self.end:
+        if current == target:
             self.allPaths.append(copy.deepcopy(path))
         elif len(path) < self.maxDepth:
             for next in self.edges[current]:
                 if not visited[next]:
-                    self.findPathsRecursive(next, visited, path)
+                    self.findPathsRecursive(next, target, visited, path)
 
         path.pop()
         visited[current] = False
@@ -93,16 +95,18 @@ class GraphEnvelope:
 
 def path_transformation(edges, path):
     T = np.eye(4)
-    for src_i, trg_i in zip(path[:len(paths)-1], path[1:]):
-        swap = src_i > trg_i
-        if swap:
-            src_i, trg_i = trg_i, src_i
-        if not swap:
-            Ti = edges[EdgeKey(src_i, trg_i)][0]
+    for e in path2edges(path):
+        if e.increasing():
+            Ti = edges[e][0]
         else:
-            Ti = edges[EdgeKey(src_i, trg_i)][1]
+            Ti = edges[e.swap()][1]
         T = np.dot(T, Ti)
     return T
+
+
+def path2edges(path):
+    src_trg_pairs = zip(path[:len(paths) - 1], path[1:])
+    return [EdgeKey(src_i, trg_i) for src_i, trg_i in src_trg_pairs]
 
 
 def load_edges(file):
@@ -115,33 +119,48 @@ def load_edges(file):
     return edges
 
 
-parser = argparse.ArgumentParser(description="Evaluation of the registrations (future edges in pose graph)")
-parser.add_argument("-c", "--out_connectivity", dest="connectivity_fn", type=str, required=False)
-parser.add_argument("-e", "--out_error", dest="error_fn", type=str, required=False)
-parser.add_argument("--circular", dest="circular", default=False, action="store_true")
-args = parser.parse_args()
+if __name__ == "__main__":
 
-edges = load_edges(sys.stdin)
-vertices_cnt = max(sum([[e.srcIdx, e.trgIdx] for e in edges], [])) + 1
+    parser = argparse.ArgumentParser(description="Evaluation of the registrations (future edges in pose graph)")
+    parser.add_argument("-c", "--out_connectivity", dest="connectivity_fn", type=str, required=False)
+    parser.add_argument("-e", "--out_error", dest="error_fn", type=str, required=False)
+    parser.add_argument("--circular", dest="circular", default=False, action="store_true")
+    args = parser.parse_args()
 
-if args.connectivity_fn is not None:
-    connectivity = compute_connectivity(edges, vertices_cnt, args.circular)
-    with open(args.connectivity_fn, "w") as connectivity_file:
-        for c in connectivity:
-            connectivity_file.write("%d\n" % (c,))
+    edges = load_edges(sys.stdin)
+    vertices_cnt = max(sum([[e.srcIdx, e.trgIdx] for e in edges], [])) + 1
 
-if args.error_fn is not None:
-    with open(args.error_fn, "w") as error_file:
+    if args.connectivity_fn is not None:
+        connectivity = compute_connectivity(edges, vertices_cnt, args.circular)
+        with open(args.connectivity_fn, "w") as connectivity_file:
+            for c in connectivity:
+                connectivity_file.write("%d\n" % (c,))
+
+    edge_errors = defaultdict(list)
+    graph = Graph(edges)
+    if args.error_fn is not None:
         for e in edges:
-            subgraph = GraphEnvelope(e.srcIdx, e.trgIdx, edges, vertices_cnt, args.circular)
-            paths = subgraph.findPaths() if not subgraph.empty() else []
-            errors = []
+            paths = graph.findPaths(e)
             Te = edges[e][0]
             for p in paths:
                 Tp = path_transformation(edges, p)
-                errors.append(np.linalg.norm(Te[0:3, 3] - Tp[0:3, 3]))
-            if len(errors) == 0:
-                error = -1.0
-            else:
-                error = np.median(errors)
-            error_file.write("%d %d %f\n" % (e.srcIdx, e.trgIdx, error))
+                err = np.linalg.norm((np.linalg.inv(Te)*Tp)[0:3, 3])
+                edge_errors[e].append(err)
+                for adj_edge in path2edges(p):
+                    if not adj_edge.increasing():
+                        adj_edge = adj_edge.swap()
+                    edge_errors[adj_edge].append(err)
+
+        with open(args.error_fn + ".json", "w") as errors_json_file:
+            json_edge_errors = {}
+            for e in edge_errors:
+                json_edge_errors[str(e.srcIdx) + " " + str(e.trgIdx)] = edge_errors[e]
+            json.dump(json_edge_errors, errors_json_file)
+
+        with open(args.error_fn, "w") as error_file:
+            for e in edges:
+                if e in edge_errors:
+                    error = np.median(edge_errors[e])
+                else:
+                    error = -1.0
+                error_file.write("%d %d %f\n" % (e.srcIdx, e.trgIdx, error))
