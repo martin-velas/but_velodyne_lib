@@ -59,7 +59,7 @@ src/VelodynePointCloud.cpp src/Visualizer2D.cpp src/Visualizer3D.cpp
 src/VelodyneSpecification.cpp src/CollarLinesFilter.cpp src/GroundDetectionDataGenerator.cpp
 src/EigenUtils.cpp src/GlobalOptimization.cpp src/common.cpp src/Clustering.cpp src/NormalsEstimation.cpp
 src/SubseqRegistration.cpp src/KittiUtils.cpp src/RegistrationCrossValidation.cpp src/CollarLinesValidation.cpp
-src/Overlap.cpp)
+src/Overlap.cpp src/InterpolationSE3.cpp)
 target_include_directories(but_velodyne PUBLIC ${PROJECT_SOURCE_DIR}/include)
 target_link_libraries(but_velodyne ${PCL_LIBRARIES})
 target_link_libraries(but_velodyne ${OpenCV_LIBS})
@@ -225,6 +225,9 @@ target_link_libraries(correct-velodyne-distortion but_velodyne)
 
 add_executable(correct-velodyne-distortion-fine src/apps/correct-velodyne-distortion-fine.cpp)
 target_link_libraries(correct-velodyne-distortion-fine but_velodyne)
+
+add_executable(interpolate-transformation src/apps/interpolate-transformation.cpp)
+target_link_libraries(interpolate-transformation but_velodyne)
 
 add_executable(pose-graph-viewer src/apps/pose-graph-viewer.cpp)
 target_link_libraries(pose-graph-viewer but_velodyne)
