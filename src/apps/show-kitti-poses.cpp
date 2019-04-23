@@ -82,7 +82,8 @@ bool parse_arguments(int argc, char **argv,
                      vector<string> &clouds_to_process,
                      SensorsCalibration &calibration,
                      bool &index_by_cloud_name,
-                     bool &color_by_phase) {
+                     bool &color_by_phase,
+                     bool &show_indices) {
   string pose_filename, calibration_filename;
 
   po::options_description desc("Poses and point clouds visualization\n"
@@ -94,6 +95,7 @@ bool parse_arguments(int argc, char **argv,
     ("calibration,c", po::value<string>(&calibration_filename)->default_value(""), "Velodynes calibration file.")
     ("index_by_cloud_name,i", po::bool_switch(&index_by_cloud_name), "Get cloud index from filename.")
     ("color_by_phase", po::bool_switch(&color_by_phase), "Color clouds by rotor phase.")
+    ("show_indices", po::bool_switch(&show_indices), "Show indices over poses.")
   ;
   po::variables_map vm;
   po::parsed_options parsed = po::parse_command_line(argc, argv, desc);
@@ -127,15 +129,17 @@ int main(int argc, char** argv) {
   vector<Eigen::Affine3f> poses;
   vector<string> clouds_fnames;
   SensorsCalibration calibration;
-  bool index_by_cloud_name, color_by_phase;
+  bool index_by_cloud_name, color_by_phase, show_indices;
   if(!parse_arguments(argc, argv, poses, clouds_fnames, calibration,
-      index_by_cloud_name, color_by_phase)) {
+      index_by_cloud_name, color_by_phase, show_indices)) {
     return EXIT_FAILURE;
   }
 
   Visualizer3D visualizer;
+
   visualizer.setColor(255, 0, 0);
   visualizer.setColor(0, 0, 255);
+  visualizer.setColor(0, 200, 0);
 
   VelodyneFileSequence sequence(clouds_fnames, calibration);
   for (int frame_i = 0; sequence.hasNext(); frame_i++) {
@@ -155,6 +159,16 @@ int main(int argc, char** argv) {
     }
   }
 
+  if(show_indices) {
+    for(int i = 0; i < poses.size(); i++) {
+      stringstream ss;
+      ss << i;
+      PointXYZ pt;
+      pt.getVector3fMap() = poses[i].translation();
+      pt.y -= visualizer.rngF() * 0.05 + 0.01;
+      visualizer.getViewer()->addText3D(ss.str(), pt, 0.01, 0.8, 0.0, 0.8);
+    }
+  }
   visualizer.addPoses(poses, 0.2).show();
 
   return EXIT_SUCCESS;
