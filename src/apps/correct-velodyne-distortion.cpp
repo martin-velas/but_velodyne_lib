@@ -1,6 +1,4 @@
 /*
- * Visualization of KITTI poses file.
- *
  * Copyright (C) Brno University of Technology (BUT)
  *
  * This file is part of software developed by Robo@FIT group.
@@ -31,11 +29,7 @@
 #include <but_velodyne/VelodynePointCloud.h>
 #include <but_velodyne/Visualizer3D.h>
 #include <but_velodyne/KittiUtils.h>
-#include <but_velodyne/PolarGridOfClouds.h>
-#include <but_velodyne/LineCloud.h>
-#include <but_velodyne/CollarLinesRegistration.h>
-#include <but_velodyne/CollarLinesRegistrationPipeline.h>
-#include <but_velodyne/Termination.h>
+#include <but_velodyne/InterpolationSE3.h>
 
 #include <pcl/common/eigen.h>
 #include <pcl/common/transforms.h>
@@ -49,26 +43,11 @@ using namespace velodyne_pointcloud;
 using namespace but_velodyne;
 namespace po = boost::program_options;
 
-const int SLICES_COUNT = 36;
-
-void getSlices(const VelodynePointCloud &in_cloud, vector<VelodynePointCloud> &slices) {
-  float polar_bin_size = 1.0 / slices.size();
-  for(VelodynePointCloud::const_iterator pt = in_cloud.begin(); pt < in_cloud.end(); pt++) {
-    int bin = floor(pt->phase/polar_bin_size);
-    if(bin >= SLICES_COUNT) {
-      cerr << pt->phase << endl;
-    } else {
-      slices[bin].push_back(*pt);
-    }
-  }
-}
-
 bool parse_arguments(
     int argc, char **argv,
     vector<Eigen::Affine3f> &poses,
     SensorsCalibration &calibration,
     vector<string> &clouds_to_process,
-    bool &apply_also_transformation,
     string &out_dir) {
 
   string pose_filename, sensors_pose_file;
@@ -76,14 +55,12 @@ bool parse_arguments(
   po::options_description desc(
       "Correction of Velodyne point clouds distortion\n"
           "======================================\n"
-          " * Reference(s): ???\n"
           " * Allowed options");
   desc.add_options()
       ("help,h", "produce help message")
       ("pose_file,p", po::value<string>(&pose_filename)->required(), "KITTI poses file.")
       ("out_dir,o", po::value<string>(&out_dir)->required(), "Output directory for clouds.")
       ("sensors_pose_file,s", po::value<string>(&sensors_pose_file)->default_value(""), "Sensors poses (calibration).")
-      ("apply_also_transformation", po::bool_switch(&apply_also_transformation), "Apply also transformations to the presented poses.")
   ;
 
   po::variables_map vm;
@@ -111,36 +88,52 @@ bool parse_arguments(
   return true;
 }
 
-Eigen::Affine3f get_fraction_of_transformation(const Eigen::Affine3f &whole, const float portion) {
-  assert(0.0 <= portion && portion  <= 1.0);
-
-  Eigen::Quaternionf rotation(whole.rotation());
-  rotation = Eigen::Quaternionf::Identity().slerp(portion, rotation);
-  Eigen::Translation3f translation(whole.translation() * portion);
-
-  return translation * rotation;
+void getSlices(const VelodynePointCloud &in_cloud, vector<VelodynePointCloud> &slices) {
+  float polar_bin_size = 1.0 / slices.size();
+  for(VelodynePointCloud::const_iterator pt = in_cloud.begin(); pt < in_cloud.end(); pt++) {
+    int bin = floor(pt->phase/polar_bin_size);
+    if(bin >= slices.size()) {
+      cerr << pt->phase << endl;
+    } else {
+      slices[bin].push_back(*pt);
+    }
+  }
 }
 
 void fix_cloud(const VelodynePointCloud &in_cloud,
-    Eigen::Affine3f delta_pose,
+    const Eigen::Affine3f &sensor_pose,
+    const Eigen::Affine3f &delta_pose,
     VelodynePointCloud &out_cloud) {
+  VelodynePointCloud in_cloud_calibrated;
+  transformPointCloud(in_cloud, in_cloud_calibrated, sensor_pose);
+
+  static const int SLICES_COUNT = 36;
   vector<VelodynePointCloud> slices(SLICES_COUNT);
-  getSlices(in_cloud, slices);
-  /*
-  vis.keepOnlyClouds(0);
+  getSlices(in_cloud_calibrated, slices);
+
+  LinearInterpolationSE3 interpolation(Eigen::Affine3f::Identity(), delta_pose);
   for(int i = 0; i < slices.size(); i++) {
-    vis.setColor(0, 100, i*(255.0/SLICES_COUNT)).addPointCloud(slices[i]);
-  }
-  vis.show();
-  */
-  for(int i = 0; i < slices.size(); i++) {
-    Eigen::Affine3f t = get_fraction_of_transformation(delta_pose, ((float) i)/SLICES_COUNT);
+    Eigen::Affine3f t = interpolation.estimate(((float) i)/SLICES_COUNT);
     transformPointCloud(slices[i], slices[i], t);
-//      vis.setColor(i*(255.0/SLICES_COUNT), 100, 0).addPointCloud(slices[i]);
     out_cloud += slices[i];
   }
-//    vis.show();
-  transformPointCloud(out_cloud, out_cloud, in_cloud.getAxisCorrection().inverse());
+
+  transformPointCloud(out_cloud, out_cloud, sensor_pose.inverse());
+  if(!in_cloud.getAxisCorrection().isIdentity()) {
+    transformPointCloud(out_cloud, out_cloud, in_cloud.getAxisCorrection().inverse());
+  }
+}
+
+void fix_cloud(const VelodynePointCloud &in_cloud,
+    const BSplineSE3 &spline,
+    const Eigen::Affine3f &sensor_pose,
+    VelodynePointCloud &out_cloud) {
+  transformPointCloud(in_cloud, out_cloud, sensor_pose);
+  const Eigen::Affine3f &T0_inv = spline.estimate(0.0).inverse();
+  for(VelodynePointCloud::iterator p = out_cloud.begin(); p < out_cloud.end(); p++) {
+    *p = transformPoint(*p, T0_inv*spline.estimate(p->phase));
+  }
+  transformPointCloud(out_cloud, out_cloud, sensor_pose.inverse());
 }
 
 int main(int argc, char** argv) {
@@ -148,28 +141,27 @@ int main(int argc, char** argv) {
   vector<Eigen::Affine3f> poses;
   SensorsCalibration calibration;
   vector<string> clouds_to_process;
-  bool apply_also_transformation;
   string out_dir;
-  if(!parse_arguments(argc, argv, poses, calibration, clouds_to_process, apply_also_transformation,
-      out_dir)) {
+  if(!parse_arguments(argc, argv, poses, calibration, clouds_to_process, out_dir)) {
     return EXIT_FAILURE;
   }
 
-//  Visualizer3D vis;
-  int output_count = MIN(clouds_to_process.size(), poses.size()) - 1;
   VelodyneFileSequence file_sequence(clouds_to_process, calibration);
   for(int frame_i = 0; file_sequence.hasNext() && frame_i+1 < poses.size(); frame_i++) {
 
     VelodyneMultiFrame multiframe = file_sequence.getNext();
-    Eigen::Affine3f poses_delta = poses[frame_i].inverse()*poses[frame_i+1];
 
     for(int sensor_i = 0; sensor_i < calibration.sensorsCount(); sensor_i++) {
       VelodynePointCloud out_cloud;
-      Eigen::Affine3f sensor_pose = multiframe.calibration.ofSensor(sensor_i);
-      fix_cloud(*multiframe.clouds[sensor_i], sensor_pose.inverse()*poses_delta*sensor_pose, out_cloud);
+      const Eigen::Affine3f &sensor_pose = multiframe.calibration.ofSensor(sensor_i);
 
-      if(apply_also_transformation) {
-        transformPointCloud(out_cloud, out_cloud, sensor_pose.inverse()*poses[frame_i]*sensor_pose);
+      if(frame_i > 0 && frame_i+2 < poses.size()) {
+        vector<Eigen::Affine3f> control_poses(poses.begin()+(frame_i-1), poses.begin()+(frame_i+3));
+        const BSplineSE3 spline(control_poses);
+        fix_cloud(*multiframe.clouds[sensor_i], spline, sensor_pose, out_cloud);
+      } else {
+        const Eigen::Affine3f poses_delta = poses[frame_i].inverse()*poses[frame_i+1];
+        fix_cloud(*multiframe.clouds[sensor_i], sensor_pose, poses_delta, out_cloud);
       }
 
       boost::filesystem::path first_cloud(multiframe.filenames[sensor_i]);
