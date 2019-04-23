@@ -33,9 +33,9 @@ public:
   virtual ~CollarLinesFilter() {
   }
 
-  void filterLines(const std::vector<PointCloudLine> &in_line_cloud,
-                   std::vector<PointCloudLine> &out_line_cloud,
-                   const CellId &src_cell, const CellId &targ_cell) const;
+  void filterLines(const std::vector<PointCloudLine> &in_lines,
+                   const CellId &src_cell, const CellId &targ_cell,
+                   std::vector<PointCloudLine> &out_lines, std::vector<size_t> &out_indices) const;
 
 protected:
   virtual bool checkLine(const PointCloudLine &line, const CellId &src_cell, const CellId &targ_cell) const;

@@ -92,6 +92,10 @@ void filter_by_range(const pcl::PointCloud<PointT> &input, pcl::PointCloud<Point
   output.erase(out_it, output.end());
 }
 
+float gauss(const float x, const float mean, const float variance);
+
+float harmonicalAverage(const float a, const float b);
+
 }
 
 #endif /* COMMON_H_ */

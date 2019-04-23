@@ -104,7 +104,10 @@ public:
         bool estimate_translation_only_ = false,
         bool dont_estimate_roll_pitch_ = false,
         bool rejection_by_line_distances_ = false,
-        bool dont_extend_segments_ = false) :
+        bool separate_sensors_ = false,
+        float phase_weights_mean_ = NAN,
+        float phase_weights_variance_ = NAN,
+        float phase_weights_min_ = 0.01) :
         distance_threshold(distance_threshold_),
         distance_threshold_decay(distance_threshold_decay_),
         distance_threshold_value(distance_threshold_value_),
@@ -114,7 +117,10 @@ public:
         estimate_translation_only(estimate_translation_only_),
         dont_estimate_roll_pitch(dont_estimate_roll_pitch_),
         rejection_by_line_distances(rejection_by_line_distances_),
-        dont_extend_segments(dont_extend_segments_) {
+        separate_sensors(separate_sensors_),
+        phase_weights_mean(phase_weights_mean_),
+        phase_weights_variance(phase_weights_variance_),
+        phase_weights_min(phase_weights_min_) {
     }
     Threshold distance_threshold;       /// how is the threshold of line matches distance estimated
     float distance_threshold_decay;
@@ -125,7 +131,10 @@ public:
     bool estimate_translation_only;
     bool dont_estimate_roll_pitch;
     bool rejection_by_line_distances;
-    bool dont_extend_segments;
+    bool separate_sensors;
+    float phase_weights_mean;
+    float phase_weights_variance;
+    float phase_weights_min;
 
     void prepareForLoading(boost::program_options::options_description &options_desc);
 
@@ -149,6 +158,9 @@ public:
     refinements_done(0) {
 
     source_kdtree.setInputCloud(source_cloud.getMiddles());
+    if(params.separate_sensors) {
+      fillKdtreesBySensors();
+    }
     this->target_cloud.transform(initial_transformation);
   }
 
@@ -165,6 +177,9 @@ public:
     matching_time(0), correnspondences_time(0), tranformation_time(0), error_time(0),
     refinements_done(0) {
 
+    if(params.separate_sensors) {
+      fillKdtreesBySensors();
+    }
     this->target_cloud.transform(initial_transformation);
   }
 
@@ -211,7 +226,11 @@ public:
   float matching_time, correnspondences_time, tranformation_time, error_time;
 
 protected:
+  int getMatches(const int target_index, vector<int> &closest_index, vector<float> &min_distance) const;
+
   void findClosestMatchesByMiddles();
+
+  float getPhaseWeight(const float phase) const;
 
   void getCorrespondingPoints(MatrixOfPoints &source_coresp_points,
                               MatrixOfPoints &target_coresp_points);
@@ -239,9 +258,13 @@ protected:
   float getMatchesPortion(float ratio);
   float getMatchesMean();
 
+  void fillKdtreesBySensors(void);
+
 private:
   const LineCloud &source_cloud;
   pcl::KdTreeFLANN<pcl::PointXYZ> source_kdtree;
+  vector< pcl::KdTreeFLANN<pcl::PointXYZ> > source_kdtrees_by_sensor;
+  vector< std::vector<int> > source_cloud_indices_by_sensor;
   LineCloud target_cloud;
   std::vector<cv::DMatch> matches;
   std::vector<cv::DMatch> rejected_matches;

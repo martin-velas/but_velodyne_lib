@@ -48,8 +48,9 @@ public:
   class PointCloudLineWithMiddleAndOrigin {
   public:
     PointCloudLineWithMiddleAndOrigin(const PointCloudLine &line_, const pcl::PointXYZ &middle_,
-        const int sensor_id_, const Eigen::Vector3f &normal_ = Eigen::Vector3f::Zero()) :
-      line(line_), middle(middle_), sensor_id(sensor_id_), normal(normal_) {
+        const int sensor_id_, const Eigen::Vector3f &normal_ = Eigen::Vector3f::Zero(),
+        const float phase_ = NAN) :
+      line(line_), middle(middle_), sensor_id(sensor_id_), normal(normal_), phase(phase_) {
     }
 
     PointCloudLineWithMiddleAndOrigin transform(const Eigen::Affine3f &t) const;
@@ -58,6 +59,7 @@ public:
     pcl::PointXYZ middle;
     int sensor_id;
     Eigen::Vector3f normal;
+    float phase;
   };
 
   typedef std::vector<PointCloudLineWithMiddleAndOrigin>::iterator iterator;
@@ -130,10 +132,10 @@ public:
   }
 
   void push_back(const PointCloudLine &line, const int sensor_id,
-      const Eigen::Vector3f &normal);
+      const Eigen::Vector3f &normal, const float phase);
 
   void push_back(const std::vector<PointCloudLine> &lines, const int sensor_id,
-      const std::vector<Eigen::Vector3f> &normals);
+      const std::vector<Eigen::Vector3f> &normals, std::vector<float> &phases);
 
   int size(void) const {
     return this->data.size();
@@ -145,12 +147,14 @@ protected:
   void generateLineCloudFromCell(const PolarGridOfClouds &polar_grid,
                                  const CellId &source_cell,
                                  const int lines_per_cell_pair_generated,
-                                 std::vector<PointCloudLine> &line_cloud) const;
+                                 std::vector<PointCloudLine> &line_cloud,
+                                 std::vector<float> &output_phases) const;
 
   void generateLineCloudAmongCells(const PolarGridOfClouds &polar_grid,
                                    CellId cell1, CellId cell2,
                                    int lines_per_cell_pair_generated,
-                                   std::vector<PointCloudLine> &line_cloud) const;
+                                   std::vector<PointCloudLine> &line_cloud,
+                                   std::vector<float> &output_phases) const;
 
   std::vector<CellId> getTargetCells(const CellId &source_cell, int total_polar_bins, int bin_subdivision) const;
 

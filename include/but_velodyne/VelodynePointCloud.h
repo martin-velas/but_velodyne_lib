@@ -518,6 +518,53 @@ private:
   int index;
 };
 
+class PhaseFilter {
+
+public:
+  PhaseFilter(const float min_phase_, const float max_phase_) :
+    min_phase(min_phase_), max_phase(max_phase_) {
+  }
+
+  void filter(VelodynePointCloud &cloud) const {
+    for(VelodynePointCloud::iterator p = cloud.begin(); p < cloud.end();) {
+      if(min_phase <= p->phase && p->phase < max_phase) {
+        p++;
+      } else {
+        p = cloud.erase(p);
+      }
+    }
+  }
+
+  void filter(const VelodynePointCloud &input, VelodynePointCloud &slice, VelodynePointCloud &rest) const {
+    for(VelodynePointCloud::const_iterator p = input.begin(); p < input.end(); p++) {
+      if(min_phase <= p->phase && p->phase < max_phase) {
+        slice.push_back(*p);
+      } else {
+        rest.push_back(*p);
+      }
+    }
+  }
+
+  void filter(VelodyneMultiFrame &multiframe) const {
+    for(std::vector<VelodynePointCloud::Ptr>::iterator cloud = multiframe.clouds.begin();
+        cloud < multiframe.clouds.end(); cloud++) {
+      filter(**cloud);
+    }
+  }
+
+  float getMaxPhase() const {
+    return max_phase;
+  }
+
+  float getMinPhase() const {
+    return min_phase;
+  }
+
+private:
+  float min_phase;
+  float max_phase;
+};
+
 }
 
 #endif /* VELODYNEPOINTCLOUD_H_ */

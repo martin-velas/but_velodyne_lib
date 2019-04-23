@@ -114,8 +114,14 @@ void CollarLinesRegistration::Parameters::prepareForLoading(po::options_descript
         "How many nearest neighbors (matches) are found for each line of source frame.")
       ("rejection_by_line_distances", po::bool_switch(&this->rejection_by_line_distances),
           "Line matches are thresholded by the distances of lines. By default, line midpoints are used.")
-      ("dont_extend_segments", po::bool_switch(&this->dont_extend_segments),
-          "Do not extent the CLS into infinite lines - correspondences outside segments are discarted.")
+      ("separate_sensors", po::bool_switch(&this->separate_sensors),
+          "Do not match lines across the sensors.")
+      ("phase_weights_mean", po::value<float>(&this->phase_weights_mean)->default_value(this->phase_weights_mean),
+          "The matches are weighted by the phase (gaussian mean)")
+      ("phase_weights_variance", po::value<float>(&this->phase_weights_variance)->default_value(this->phase_weights_variance),
+          "The matches are weighted by the phase (gaussian variance sigma^2)")
+      ("phase_weights_min", po::value<float>(&this->phase_weights_min)->default_value(this->phase_weights_min),
+          "Minimum weight by the phase for matches")
   ;
 }
 
@@ -170,7 +176,13 @@ float CollarLinesRegistration::computeError(
   target_points_transformed = transformation * target_points_transformed;
   MatrixOfPoints difference = source_coresp_points - target_points_transformed.block(0, 0, 3, matches.size());
   VectorXf square_distances = difference.cwiseProduct(difference).transpose() * Vector3f::Ones();
-  float error = (square_distances.cwiseSqrt()).sum() / matches.size();
+  VectorXf distances = square_distances.cwiseSqrt();
+
+  WeightsMatrix weights;
+  getWeightingMatrix(weights);
+  VectorXf distances_weighted = weights * distances;
+
+  float error = distances_weighted.sum();
 
   if(params.normalize_error_by_threshold) {
     error /= thresholdTypeToFraction()*getEffectiveDecay();
@@ -187,19 +199,62 @@ const void CollarLinesRegistration::getLastMatches(std::vector<CLSMatch> &out_ma
   }
 }
 
+void CollarLinesRegistration::fillKdtreesBySensors(void) {
+  int sensors_cnt = -1;
+  for(LineCloud::const_iterator l = source_cloud.begin(); l < source_cloud.end(); l++) {
+    sensors_cnt = MAX(sensors_cnt, l->sensor_id);
+  }
+  sensors_cnt++;
+
+  vector< PointCloud<PointXYZ>::Ptr > sensors_middles(sensors_cnt);
+  for(int sensor_i = 0; sensor_i < sensors_cnt; sensor_i++) {
+    sensors_middles[sensor_i].reset(new PointCloud<PointXYZ>);
+  }
+
+  source_cloud_indices_by_sensor.resize(sensors_cnt);
+  for(int i = 0; i < source_cloud.size(); i++) {
+    const LineCloud::PointCloudLineWithMiddleAndOrigin l = source_cloud[i];
+    sensors_middles[l.sensor_id]->push_back(l.middle);
+    source_cloud_indices_by_sensor[l.sensor_id].push_back(i);
+  }
+
+  source_kdtrees_by_sensor.resize(sensors_cnt);
+  for(int sensor_i = 0; sensor_i < sensors_cnt; sensor_i++) {
+    source_kdtrees_by_sensor[sensor_i].setInputCloud(sensors_middles[sensor_i]);
+  }
+}
+
+int CollarLinesRegistration::getMatches(const int target_index,
+    vector<int> &closest_index, vector<float> &min_distance) const {
+
+  const PointXYZ &target_line_middle = target_cloud[target_index].middle;
+  const int target_sensor = target_cloud[target_index].sensor_id;
+
+  const int K = params.nearestNeighbors;
+  closest_index.resize(K);
+  min_distance.resize(K);
+
+  int matches_count;
+  if(params.separate_sensors) {
+    matches_count = source_kdtrees_by_sensor[target_sensor].nearestKSearch(target_line_middle, K, closest_index, min_distance);
+    for(int i = 0; i < matches_count; i++) {
+      closest_index[i] = source_cloud_indices_by_sensor[target_sensor][closest_index[i]];
+    }
+  } else {
+    matches_count = source_kdtree.nearestKSearch(target_line_middle, K, closest_index, min_distance);
+  }
+
+  assert(matches_count == K);
+  return matches_count;
+}
+
 void CollarLinesRegistration::findClosestMatchesByMiddles() {
   matches.clear();
 
   for(int target_index = 0; target_index < target_cloud.size(); target_index++) {
-    const PointCloudLine &target_line = target_cloud[target_index].line;
-    const PointXYZ &target_line_middle = target_cloud[target_index].middle;
-
-    const int K = params.nearestNeighbors;
-    vector<int> closest_index(K);
-    vector<float> min_distance(K);
-    int matches_count = source_kdtree.
-        nearestKSearch(target_line_middle, K, closest_index, min_distance);
-    assert(matches_count == K);
+    vector<int> closest_index;
+    vector<float> min_distance;
+    int matches_count = getMatches(target_index, closest_index, min_distance);
 
     for(int i = 0; i < matches_count; i++) {
       // distance is actually square of real distance
@@ -207,6 +262,7 @@ void CollarLinesRegistration::findClosestMatchesByMiddles() {
       float distance;
       if(params.rejection_by_line_distances) {
         const PointCloudLine &source_line = source_cloud[source_index].line;
+        const PointCloudLine &target_line = target_cloud[target_index].line;
         Eigen::Vector3f distance_vec = target_line.distanceVectorFrom(source_line);
         const Eigen::Vector3f source_normal = source_cloud[source_index].normal;
         const Eigen::Vector3f target_normal = target_cloud[target_index].normal;
@@ -243,21 +299,6 @@ void CollarLinesRegistration::findClosestMatchesByMiddles() {
     effective_threshold = getMatchesPortion(thresholdTypeToFraction()*getEffectiveDecay());
   }
   filterMatchesByThreshold(effective_threshold);
-
-  if(params.dont_extend_segments) {
-    for(vector<DMatch>::iterator m = matches.begin(); m < matches.end();) {
-      const PointCloudLine &source_line = source_cloud[m->trainIdx].line;
-      const PointCloudLine &target_line = target_cloud[m->queryIdx].line;
-
-      Vector3f source_line_pt, target_line_pt;
-      if(source_line.closestPointsWith(target_line, source_line_pt, target_line_pt)) {
-        m++;
-      } else {
-        m = matches.erase(m);
-        rejected_matches.push_back(*m);
-      }
-    }
-  }
 }
 
 void CollarLinesRegistration::filterMatchesByThreshold(const float threshold) {
@@ -313,6 +354,16 @@ float CollarLinesRegistration::getMatchesMean() {
   return sum / matches.size();
 }
 
+float CollarLinesRegistration::getPhaseWeight(const float phase) const {
+  static const float phase_weights_scale = 1.0
+      / gauss(params.phase_weights_mean, params.phase_weights_mean, params.phase_weights_variance);
+  if(isnan(phase)) {
+    return 0.0;
+  } else {
+    return gauss(phase, params.phase_weights_mean, params.phase_weights_variance) * phase_weights_scale + params.phase_weights_min;
+  }
+}
+
 void CollarLinesRegistration::getCorrespondingPoints(
     MatrixOfPoints &source_coresp_points,
     MatrixOfPoints &target_coresp_points) {
@@ -343,6 +394,10 @@ void CollarLinesRegistration::getCorrespondingPoints(
       weight = getVerticalWeight(source_line.orientation, target_line.orientation);
     } else if(params.weighting == DISTANCE_WEIGHTS) {
       weight = 1.0/match->distance;
+    } else if(!isnan(params.phase_weights_mean) && !isnan(params.phase_weights_variance)) {
+      float source_phase = source_cloud[match->trainIdx].phase;
+      float target_phase = target_cloud[match->queryIdx].phase;
+      weight = harmonicalAverage(getPhaseWeight(source_phase), getPhaseWeight(target_phase));
     } else {
       assert(params.weighting == NO_WEIGHTS);
       weight = 1.0;
@@ -351,16 +406,20 @@ void CollarLinesRegistration::getCorrespondingPoints(
   }
 
   /* visualisation:
-  Visualizer3D vis;
+  static Visualizer3D vis;
+  vis.getViewer()->removeAllShapes();
+  vis.keepOnlyClouds(0)
+          .setColor(255, 0, 0).addPointCloud(*source_cloud.getMiddles())
+          .setColor(0, 0, 255).addPointCloud(*target_cloud.getMiddles())
+          .show();
   for(int i = 0; i < matches.size(); i++) {
-    if(i%3 == 0) {
-      float w = MIN(1.0, correspondences_weights.data()[i]);
-      PointCloudLine source_line = source_cloud.line_cloud[matches[i].trainIdx];
-      vis.addLine(source_line, w, 0, 0);
+    if(i%10 == 0) {
+      const PointCloudLine &source_line = source_cloud[matches[i].trainIdx].line;
+      vis.addLine(source_line);
     }
   }
   cerr << endl << endl;
-  vis.show();*/
+  vis.show(); */
 }
 
 float CollarLinesRegistration::getVerticalWeight(const Vector3f &source_line_orient,
@@ -440,7 +499,7 @@ Eigen::Matrix4f CollarLinesRegistration::computeTransformationWeighted(
   // This is not properly covariance matrix as there is missing the 1/N
   // 1/N is important for computing eigenvalues(scale), not the eigenvectors(directions) - as we are interested in eigenvectors
 
-  Matrix3f A = target_coresp_points_translated * weights * source_coresp_points_translated.transpose();
+  Matrix3f A = target_coresp_points_translated * weights * weights * source_coresp_points_translated.transpose();
 
   if(params.dont_estimate_roll_pitch) {
     A.row(1) << 0, 0, 0;

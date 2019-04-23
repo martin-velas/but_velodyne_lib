@@ -17,39 +17,52 @@ using namespace pcl;
 namespace but_velodyne
 {
 
+class PointCloudLineWithIndex {
+public:
+  PointCloudLineWithIndex(const PointCloudLine &line_, const size_t index_) :
+    line(line_), index(index_) {
+  }
+
+  bool operator < (const PointCloudLineWithIndex &other) const {
+    return this->line < other.line;
+  }
+
+  bool lessByHorizontalRangeDiff(const PointCloudLineWithIndex &other) const {
+    return this->line.horizontalRangeDiff() < other.line.horizontalRangeDiff();
+  }
+
+  PointCloudLine line;
+  size_t index;
+};
+
 bool CollarLinesFilter::checkLine(const PointCloudLine &line, const CellId &src_cell, const CellId &targ_cell) const {
   return true;
 }
 
-bool orderLinesByHorizontalRangeDiff(const PointCloudLine &first, const PointCloudLine &second) {
-  return first.horizontalRangeDiff() < second.horizontalRangeDiff();
+bool orderLinesByHorizontalRangeDiff(const PointCloudLineWithIndex &first, const PointCloudLineWithIndex &second) {
+  return first.lessByHorizontalRangeDiff(second);
 }
 
-void CollarLinesFilter::filterLines(const vector<PointCloudLine> &in_lines, vector<PointCloudLine> &out_lines,
-                                   const CellId &src_cell, const CellId &targ_cell) const {
-  //bool visualize = (abs(src_cell.ring - targ_cell.ring) > 1 && src_cell.polar == 135 && src_cell.polar < 140) && false;
-  //if(visualize)
-  //  Visualizer3D::getCommonVisualizer()->getViewer()->removeAllShapes();
-  vector<PointCloudLine> filtered_lines;
-  for(vector<PointCloudLine>::const_iterator l = in_lines.begin(); l < in_lines.end(); l++) {
-    if(checkLine(*l, src_cell, targ_cell)) {
-      //if(visualize)
-      //  Visualizer3D::getCommonVisualizer()->addLine(*l, 0.0, 0.0, 1.0);
-      filtered_lines.push_back(*l);
-    } else {
-      //if(visualize)
-      //  Visualizer3D::getCommonVisualizer()->addLine(*l, 1.0, 0.0, 0.0);
-    }
+void CollarLinesFilter::filterLines(const vector<PointCloudLine> &in_lines,
+                                   const CellId &src_cell, const CellId &targ_cell,
+                                   vector<PointCloudLine> &out_lines, vector<size_t> &out_indices) const {
+  vector<PointCloudLineWithIndex> filtered_lines;
+  for(size_t i = 0; i < in_lines.size(); i++) {
+    const PointCloudLine &line = in_lines[i];
+    filtered_lines.push_back(PointCloudLineWithIndex(line, i));
   }
-  //if(visualize)
-  //  Visualizer3D::getCommonVisualizer()->show();
+
   if(comparation_metric == LINE_LENGTH) {
     sort(filtered_lines.begin(), filtered_lines.end());
   } else if (comparation_metric == HORIZONTAL_RANGE_DIFF) {
     sort(filtered_lines.begin(), filtered_lines.end(), orderLinesByHorizontalRangeDiff);
   }
   int lines_to_effectively_preserve = MIN(lines_to_preserve, filtered_lines.size());
-  out_lines.insert(out_lines.end(), filtered_lines.begin(), filtered_lines.begin()+lines_to_effectively_preserve);
+
+  for(int i = 0; i < lines_to_effectively_preserve; i++) {
+    out_lines.push_back(filtered_lines[i].line);
+    out_indices.push_back(filtered_lines[i].index);
+  }
 }
 
 bool AngularCollarLinesFilter::checkLine(const PointCloudLine &line, const CellId &src_cell, const CellId &targ_cell) const {

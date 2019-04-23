@@ -5,6 +5,8 @@
  *      Author: ivelas
  */
 
+#include <cmath>
+
 #include <pcl/common/common.h>
 
 #include <but_velodyne/common.h>
@@ -40,6 +42,18 @@ void invert_indices(const vector<int> &labels, vector< PointIndices::Ptr > &inve
   }
   for(int i = 0; i < labels.size(); i++) {
     inverted_indices[labels[i]]->indices.push_back(i);
+  }
+}
+
+float gauss(const float x, const float mean, const float variance) {
+  return exp( - pow((x-mean), 2) / (2*variance) ) / sqrt( 2*M_PI*variance );
+}
+
+float harmonicalAverage(const float a, const float b) {
+  if(-0.0001 < a+b && a+b < 0.0001) {
+    return 0;
+  } else {
+    return 2.0*a*b/(a+b);
   }
 }
 

@@ -30,6 +30,7 @@
 
 using namespace std;
 using namespace pcl;
+using namespace velodyne_pointcloud;
 
 namespace but_velodyne
 {
@@ -74,7 +75,8 @@ LineCloud::PointCloudLineWithMiddleAndOrigin LineCloud::PointCloudLineWithMiddle
     this->line.transform(t.matrix()),
     transformPoint(this->middle, t),
     this->sensor_id,
-    t.rotation() * this->normal
+    t.rotation() * this->normal,
+    this->phase
   );
 }
 
@@ -88,31 +90,33 @@ LineCloud::LineCloud(const PolarGridOfClouds &polar_grid,
       for(int ring = 0; ring < polar_grid.rings-1; ring++) {
         //cerr << "Ring: " << ring << ", expected_range: " << VelodyneSpecification::getExpectedRange(ring, VelodyneSpecification::KITTI_HEIGHT) << endl;
         vector<PointCloudLine> lines_among_cells;
+        std::vector<float> phases;
         generateLineCloudFromCell(polar_grid,
                                   CellId(polar, ring, sensor_idx),
                                   lines_per_cell_pair_generated,
-                                  lines_among_cells);
+                                  lines_among_cells, phases);
         vector<Eigen::Vector3f> normals;
         estimate_normals(lines_among_cells, normals);
-        this->push_back(lines_among_cells, sensor_idx, normals);
+        this->push_back(lines_among_cells, sensor_idx, normals, phases);
       }
     }
   }
 }
 
 void LineCloud::push_back(const PointCloudLine &line, const int sensor_id,
-    const Eigen::Vector3f &normal) {
+    const Eigen::Vector3f &normal, const float phase) {
   Eigen::Vector3f middle = line.middle();
-  PointCloudLineWithMiddleAndOrigin new_line(line, PointXYZ(middle.x(), middle.y(), middle.z()), sensor_id, normal);
+  PointCloudLineWithMiddleAndOrigin new_line(line, PointXYZ(middle.x(), middle.y(), middle.z()),
+      sensor_id, normal, phase);
   data.push_back(new_line);
 }
 
 void LineCloud::push_back(const vector<PointCloudLine> &lines, const int sensor_id,
-    const std::vector<Eigen::Vector3f> &normals) {
+    const std::vector<Eigen::Vector3f> &normals, vector<float> &phases) {
   int i = 0;
   for(vector<PointCloudLine>::const_iterator l = lines.begin(); l < lines.end(); l++) {
     Eigen::Vector3f normal = !normals.empty() ? normals[i] : Eigen::Vector3f::Zero();
-    this->push_back(*l, sensor_id, normal);
+    this->push_back(*l, sensor_id, normal, phases[i]);
     i++;
   }
 }
@@ -128,7 +132,8 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr LineCloud::getMiddles(void) const {
 void LineCloud::generateLineCloudAmongCells(const PolarGridOfClouds &polar_grid,
                                             CellId cell1_id, CellId cell2_id,
                                             int lines_per_cell_pair_generated,
-                                            vector<PointCloudLine> &output_lines) const {
+                                            vector<PointCloudLine> &output_lines,
+                                            vector<float> &output_phases) const {
   const VelodynePointCloud *cell1 = &polar_grid[cell1_id];
   const VelodynePointCloud *cell2;
   while(true) {
@@ -145,26 +150,41 @@ void LineCloud::generateLineCloudAmongCells(const PolarGridOfClouds &polar_grid,
   int lines_to_generate = MIN(lines_per_cell_pair_generated, cell1->size()*cell2->size());
 
   vector<PointCloudLine> generated_lines;
+  vector<float> generated_phases;
   for(int i = 0; i < lines_to_generate; i++) {
     int cell1_index = rng(cell1->size());
     int cell2_index = rng(cell2->size());
-    PointCloudLine generated_line(cell1->at(cell1_index),
-                                  cell2->at(cell2_index));
+    const VelodynePoint &pt1 = cell1->at(cell1_index);
+    const VelodynePoint &pt2 = cell2->at(cell2_index);
+    PointCloudLine generated_line(pt1, pt2);
+    float phase;
+    if(fabs(pt1.phase - pt2.phase) > 0.5) {
+      // the overlap of start and end of single revolution
+      phase = NAN;
+    } else {
+      phase = (pt1.phase + pt2.phase) / 2.0;
+    }
     generated_lines.push_back(generated_line);
+    generated_phases.push_back(phase);
   }
-  filter.filterLines(generated_lines, output_lines, cell1_id, cell2_id);
+  vector<size_t> indices;
+  filter.filterLines(generated_lines, cell1_id, cell2_id, output_lines, indices);
+  for(vector<size_t>::iterator i = indices.begin(); i < indices.end(); i++) {
+    output_phases.push_back(generated_phases[*i]);
+  }
 }
 
 void LineCloud::generateLineCloudFromCell(const PolarGridOfClouds &polar_grid,
                                const CellId &source_cell,
                                const int lines_per_cell_pair_generated,
-                               std::vector<PointCloudLine> &line_cloud) const {
+                               std::vector<PointCloudLine> &line_cloud,
+                               vector<float> &output_phases) const {
   vector<CellId> target_cells = getTargetCells(source_cell, polar_grid.getPolarBins(), polar_grid.bin_subdivision);
   for(vector<CellId>::iterator target_cell = target_cells.begin(); target_cell < target_cells.end(); target_cell++) {
     generateLineCloudAmongCells(polar_grid,
                                 source_cell, *target_cell,
                                 lines_per_cell_pair_generated,
-                                line_cloud);
+                                line_cloud, output_phases);
   }
 }
 
