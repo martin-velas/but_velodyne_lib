@@ -57,7 +57,7 @@ def compute_connectivity(edges, verticles_cnt, circular):
 
 
 class Graph:
-    maxDepth = 4
+    maxDepth = 3
     allPaths = []
 
     def __init__(self, all_edges):
