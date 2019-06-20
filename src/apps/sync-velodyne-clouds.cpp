@@ -43,9 +43,18 @@ using namespace but_velodyne;
 namespace po = boost::program_options;
 
 
-typedef struct {
+class TimeSpan {
+public:
+
+  bool overlaps(const TimeSpan &other) const {
+    return (this->from <= other.from && other.from <= this->to) ||
+           (this->from <= other.to && other.to <= this->to) ||
+           (other.from <= this->from && this->from <= other.to) ||
+           (other.from <= this->to && this->to <= other.to);
+  }
+
   float from, to;
-} TimeSpan;
+};
 
 
 bool parse_arguments(int argc, char **argv,
@@ -80,55 +89,61 @@ bool parse_arguments(int argc, char **argv,
   return true;
 }
 
-void load_cloud_times(const vector<string> &cloud_filenames, vector<TimeSpan> &cloud_times) {
-  cloud_times.resize(cloud_filenames.size());
-  for(int i = 0; i < cloud_filenames.size(); i++) {
-    VelodynePointCloud cloud;
-    VelodynePointCloud::fromFile(cloud_filenames[i], cloud);
-    cloud_times[i].from = 1000000;
-    cloud_times[i].to = -1;
-    for(VelodynePointCloud::const_iterator p = cloud.begin(); p < cloud.end(); p++) {
-      cloud_times[i].from = MIN(cloud_times[i].from, p->phase);
-      cloud_times[i].to = MAX(cloud_times[i].to, p->phase);
-    }
-  }
-}
+class SequenceSlicer {
 
-bool get_slice(const TimeSpan &slice_span,
-    const vector<string> &cloud_filenames, const vector<TimeSpan> &cloud_spans,
-    VelodynePointCloud &slice) {
-  assert(cloud_filenames.size() == cloud_spans.size());
+public:
 
-  cerr << fixed << slice_span.from << " " << slice_span.to << " " << cloud_spans.front().from << " "  << cloud_spans.back().to << endl;
-
-  float min_phase = INFINITY;
-  float max_phase = -INFINITY;
-
-  for(int i = 0; i < cloud_filenames.size(); i++) {
-    if((slice_span.from <= cloud_spans[i].from && cloud_spans[i].from <= slice_span.to) ||
-       (slice_span.from <= cloud_spans[i].to && cloud_spans[i].to <= slice_span.to) ||
-       (cloud_spans[i].from <= slice_span.from && slice_span.from <= cloud_spans[i].to) ||
-       (cloud_spans[i].from <= slice_span.to && slice_span.to <= cloud_spans[i].to)) {
-      VelodynePointCloud raw_cloud;
-      VelodynePointCloud::fromFile(cloud_filenames[i], raw_cloud);
-      for(VelodynePointCloud::const_iterator p = raw_cloud.begin(); p < raw_cloud.end(); p++) {
-        if(slice_span.from <= p->phase && p->phase <= slice_span.to) {
-          slice.push_back(*p);
-          min_phase = MIN(min_phase, p->phase);
-          max_phase = MAX(max_phase, p->phase);
-        }
+  SequenceSlicer(const vector<string> &cloud_filenames_) : cloud_filenames(cloud_filenames_) {
+    cloud_spans.resize(cloud_filenames.size());
+    for(int i = 0; i < cloud_filenames.size(); i++) {
+      VelodynePointCloud cloud;
+      VelodynePointCloud::fromFile(cloud_filenames[i], cloud);
+      cloud_spans[i].from = 1000000;
+      cloud_spans[i].to = -1;
+      for(VelodynePointCloud::const_iterator p = cloud.begin(); p < cloud.end(); p++) {
+        cloud_spans[i].from = MIN(cloud_spans[i].from, p->phase);
+        cloud_spans[i].to = MAX(cloud_spans[i].to, p->phase);
       }
     }
   }
 
-  for(VelodynePointCloud::iterator p = slice.begin(); p < slice.end(); p++) {
-    p->phase = (p->phase - min_phase) / (max_phase - min_phase + 0.0001);
+  bool getSlice(const TimeSpan &slice_span, VelodynePointCloud &slice) {
+    assert(cloud_filenames.size() == cloud_spans.size());
+
+    cerr << fixed << slice_span.from << " " << slice_span.to << " " << cloud_spans.front().from << " "  << cloud_spans.back().to << endl;
+
+    float min_phase = INFINITY;
+    float max_phase = -INFINITY;
+
+    for(int i = 0; i < cloud_filenames.size(); i++) {
+      if(slice_span.overlaps(cloud_spans[i])) {
+        VelodynePointCloud raw_cloud;
+        VelodynePointCloud::fromFile(cloud_filenames[i], raw_cloud);
+        for(VelodynePointCloud::const_iterator p = raw_cloud.begin(); p < raw_cloud.end(); p++) {
+          if(slice_span.from <= p->phase && p->phase <= slice_span.to) {
+            slice.push_back(*p);
+            min_phase = MIN(min_phase, p->phase);
+            max_phase = MAX(max_phase, p->phase);
+          }
+        }
+      }
+    }
+
+    for(VelodynePointCloud::iterator p = slice.begin(); p < slice.end(); p++) {
+      p->phase = (p->phase - min_phase) / (max_phase - min_phase + 0.0001);
+    }
+
+    cerr << "--------------------------------------------------" << endl;
+
+    return !slice.empty();
   }
 
-  cerr << "--------------------------------------------------" << endl;
+private:
 
-  return !slice.empty();
-}
+  vector<TimeSpan> cloud_spans;
+  vector<string> cloud_filenames;
+};
+
 
 int main(int argc, char** argv) {
 
@@ -140,8 +155,8 @@ int main(int argc, char** argv) {
     return EXIT_FAILURE;
   }
 
-  vector<TimeSpan> cloud_spans;
-  load_cloud_times(cloud_filenames, cloud_spans);
+
+  SequenceSlicer slicer(cloud_filenames);
 
   vector<double> frame_borders;
   load_vector_from_file(frame_borders_filename, frame_borders);
@@ -150,7 +165,7 @@ int main(int argc, char** argv) {
     TimeSpan slice_span;
     slice_span.from = frame_borders[i];
     slice_span.to = frame_borders[i+1];
-    bool slice_found = get_slice(slice_span, cloud_filenames, cloud_spans, slice);
+    bool slice_found = slicer.getSlice(slice_span, slice);
     if(slice_found) {
       string fn = output_dir + "/" + KittiUtils::getKittiFrameName(i, ".pcd", velodyne_idx);
       io::savePCDFileBinary(fn, slice);
