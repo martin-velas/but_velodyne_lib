@@ -165,6 +165,15 @@ target_link_libraries(calibrate-imu-velodyne-evolution but_velodyne)
 add_executable(get-ranges src/apps/get-ranges.cpp)
 target_link_libraries(get-ranges but_velodyne)
 
+add_executable(eval-4recon src/apps/eval-4recon.cpp)
+target_link_libraries(eval-4recon but_velodyne)
+
+add_executable(eval-4recon-snapshots src/apps/eval-4recon-snapshots.cpp)
+target_link_libraries(eval-4recon-snapshots but_velodyne)
+
+add_executable(eval-4recon-crop src/apps/eval-4recon-crop.cpp)
+target_link_libraries(eval-4recon-crop but_velodyne)
+
 ########################## Visualization apps: ###############################
 
 add_executable(show-kitti-poses src/apps/show-kitti-poses.cpp)
