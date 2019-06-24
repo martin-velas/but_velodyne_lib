@@ -85,6 +85,37 @@ public:
   }
 
   /**!
+   * Load odometry from KITTI pose file.
+   *
+   * @param poses_filename input KITTI pose file
+   * @return timed poses of sensory platform for whole data sequence
+   */
+  template <typename K>
+  static bool load_kitti_poses_with_keys(const std::string poses_filename,
+      std::map<K, Eigen::Affine3f> &poses_timed) {
+
+    std::ifstream poses_file(poses_filename.c_str());
+    if(!poses_file.is_open()) {
+      std::perror((std::string("Unable to open file: ") + poses_filename).c_str());
+      return false;
+    }
+
+    while(true) {
+      K time;
+      Eigen::Affine3f pose = Eigen::Affine3f::Identity();
+      poses_file >> time >> pose;
+
+      if(poses_file.eof()) {
+        break;
+      } else {
+        poses_timed[time] = pose;
+      }
+    }
+
+    return true;
+  }
+
+  /**!
    * Save multiple odometry poses to the file.
    *
    * @param poses the poses to save
