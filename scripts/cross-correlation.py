@@ -1,6 +1,7 @@
 #! /usr/bin/env python
 
 import argparse, sys
+import numpy as np
 
 
 EPS = 0.0001
@@ -52,7 +53,17 @@ def upsample_signal(dense_times, sparse_signal):
     return upsampled
 
 
+def generate_matrices(signal1, signal2):
+    assert (len(signal1) == len(signal2))
 
+    M1 = np.zeros((len(signal1), 3))
+    M2 = np.zeros((len(signal2), 3))
+
+    for i, t in enumerate(signal1.keys()):
+        M1[i, :] = signal1[t]
+        M2[i, :] = signal2[t]
+
+    return M1, M2
 
 
 parser = argparse.ArgumentParser(description="Cross correlation of two signals")
@@ -65,7 +76,11 @@ args = parser.parse_args()
 signal_imu = load_signal(args.signal_imu)
 signal_cls = load_signal(args.signal_cls)
 
-signal_sparser_upsampled = upsample_signal(sorted(signal_imu.keys()), signal_cls)
-assert(len(signal_sparser_upsampled) == len(signal_imu))
+signal_cls_upsampled = upsample_signal(sorted(signal_imu.keys()), signal_cls)
+assert(len(signal_cls_upsampled) == len(signal_imu))
 
-matrix_imu, matrix_cls = generate_matrices(signal_imu, signal_cls)
+print len(signal_cls_upsampled), len(signal_imu)
+matrix_imu, matrix_cls = generate_matrices(signal_imu, signal_cls_upsampled)
+
+# correlation:
+print np.trace(np.matmul(matrix_imu, np.transpose(matrix_cls)))
