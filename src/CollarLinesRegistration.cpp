@@ -116,12 +116,8 @@ void CollarLinesRegistration::Parameters::prepareForLoading(po::options_descript
           "Line matches are thresholded by the distances of lines. By default, line midpoints are used.")
       ("separate_sensors", po::bool_switch(&this->separate_sensors),
           "Do not match lines across the sensors.")
-      ("phase_weights_mean", po::value<float>(&this->phase_weights_mean)->default_value(this->phase_weights_mean),
-          "The matches are weighted by the phase (gaussian mean)")
-      ("phase_weights_variance", po::value<float>(&this->phase_weights_variance)->default_value(this->phase_weights_variance),
-          "The matches are weighted by the phase (gaussian variance sigma^2)")
-      ("phase_weights_min", po::value<float>(&this->phase_weights_min)->default_value(this->phase_weights_min),
-          "Minimum weight by the phase for matches")
+      ("phase_weights_max", po::value<float>(&this->phase_weights_max)->default_value(this->phase_weights_max),
+          "The matches are weighted by the phase (which phase is considered most significant)")
   ;
 }
 
@@ -355,18 +351,16 @@ float CollarLinesRegistration::getMatchesMean() {
 }
 
 float CollarLinesRegistration::getPhaseWeight(const float phase) const {
-  static const float phase_weights_scale = 1.0
-      / gauss(params.phase_weights_mean, params.phase_weights_mean, params.phase_weights_variance);
-  if(isnan(phase)) {
-    return 0.0;
-  } else {
-    return gauss(phase, params.phase_weights_mean, params.phase_weights_variance) * phase_weights_scale + params.phase_weights_min;
-  }
+  return 1.0 - fabs(phase - params.phase_weights_max);
 }
 
 void CollarLinesRegistration::getCorrespondingPoints(
     MatrixOfPoints &source_coresp_points,
     MatrixOfPoints &target_coresp_points) {
+
+//  PointCloud<PointXYZRGB>::Ptr src_vis_cloud(new PointCloud<PointXYZRGB>(matches.size(), 1));
+//  PointCloud<PointXYZRGB>::Ptr trg_vis_cloud(new PointCloud<PointXYZRGB>(matches.size(), 1));
+
   correspondences_weights = VectorXf(matches.size());
   int index = 0;
   last_point_matches.clear();
@@ -394,18 +388,39 @@ void CollarLinesRegistration::getCorrespondingPoints(
       weight = getVerticalWeight(source_line.orientation, target_line.orientation);
     } else if(params.weighting == DISTANCE_WEIGHTS) {
       weight = 1.0/match->distance;
-    } else if(!isnan(params.phase_weights_mean) && !isnan(params.phase_weights_variance)) {
-      float source_phase = source_cloud[match->trainIdx].phase;
-      float target_phase = target_cloud[match->queryIdx].phase;
-      weight = harmonicalAverage(getPhaseWeight(source_phase), getPhaseWeight(target_phase));
+    } else if(params.phase_weights_max > -0.0001) {
+      const float source_phase = source_cloud[match->trainIdx].phase;
+      const float target_phase = target_cloud[match->queryIdx].phase;
+      if(!isnan(source_phase) && !isnan(target_phase)) {
+        weight = MAX(getPhaseWeight(source_phase), getPhaseWeight(target_phase));
+      } else {
+        weight = 0;
+      }
+      // cerr << "params.phase_weights_max: " << params.phase_weights_max << " weight: " << weight << " source_phase: " << source_phase << " target_phase: " << target_phase << endl;
     } else {
       assert(params.weighting == NO_WEIGHTS);
       weight = 1.0;
     }
     correspondences_weights.data()[index] = weight;
+
+//    src_vis_cloud->at(index).getVector3fMap() = source_line.point;
+//    trg_vis_cloud->at(index).getVector3fMap() = target_line.point;
+//    src_vis_cloud->at(index).r = 255*weight;
+//    src_vis_cloud->at(index).g = src_vis_cloud->at(index).b = 0;
+//    trg_vis_cloud->at(index).r = 255*weight;
+//    trg_vis_cloud->at(index).g = trg_vis_cloud->at(index).b = 0;
   }
 
-  /* visualisation:
+  // visualization of weights
+//  static Visualizer3D vis;
+//  vis.getViewer()->removeAllShapes();
+//  vis.keepOnlyClouds(0);
+//  vis.addColorPointCloud(src_vis_cloud);
+//  vis.addColorPointCloud(trg_vis_cloud);
+//  vis.show();
+
+  //visualization of correspondences:
+/*
   static Visualizer3D vis;
   vis.getViewer()->removeAllShapes();
   vis.keepOnlyClouds(0)
@@ -419,7 +434,8 @@ void CollarLinesRegistration::getCorrespondingPoints(
     }
   }
   cerr << endl << endl;
-  vis.show(); */
+  vis.show();
+*/
 }
 
 float CollarLinesRegistration::getVerticalWeight(const Vector3f &source_line_orient,

@@ -105,9 +105,7 @@ public:
         bool dont_estimate_roll_pitch_ = false,
         bool rejection_by_line_distances_ = false,
         bool separate_sensors_ = false,
-        float phase_weights_mean_ = NAN,
-        float phase_weights_variance_ = NAN,
-        float phase_weights_min_ = 0.01) :
+        float phase_weights_max_ = -1.0) :
         distance_threshold(distance_threshold_),
         distance_threshold_decay(distance_threshold_decay_),
         distance_threshold_value(distance_threshold_value_),
@@ -118,9 +116,7 @@ public:
         dont_estimate_roll_pitch(dont_estimate_roll_pitch_),
         rejection_by_line_distances(rejection_by_line_distances_),
         separate_sensors(separate_sensors_),
-        phase_weights_mean(phase_weights_mean_),
-        phase_weights_variance(phase_weights_variance_),
-        phase_weights_min(phase_weights_min_) {
+        phase_weights_max(phase_weights_max_) {
     }
     Threshold distance_threshold;       /// how is the threshold of line matches distance estimated
     float distance_threshold_decay;
@@ -132,9 +128,7 @@ public:
     bool dont_estimate_roll_pitch;
     bool rejection_by_line_distances;
     bool separate_sensors;
-    float phase_weights_mean;
-    float phase_weights_variance;
-    float phase_weights_min;
+    float phase_weights_max;
 
     void prepareForLoading(boost::program_options::options_description &options_desc);
 

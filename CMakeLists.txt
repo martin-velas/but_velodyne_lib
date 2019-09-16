@@ -120,14 +120,23 @@ target_link_libraries(print-graph-from-points-picked but_velodyne)
 add_executable(estimate-planar-noise src/apps/estimate-planar-noise.cpp)
 target_link_libraries(estimate-planar-noise but_velodyne)
 
-add_executable(overlaping-frames src/apps/overlaping-frames.cpp)
-target_link_libraries(overlaping-frames but_velodyne)
+add_executable(overlaping-keyframes src/apps/overlaping-keyframes.cpp)
+target_link_libraries(overlaping-keyframes but_velodyne)
 
 add_executable(overlaping-volumes src/apps/overlaping-volumes.cpp)
 target_link_libraries(overlaping-volumes but_velodyne)
 
 add_executable(overlaping-projections src/apps/overlaping-projections.cpp)
 target_link_libraries(overlaping-projections but_velodyne)
+
+add_executable(overlaping-projections-intra-keyframes src/apps/overlaping-projections-intra-keyframes.cpp)
+target_link_libraries(overlaping-projections-intra-keyframes but_velodyne)
+
+add_executable(overlaping-projections-binary src/apps/overlaping-projections-binary.cpp)
+target_link_libraries(overlaping-projections-binary but_velodyne)
+
+add_executable(overlaping-projections-keyframes src/apps/overlaping-projections-keyframes.cpp)
+target_link_libraries(overlaping-projections-keyframes but_velodyne)
 
 add_executable(print-graph-from-ransac-planes src/apps/print-graph-from-ransac-planes.cpp)
 target_link_libraries(print-graph-from-ransac-planes but_velodyne)
@@ -188,6 +197,9 @@ target_link_libraries(kitti-viewer but_velodyne)
 add_executable(build-3d-model src/apps/build-3d-model.cpp)
 target_link_libraries(build-3d-model but_velodyne)
 
+add_executable(clear-long-range-noise src/apps/clear-long-range-noise.cpp)
+target_link_libraries(clear-long-range-noise but_velodyne)
+
 add_executable(threshold-intensity src/apps/threshold-intensity.cpp)
 target_link_libraries(threshold-intensity but_velodyne)
 
@@ -215,10 +227,22 @@ target_link_libraries(pick-sources but_velodyne)
 add_executable(visualize-corrections src/apps/visualize-corrections.cpp)
 target_link_libraries(visualize-corrections but_velodyne)
 
+add_executable(poses-to-dof src/apps/poses-to-dof.cpp)
+target_link_libraries(poses-to-dof but_velodyne)
+
+add_executable(imu-orientations-extraction src/apps/imu-orientations-extraction.cpp)
+target_link_libraries(imu-orientations-extraction but_velodyne)
+
 ########################## Loops detection/closure: ##########################
 
 add_executable(extract-vfh src/apps/extract-vfh.cpp)
 target_link_libraries(extract-vfh but_velodyne)
+
+add_executable(filter-by-angle src/apps/filter-by-angle.cpp)
+target_link_libraries(filter-by-angle but_velodyne)
+
+add_executable(filter-by-phase src/apps/filter-by-phase.cpp)
+target_link_libraries(filter-by-phase but_velodyne)
 
 add_executable(verify-loops src/apps/verify-loops.cpp)
 target_link_libraries(verify-loops but_velodyne)
@@ -268,11 +292,39 @@ add_executable(to-kitti src/mit-dgc-data/c/to-kitti.cpp
     src/mit-dgc-data/c/config.c src/mit-dgc-data/c/rotations.c
     src/mit-dgc-data/c/math_util.c src/mit-dgc-data/c/velodyne.c
     src/mit-dgc-data/c/config_util.c src/mit-dgc-data/c/camtrans.c)
+
 target_link_libraries(to-kitti but_velodyne)
 target_include_directories(to-kitti PUBLIC ${PROJECT_SOURCE_DIR}/mit-dgc-data)
 
 add_executable(ground-labels-viewer src/apps/ground-labels-viewer.cpp)
 target_link_libraries(ground-labels-viewer but_velodyne)
+
+add_executable(gestalt-loops src/apps/gestalt-loops.cpp)
+target_link_libraries(gestalt-loops but_velodyne)
+
+add_executable(keypoints-matches src/apps/keypoints-matches.cpp)
+target_link_libraries(keypoints-matches but_velodyne)
+
+add_executable(correct-velodyne-distortion src/apps/correct-velodyne-distortion.cpp)
+target_link_libraries(correct-velodyne-distortion but_velodyne)
+
+add_executable(correct-velodyne-distortion-per-parts src/apps/correct-velodyne-distortion-per-parts.cpp)
+target_link_libraries(correct-velodyne-distortion-per-parts but_velodyne)
+
+add_executable(correct-velodyne-distortion-fine src/apps/correct-velodyne-distortion-fine.cpp)
+target_link_libraries(correct-velodyne-distortion-fine but_velodyne)
+
+add_executable(transform-sequence src/apps/transform-sequence.cpp)
+target_link_libraries(transform-sequence but_velodyne)
+
+add_executable(interpolate-transformation src/apps/interpolate-transformation.cpp)
+target_link_libraries(interpolate-transformation but_velodyne)
+
+add_executable(interpolate-missing-poses src/apps/interpolate-missing-poses.cpp)
+target_link_libraries(interpolate-missing-poses but_velodyne)
+
+add_executable(pose-graph-viewer src/apps/pose-graph-viewer.cpp)
+target_link_libraries(pose-graph-viewer but_velodyne)
 
 ########################## Installation: #####################################
 

@@ -124,11 +124,12 @@ void getSlices(const VelodynePointCloud &in_cloud, SliceMap &slices) {
 Eigen::Affine3f interpolate_poses(const Eigen::Affine3f &T1, const Eigen::Affine3f &T2, const float alpha) {
   Eigen::Quaternionf R1(T1.rotation());
   Eigen::Quaternionf R2(T2.rotation());
-  Eigen::Quaternionf R_result = R1.slerp(1.0-alpha, R2);
+  Eigen::Quaternionf R_result = R1.slerp(alpha, R2);
+  return Eigen::Affine3f(R_result);
 
-  Eigen::Translation3f t_result(T1.translation() * alpha + T2.translation() * alpha);
+  //Eigen::Translation3f t_result(T1.translation() * alpha + T2.translation() * alpha);
 
-  return t_result * R_result;
+  //return t_result * R_result;
 }
 
 Eigen::Affine3f get_interpolated_pose(const vector<Eigen::Affine3f> &poses,
@@ -148,6 +149,8 @@ Eigen::Affine3f get_interpolated_pose(const vector<Eigen::Affine3f> &poses,
     }
   }
   float alpha = (time - timestamps[before]) / (timestamps[after] - timestamps[before]);
+  //cerr << "current: " << time << ", before: " << timestamps[before] << ", after: " << timestamps[after] << endl;
+  //cerr << "alpha: " << alpha << endl;
   return interpolate_poses(poses[before], poses[after], alpha);
 }
 
@@ -157,28 +160,34 @@ void fix_cloud(const VelodynePointCloud &in_cloud,
     const vector<Eigen::Affine3f> &poses,
     const vector<float> &timestamps,
     VelodynePointCloud &out_cloud) {
+  //cerr << "Frame start: " << start << ", end: " << end << endl;
+
   SliceMap slices;
   getSlices(in_cloud, slices);
 
-//  static Visualizer3D vis;
-//  vis.keepOnlyClouds(0);
+  // static Visualizer3D vis;
+  // vis.keepOnlyClouds(0);
 
+  const Eigen::Affine3f sensor_pose_inv = sensor_pose.inverse();
   for(SliceMap::iterator s = slices.begin(); s != slices.end(); s++) {
     if(s->second.empty()) {
       continue;
     }
     const float phase = s->second.front().phase;
     const float time = start + (end-start) * phase;
+    //cerr << "time: " << time << ", for phase: " << phase << endl;
     Eigen::Affine3f interpolated_pose = get_interpolated_pose(poses, timestamps, time);
-    interpolated_pose = sensor_pose.inverse() * interpolated_pose * sensor_pose;
+    //cerr << "pose (raw): " << interpolated_pose << endl;
+    interpolated_pose = sensor_pose_inv * interpolated_pose * sensor_pose;
+    //cerr << "pose (cal): " << interpolated_pose << endl;
 
     transformPointCloud(s->second, s->second, interpolated_pose);
     out_cloud += s->second;
 
-//    vis.setColor(255.0*phase, 100, 50).addPointCloud(s->second);
+    // vis.setColor(255.0*phase, 0, 0).addPointCloud(s->second);
   }
 
-//  vis.show();
+  // vis.show();
 }
 
 int main(int argc, char** argv) {
