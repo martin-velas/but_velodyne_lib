@@ -233,6 +233,9 @@ target_link_libraries(poses-to-dof but_velodyne)
 add_executable(imu-orientations-extraction src/apps/imu-orientations-extraction.cpp)
 target_link_libraries(imu-orientations-extraction but_velodyne)
 
+add_executable(fit-bsplines-to-registrations src/apps/fit-bsplines-to-registrations.cpp)
+target_link_libraries(fit-bsplines-to-registrations but_velodyne)
+
 ########################## Loops detection/closure: ##########################
 
 add_executable(extract-vfh src/apps/extract-vfh.cpp)

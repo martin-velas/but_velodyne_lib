@@ -33,8 +33,6 @@
 
 #include <pcl/common/eigen.h>
 #include <pcl/common/transforms.h>
-#include <pcl/filters/voxel_grid.h>
-#include <pcl/filters/passthrough.h>
 #include <pcl/registration/transformation_estimation_svd.h>
 
 using namespace std;
@@ -89,7 +87,7 @@ bool parse_arguments(int argc, char **argv,
   }
 
   if(clouds_to_process.size() == 0 ||
-      clouds_to_process.size()*(slices_cnt+1) != slice_poses.size()*calibration.sensorsCount()) {
+      clouds_to_process.size()*slices_cnt != (slice_poses.size()-1)*calibration.sensorsCount()) {
     cerr << "Invalid number of clouds: " << clouds_to_process.size() << " for " << slice_poses.size() << " half-poses."
         << endl << desc << endl;
     return false;
@@ -111,32 +109,11 @@ void fix_cloud(const VelodynePointCloud &in_cloud,
 
 void get_control_points(const vector<Eigen::Affine3f> &slice_poses, const int t1_idx,
     const int slices_cnt, vector<Eigen::Affine3f> &control_points) {
-  Eigen::Affine3f relative_pose_inv = slice_poses[(t1_idx/slices_cnt)*slices_cnt].inverse();
+  const Eigen::Affine3f relative_pose_inv = slice_poses[(t1_idx/slices_cnt)*slices_cnt].inverse();
   for(int i = t1_idx-1; i <= t1_idx+2; i++) {
     control_points.push_back(relative_pose_inv*slice_poses[i]);
   }
-  /*cerr << endl << "control points: " << control_points.size() << endl;
-  static Visualizer3D vis;
-  vis.getViewer()->removeAllCoordinateSystems();
-  vis.addPoses(control_points).show();*/
 }
-
-class ConstantInterpolationSE3 : public InterpolationSE3 {
-public:
-  ConstantInterpolationSE3(const Eigen::Affine3f &transformation_) :
-    transformation(transformation_) {
-  }
-
-  virtual ~ConstantInterpolationSE3() {
-  }
-
-  virtual Eigen::Affine3f estimate(const float t) const {
-    return transformation;
-  }
-
-private:
-  const Eigen::Affine3f transformation;
-};
 
 int main(int argc, char** argv) {
 
@@ -164,10 +141,12 @@ int main(int argc, char** argv) {
   for(int frame_i = 0; file_sequence.hasNext(); frame_i++) {
 
     VelodyneMultiFrame multiframe = file_sequence.getNext();
+    const Eigen::Affine3f &first_inv = slice_poses[frame_i*slices_cnt].inverse();
 
     for(int sensor_i = 0; sensor_i < calibration.sensorsCount(); sensor_i++) {
-      Eigen::Affine3f sensor_pose = multiframe.calibration.ofSensor(sensor_i);
-      Eigen::Affine3f first_inv = slice_poses[frame_i*slices_cnt].inverse();
+
+      const Eigen::Affine3f &sensor_pose = multiframe.calibration.ofSensor(sensor_i);
+
       VelodynePointCloud out_cloud;
       for(int slice_i = 0; slice_i < slices_cnt; slice_i++) {
         VelodynePointCloud in_cloud_part = *multiframe.clouds[sensor_i];
@@ -176,19 +155,16 @@ int main(int argc, char** argv) {
 
         int pose_i = frame_i*slices_cnt + slice_i;
         InterpolationSE3::Ptr interpolation;
+
         if(pose_i == 0 || pose_i == slice_poses.size()-2) {
           Eigen::Affine3f current = first_inv * slice_poses[pose_i];
           Eigen::Affine3f next = first_inv * slice_poses[pose_i+1];
           interpolation.reset(new LinearInterpolationSE3(current, next));
-        } else if(pose_i == slice_poses.size()-1) {
-/*
-          Eigen::Affine3f previous = first_inv * slice_poses[pose_i-1];
-          Eigen::Affine3f current = first_inv * slice_poses[pose_i];
-          Eigen::Affine3f next = current * (previous.inverse() * current);
-          interpolation.reset(new LinearInterpolationSE3(current, next));
-*/
-          PCL_ERROR("ERROR, this should not happen (pose_i == slice_poses.size()-1)");
+
+        } else if(pose_i >= slice_poses.size()-1) {
+          PCL_ERROR("ERROR, this should not happen (pose_i >= slice_poses.size()-1)");
           return EXIT_FAILURE;
+
         } else {
           vector<Eigen::Affine3f> control_points;
           get_control_points(slice_poses, pose_i, slices_cnt, control_points);
@@ -201,12 +177,6 @@ int main(int argc, char** argv) {
         VelodynePointCloud out_cloud_part;
         fix_cloud(in_cloud_part, interpolation_buffered, sensor_pose, out_cloud_part);
         out_cloud += out_cloud_part;
-        if(sensor_i == 0) {
-          cout << interpolation->estimate(0.0) << endl;
-          if(pose_i == slice_poses.size()-2) {
-            cout << interpolation->estimate(1.0) << endl;
-          }
-        }
       }
 
       boost::filesystem::path first_cloud(multiframe.filenames[sensor_i]);
