@@ -212,8 +212,8 @@ target_link_libraries(normalize-intensity but_velodyne)
 add_executable(show-registration-in-seq src/apps/show-registration-in-seq.cpp)
 target_link_libraries(show-registration-in-seq but_velodyne)
 
-add_executable(visualize-part-clouds src/apps/visualize-part-clouds.cpp)
-target_link_libraries(visualize-part-clouds but_velodyne)
+add_executable(visualize-part-cloud-regs src/apps/visualize-part-cloud-regs.cpp)
+target_link_libraries(visualize-part-cloud-regs but_velodyne)
 
 add_executable(showroom-demo src/apps/showroom-demo.cpp)
 target_link_libraries(showroom-demo but_velodyne)
