@@ -351,7 +351,7 @@ float CollarLinesRegistration::getMatchesMean() {
 }
 
 float CollarLinesRegistration::getPhaseWeight(const float phase) const {
-  return 1.0 - fabs(phase - params.phase_weights_max);
+  return pow(1.0 - fabs(phase - params.phase_weights_max), 4);
 }
 
 void CollarLinesRegistration::getCorrespondingPoints(
