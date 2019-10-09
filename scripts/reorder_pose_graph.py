@@ -39,6 +39,10 @@ if __name__ == "__main__":
             i1 = indexer.reindex(int(tokens[1]))
             i2 = indexer.reindex(int(tokens[2]))
             out_graph.write("%s %d %d %s\n" % (type, i1, i2, " ".join(tokens[3:])))
+        elif type == "BSPLINE_CONSTR":
+            new_vertices = map(lambda t: indexer.reindex(int(t)), tokens[1:])
+            format_str = "%s " + "%d "*len(new_vertices) + "\n"
+            out_graph.write(format_str % tuple([type] + new_vertices))
         else:
             sys.stderr.write("Unknown element type: %s\n" % (type,))
             sys.exit(1)
