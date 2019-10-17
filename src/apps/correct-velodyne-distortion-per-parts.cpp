@@ -96,6 +96,17 @@ bool parse_arguments(int argc, char **argv,
   return true;
 }
 
+boost::shared_ptr< vector<VelodynePointCloud> > split_by_phase(
+    const VelodynePointCloud &in_cloud, const int slices_cnt) {
+  boost::shared_ptr< vector<VelodynePointCloud> > slices(new vector<VelodynePointCloud>(slices_cnt));
+  const float slice_size = 1.0 / slices_cnt;
+  for(VelodynePointCloud::const_iterator p = in_cloud.begin(); p < in_cloud.end(); p++) {
+    const int slice_i = int (floor(p->phase / slice_size));
+    slices->at(slice_i).push_back(*p);
+  }
+  return slices;
+}
+
 void fix_cloud(const VelodynePointCloud &in_cloud,
     InterpolationBuffered &interpolation,
     const Eigen::Affine3f &sensor_pose,
@@ -115,6 +126,7 @@ void get_control_points(const vector<Eigen::Affine3f> &slice_poses, const int t1
   }
 }
 
+
 int main(int argc, char** argv) {
 
   vector<Eigen::Affine3f> slice_poses;
@@ -129,14 +141,6 @@ int main(int argc, char** argv) {
 
   float slice_fraction = 1.0/slices_cnt;
 
-  vector<PhaseFilter> filters;
-  float range_start = 0.0;
-  for(int i = 0; i < slices_cnt; i++) {
-    float range_end = range_start+slice_fraction;
-    filters.push_back(PhaseFilter(range_start, range_end));
-    range_start = range_end;
-  }
-
   VelodyneFileSequence file_sequence(clouds_to_process, calibration);
   for(int frame_i = 0; file_sequence.hasNext(); frame_i++) {
 
@@ -147,11 +151,12 @@ int main(int argc, char** argv) {
 
       const Eigen::Affine3f &sensor_pose = multiframe.calibration.ofSensor(sensor_i);
 
+      const VelodynePointCloud &in_cloud = *multiframe.clouds[sensor_i];
+      boost::shared_ptr< vector<VelodynePointCloud> > in_cloud_parts =
+          split_by_phase(in_cloud, slices_cnt);
+
       VelodynePointCloud out_cloud;
       for(int slice_i = 0; slice_i < slices_cnt; slice_i++) {
-        VelodynePointCloud in_cloud_part = *multiframe.clouds[sensor_i];
-        const PhaseFilter &filter = filters[slice_i];
-        filter.filter(in_cloud_part);
 
         int pose_i = frame_i*slices_cnt + slice_i;
         InterpolationSE3::Ptr interpolation;
@@ -171,11 +176,11 @@ int main(int argc, char** argv) {
           interpolation.reset(new BSplineSE3(control_points));
         }
 
-        float phase_scale = 1.0 / (filter.getMaxPhase() - filter.getMinPhase());
-        InterpolationBuffered interpolation_buffered(interpolation, -filter.getMinPhase(), phase_scale);
+        float min_phase = slice_i*slice_fraction;
+        InterpolationBuffered interpolation_buffered(interpolation, -min_phase, 1.0/slice_fraction);
 
         VelodynePointCloud out_cloud_part;
-        fix_cloud(in_cloud_part, interpolation_buffered, sensor_pose, out_cloud_part);
+        fix_cloud(in_cloud_parts->at(slice_i), interpolation_buffered, sensor_pose, out_cloud_part);
         out_cloud += out_cloud_part;
       }
 
