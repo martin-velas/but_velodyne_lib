@@ -125,7 +125,7 @@ double bspline_error(const Eigen::Vector6d &V0, const Eigen::Vector6d &V1,
   double diff_t = diff.translation().norm();
   double diff_R = fabs(Eigen::AngleAxisf(diff.rotation()).angle());
 
-  but_velodyne::Visualizer3D vis;
+/*  but_velodyne::Visualizer3D vis;
   vis.getViewer()->removeAllCoordinateSystems();
   vis.getViewer()->removeAllShapes();
   vis.addPoses(control_points).show();
@@ -140,6 +140,7 @@ double bspline_error(const Eigen::Vector6d &V0, const Eigen::Vector6d &V1,
   cerr << "Diff t: " << diff_t << " m; R: " << diff_R << endl;
   vis.getViewer()->removeAllCoordinateSystems();
   vis.addPoses(control_points).show();
+*/
 
   const double wt = 1.0;
   const double wR = 10.0;

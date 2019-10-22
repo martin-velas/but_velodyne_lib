@@ -247,8 +247,8 @@ target_link_libraries(filter-by-angle but_velodyne)
 add_executable(filter-by-phase src/apps/filter-by-phase.cpp)
 target_link_libraries(filter-by-phase but_velodyne)
 
-add_executable(verify-loops src/apps/verify-loops.cpp)
-target_link_libraries(verify-loops but_velodyne)
+add_executable(error-subframe-regs-bspline src/apps/error-subframe-regs-bspline.cpp)
+target_link_libraries(error-subframe-regs-bspline but_velodyne)
 
 add_executable(slampp-solution-to-poses src/apps/slampp-solution-to-poses.cpp)
 target_link_libraries(slampp-solution-to-poses but_velodyne)
@@ -338,7 +338,7 @@ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/but_velodyne-config.cmake" "${CMAKE_C
 
 install(
 TARGETS but_velodyne collar-lines-odom show-kitti-poses show_correspondences extract-vfh
-    verify-loops slampp-solution-to-poses
+    slampp-solution-to-poses
 RUNTIME DESTINATION bin/
 LIBRARY DESTINATION lib/
 INCLUDES DESTINATION include/
