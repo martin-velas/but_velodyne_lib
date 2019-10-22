@@ -9,8 +9,8 @@ function plot {
              set key inside bottom left
              set xlabel 'Time'
              set ylabel 'pitch [rad]'
-             set xrange [144:146]
-             set xtics 0.1
+             # set xrange [144:146]
+             # set xtics 0.1
              set grid
              plot '$cls_eulerangles' using 1:$idx with lines title 'CLS',\
                '$out_dir/quat.euler_angles' using 1:$idx with lines title 'IMU-quat'"
