@@ -271,8 +271,8 @@ target_link_libraries(interpolate-transformation but_velodyne)
 add_executable(pose-graph-viewer src/apps/pose-graph-viewer.cpp)
 target_link_libraries(pose-graph-viewer but_velodyne)
 
-add_executable(cloud-eraser-from-seq src/apps/cloud-eraser-from-seq.cpp)
-target_link_libraries(cloud-eraser-from-seq but_velodyne)
+add_executable(join-corrections-and-registrations src/apps/join-corrections-and-registrations.cpp)
+target_link_libraries(join-corrections-and-registrations but_velodyne)
 
 ########################## Moving object detection: ##########################
 
