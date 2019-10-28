@@ -57,7 +57,8 @@ typedef map<DoubleIdx, Eigen::Affine3f> Registrations;
 
 bool parse_arguments(int argc, char **argv,
                      vector<Eigen::Affine3f> &corrections,
-                     Registrations &registrations) {
+                     Registrations &registrations,
+                     int &slices_cnt) {
   string corrections_filename, registrations_filename;
 
   po::options_description desc("Join previous corrections with current registrations\n"
@@ -87,6 +88,7 @@ bool parse_arguments(int argc, char **argv,
 
   corrections = KittiUtils::load_kitti_poses(corrections_filename);
 
+  slices_cnt = -1;
   std::ifstream registrations_file(registrations_filename.c_str());
   if(!registrations_file.is_open()) {
     std::perror((std::string("Unable to open file: ") + registrations_filename).c_str());
@@ -100,6 +102,13 @@ bool parse_arguments(int argc, char **argv,
     if(registrations_file.eof()) {
       break;
     } else {
+      if(slices_cnt > 0 && slices_cnt != (indices.trgIdx - indices.srcIdx)) {
+        cerr << "ERROR - Uneven slices count in the registrations!" << endl;
+        cerr << "previous slices_cnt: " << slices_cnt <<
+            ", srcIdx: " << indices.srcIdx << ", trgIdx: " << indices.trgIdx << endl;
+        return false;
+      }
+      slices_cnt = indices.trgIdx - indices.srcIdx;
       registrations[indices] = pose;
     }
   }
@@ -111,12 +120,19 @@ int main(int argc, char** argv) {
 
   vector<Eigen::Affine3f> C;
   Registrations R;
-  if(!parse_arguments(argc, argv, C, R)) {
+  int slices_cnt;
+  if(!parse_arguments(argc, argv, C, R, slices_cnt)) {
     return EXIT_FAILURE;
   }
 
   for(Registrations::const_iterator r = R.begin(); r != R.end(); r++) {
-    const Eigen::Affine3f T = C[r->first.srcIdx].inverse() * r->second * C[r->first.trgIdx];
+    const int src_start_idx = (r->first.srcIdx / slices_cnt) * slices_cnt;
+    const Eigen::Affine3f src_fix = C[src_start_idx].inverse() * C[r->first.srcIdx];
+
+    const int trg_start_idx = (r->first.trgIdx / slices_cnt) * slices_cnt;
+    const Eigen::Affine3f trg_fix = C[trg_start_idx].inverse() * C[r->first.trgIdx];
+
+    const Eigen::Affine3f T = src_fix.inverse() * r->second * trg_fix;
     cout << r->first.srcIdx << " " << r->first.trgIdx << " " << T << endl;
   }
 
