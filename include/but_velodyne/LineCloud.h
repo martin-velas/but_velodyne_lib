@@ -85,6 +85,10 @@ public:
     return this->data.erase(it);
   }
 
+  iterator erase(iterator begin, iterator end) {
+    return this->data.erase(begin, end);
+  }
+
   /**!
    * Initialize empty line cloud.
    */

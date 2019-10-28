@@ -30,6 +30,7 @@
 #include <cstdlib>
 #include <cstdio>
 #include <libgen.h>
+#include <algorithm>
 
 #include <boost/program_options.hpp>
 #include <boost/circular_buffer.hpp>
@@ -54,9 +55,11 @@ using namespace but_velodyne;
 namespace po = boost::program_options;
 
 
-class LineCloudsWithTimeAndQuality {
+class CLSMap {
 
 public:
+  LineCloud all_lines;
+
   PointCloud<pcl::PointXYZ>::Ptr getMiddlesPtr(void) {
     return all_lines.getMiddles();
   }
@@ -66,42 +69,15 @@ public:
   }
 
   void add(const LineCloud &lines) {
-    prune();
     all_lines += lines;
-    frame_sizes.push_back(lines.size());
     cerr << "all: " << all_lines.size() << "; new: " << lines.size() << endl;
   }
 
-protected:
-
-  void prune(void) {
-    int coutn_so_far = 0;
-    for(int si = 0; si < frame_sizes.size(); si++) {
-      if(si > frame_sizes.size() - FRAMES_TO_PRUNE) {
-        LineCloud::iterator line_it = all_lines.begin() + coutn_so_far;
-        int removed = 0;
-        for(int li = 0; li < frame_sizes[si]; li++) {
-          if(cv::theRNG().uniform(0,2) != 0) {
-            line_it = all_lines.erase(line_it);
-            removed++;
-          } else {
-            line_it++;
-          }
-        }
-        frame_sizes[si] -= removed;
-      }
-      cerr << frame_sizes[si] << ", ";
-      cerr << endl;
-      coutn_so_far += frame_sizes[si];
-    }
+  void prune(const float ratio) {
+    random_shuffle(all_lines.begin(), all_lines.end());
+    all_lines.erase(all_lines.begin() + all_lines.size() * (1.0 - ratio),
+        all_lines.end());
   }
-
-public:
-  LineCloud all_lines;
-
-private:
-  vector<int> frame_sizes;
-  static const int FRAMES_TO_PRUNE = 6;
 };
 
 
@@ -111,11 +87,15 @@ public:
   CollarLinesRegistration::Parameters registration_params;
 
   CollarLinesRegistrationToMap(CollarLinesRegistrationPipeline::Parameters pipeline_params_,
-                               CollarLinesRegistration::Parameters registration_params_) :
+                               CollarLinesRegistration::Parameters registration_params_,
+                               const float prune_ratio_, const bool &visualization) :
                                  filter(pipeline_params_.linesPerCellPreserved),
                                  params(pipeline_params_),
                                  registration_params(registration_params_),
-                                 indexed(false), vis(Visualizer3D::getCommonVisualizer()) {
+                                 prune_ratio(prune_ratio_), indexed(false) {
+    if(visualization) {
+      vis = Visualizer3D::getCommonVisualizer();
+    }
   }
 
   void addToMap(const std::vector<VelodynePointCloud::Ptr> &point_clouds,
@@ -136,9 +116,12 @@ public:
   Eigen::Matrix4f runMapping(const VelodyneMultiFrame &multiframe,
       const SensorsCalibration &calibration, const Eigen::Matrix4f &init_pose) {
     PointCloud<PointXYZ> target_cloud_vis;
-    multiframe.joinTo(target_cloud_vis);
-    vis->keepOnlyClouds(0).setColor(200,0,200).addPointCloud(target_cloud_vis, init_pose)
-        .setColor(150,150,150).addPointCloud(*lines_map.all_lines.getMiddles()).show();
+    if(vis) {
+      multiframe.joinTo(target_cloud_vis);
+      vis->keepOnlyClouds(0).setColor(200,0,200).addPointCloud(target_cloud_vis, init_pose)
+          .setColor(150,150,150).addPointCloud(*lines_map.all_lines.getMiddles()).show();
+    }
+
     if(!indexed) {
       buildKdTree();
     }
@@ -146,7 +129,18 @@ public:
     LineCloud target_line_cloud(target_polar_grid, params.linesPerCellGenerated, filter);
     Eigen::Matrix4f refined_pose = registerLineCloud(target_line_cloud, init_pose);
     addToMap(target_line_cloud, refined_pose);
-    vis->keepOnlyClouds(1).setColor(0,200,0).addPointCloud(target_cloud_vis, refined_pose).show();
+    if(lines_map.size()*prune_ratio > target_line_cloud.size()) {
+      cerr << "[DEBUG] Before pruning: " << lines_map.size() << endl;
+      lines_map.prune(prune_ratio);
+      indexed = false;
+      cerr << "[DEBUG] After pruning: " << lines_map.size() << endl;
+    }
+
+    if(vis) {
+      vis->keepOnlyClouds(1).setColor(0,200,0)
+          .addPointCloud(target_cloud_vis, refined_pose).show();
+    }
+
     return refined_pose;
   }
 
@@ -172,26 +166,19 @@ protected:
   }
 
 private:
+  float prune_ratio;
   CollarLinesFilter filter;
-  LineCloudsWithTimeAndQuality lines_map;
+  CLSMap lines_map;
   pcl::KdTreeFLANN<pcl::PointXYZ> map_kdtree;
   bool indexed;
   Visualizer3D::Ptr vis;
 };
 
-void read_lines(const string &fn, vector<string> &lines) {
-  ifstream file(fn.c_str());
-  string line;
-  while (getline(file, line)) {
-    lines.push_back(line);
-  }
-}
-
 bool parse_arguments(int argc, char **argv,
     CollarLinesRegistration::Parameters &registration_parameters,
     CollarLinesRegistrationPipeline::Parameters &pipeline_parameters,
     vector<Eigen::Affine3f> &init_poses, SensorsCalibration &calibration,
-    vector<string> &clouds_to_process) {
+    vector<string> &clouds_to_process, float &prune_ratio, bool &visualization) {
   string pose_file, sensors_pose_file;
 
   po::options_description desc("Collar Lines Registration of Velodyne scans against the map\n"
@@ -199,9 +186,6 @@ bool parse_arguments(int argc, char **argv,
       " * Reference(s): Velas et al, ICRA 2016\n"
       " * Allowed options");
   registration_parameters.prepareForLoading(desc);
-  pipeline_parameters.linesPerCellGenerated = 10;
-  pipeline_parameters.linesPerCellPreserved = 1;
-  pipeline_parameters.term_params.maxIterations = 1000;
   pipeline_parameters.prepareForLoading(desc);
   desc.add_options()
     ("help,h", "produce help message")
@@ -209,6 +193,10 @@ bool parse_arguments(int argc, char **argv,
       "File with initial poses")
     ("sensors_pose_file", po::value<string>(&sensors_pose_file)->default_value(""),
         "Extrinsic calibration parameters, when multiple Velodyne LiDARs are used")
+    ("prune_ratio", po::value<float>(&prune_ratio)->default_value(0.1),
+        "How many lines (portion) should be discarted from the map.")
+    ("visualize", po::bool_switch(&visualization),
+        "Run visualization")
   ;
 
   po::variables_map vm;
@@ -250,14 +238,18 @@ int main(int argc, char** argv) {
   vector<Eigen::Affine3f> init_poses;
   vector<string> clouds_filenames;
   SensorsCalibration calibration;
+  float prune_ratio;
+  bool visualization;
 
   if (!parse_arguments(argc, argv,
       registration_parameters, pipeline_parameters,
-      init_poses, calibration, clouds_filenames)) {
+      init_poses, calibration, clouds_filenames,
+      prune_ratio, visualization)) {
     return EXIT_FAILURE;
   }
 
-  CollarLinesRegistrationToMap registration(pipeline_parameters, registration_parameters);
+  CollarLinesRegistrationToMap registration(
+      pipeline_parameters, registration_parameters, prune_ratio, visualization);
 
   VelodyneFileSequence sequence(clouds_filenames, calibration);
   Eigen::Matrix4f last_refined_pose;
