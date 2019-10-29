@@ -106,26 +106,6 @@ Visualizer3D& Visualizer3D::addCloudColoredByRing(const VelodynePointCloud &clou
   return this->addColorPointCloud(rgb_cloud, transformation);
 }
 
-Visualizer3D& Visualizer3D::addHeightMap(const Regular2DGrid<float> &height_map,
-                                         const Regular2DGridGenerator::Parameters &params,
-                                         const float min_height) {
-  Eigen::Vector2f min, max;
-  Eigen::Vector2f delta(params.width/params.cols, params.height/params.rows);
-
-  min.y() = params.v_origin;
-  for(int r = 0; r < height_map.rows; r++) {
-    min.x() = params.h_origin;
-    for(int c = 0; c < height_map.cols; c++) {
-      max = min + delta;
-      viewer->addCube(min.x(), max.x(), min_height, *height_map.at(r, c), min.y(), max.y(),
-                      rngF(), rngF(), rngF(), getId("cube"));
-      min.x() += delta.x();
-    }
-    min.y() += delta.y();
-  }
-  return *this;
-}
-
 Visualizer3D& Visualizer3D::addLine(const Correspondence3D &line) {
   viewer->addLine(line.source, line.target, rngF(), rngF(), rngF(), getId("line"));
   return *this;

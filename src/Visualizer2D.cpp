@@ -147,33 +147,6 @@ Visualizer2D& Visualizer2D::add3DLineCorrenspondences(
   return *this;
 }
 
-Visualizer2D& Visualizer2D::addHeightMap(const Regular2DGrid<float> &height_map) {
-  float min = INFINITY;
-  float max = -INFINITY;
-  for(int r = 0; r < height_map.rows; r++) {
-    for(int c = 0; c < height_map.cols; c++) {
-      float val = *height_map.at(r, c);
-      if(!isnan(val) && !isinf(val) && val != 0.0) {
-        min = MIN(min, val);
-        max = MAX(max, val);
-      }
-    }
-  }
-  for(int r = 0; r < height_map.rows; r++) {
-    for(int c = 0; c < height_map.cols; c++) {
-      float val = *height_map.at(r, c);
-      if(!isnan(val) && !isinf(val) && val != 0.0) {
-        Vec3b &pixel = drawingImage.at<Vec3b>(r, c);
-        if(!isnan(val)) {
-          Visualizer3D::colorizeIntensity((*height_map.at(r, c) - min) / (max - min),
-                                          pixel.val[0], pixel.val[1], pixel.val[2]);
-        }
-      }
-    }
-  }
-  return *this;
-}
-
 Visualizer2D& Visualizer2D::addSenzor(Point pos) {
   senzor_position = pos;
   return *this;

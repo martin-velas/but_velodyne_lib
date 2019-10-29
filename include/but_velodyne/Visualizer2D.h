@@ -92,8 +92,6 @@ public:
       const Eigen::Matrix4f &transformation
   );
 
-  Visualizer2D& addHeightMap(const Regular2DGrid<float> &height_map);
-
   Visualizer2D& addSenzor(cv::Point pos);
 
   void show(int wait = 0, float scale = 1.0);
