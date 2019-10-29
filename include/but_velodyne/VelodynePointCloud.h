@@ -150,7 +150,7 @@ void subsample_clouds(typename pcl::PointCloud<PointType1>::Ptr cloud1,
 template <class PointType>
 void regular_subsampling(typename pcl::PointCloud<PointType>::ConstPtr full_cloud, const float sampling_rate,
     pcl::PointIndices::Ptr indices, typename pcl::PointCloud<PointType>::Ptr subsampled_cloud) {
-  static const float LEAF_SIZE = 0.2;
+  const float LEAF_SIZE = 0.2;
   pcl::VoxelGrid<PointType> grid;
   grid.setLeafSize(LEAF_SIZE, LEAF_SIZE, LEAF_SIZE);
   typename pcl::PointCloud<PointType>::Ptr cumulated_grid_clouds(new pcl::PointCloud<PointType>);

@@ -107,7 +107,7 @@ bool parse_arguments(
 
 struct float_less {
   bool operator()(const float &a, const float &b) {
-    static const float EPS = 1e-4;
+    const float EPS = 1e-4;
     return (a < b) && (b - a) > EPS;
   }
 };

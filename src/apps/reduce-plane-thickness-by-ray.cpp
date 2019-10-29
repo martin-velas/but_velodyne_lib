@@ -205,7 +205,7 @@ public:
       return bin2dist(best_bin);
     }
 
-    static const float RESOLUTION = 0.01;
+    static const float RESOLUTION;
     const float RADIUS_TH;
     const int BINS_CNT, AFFECTED_BINS_RADIUS;
   private:
@@ -224,7 +224,7 @@ public:
     float in_range = pt_to_origin.orientation.norm();
     vector<int> indices;
     vector<float> distances;
-    static const float RADIUS_TH = 1.0;  // 1m
+    const float RADIUS_TH = 1.0;  // 1m
     tree.radiusSearch(in, RADIUS_TH, indices, distances);
 
     float dot = in_normal.dot(pt_to_origin.orientation);
@@ -234,7 +234,7 @@ public:
     PointCloud<PointWithSource> pts;
 #endif
 
-    static const float COS45 = sqrt(2.0)/2.0;
+    const float COS45 = sqrt(2.0)/2.0;
     RangeDenoiser denoiser(RADIUS_TH, wall_thickness_th*radius_scale);
     for(vector<int>::const_iterator i = indices.begin(); i < indices.end(); i++) {
       const PointWithSource &pt = cloud->at(*i);
@@ -274,6 +274,8 @@ private:
     Visualizer3D vis;
 #endif
 };
+
+const float RayThinner::RangeDenoiser::RESOLUTION = 0.01;
 
 void get_origin(const vector<Eigen::Affine3f> &poses, const SensorsCalibration &calibration,
     const int origin_idx, PointXYZ &origin) {

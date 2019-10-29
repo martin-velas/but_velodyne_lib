@@ -74,7 +74,7 @@ private:
 };
 
 typedef struct less_float_struct : std::binary_function<float,float,bool> {
-  static const float TOLERANCE = 1e-6;
+  const float TOLERANCE = 1e-6;
   bool operator()(const float f1, const float f2) const
   {
       return f1 < f2 && std::abs(f2 - f1) >= TOLERANCE;

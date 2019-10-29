@@ -209,13 +209,16 @@ protected:
   }
 
 private:
-  static const float AZIMUTHAL_RANGE = 360.0;
-  static const float POLAR_RANGE = 180.0;
+  static const float AZIMUTHAL_RANGE;
+  static const float POLAR_RANGE;
 
   const int azimuthal_bins, polar_bins;
   const float azimuthal_resolution, polar_resolution;
   vector<float> depths;
 };
+
+const float SphericalZbuffer::AZIMUTHAL_RANGE = 360.0;
+const float SphericalZbuffer::POLAR_RANGE = 180.0;
 
 int get_frames_distance(const int i, const int j, const int frames_count, const bool circular) {
   if(!circular) {

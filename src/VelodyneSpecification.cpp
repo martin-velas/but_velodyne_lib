@@ -27,6 +27,8 @@
 
 namespace but_velodyne {
 
+const float VelodyneSpecification::KITTI_HEIGHT = 1.73;        // m
+
 float radToDeg(float rad) {
   static float factor = 180.0 / M_PI;
   return rad * factor;

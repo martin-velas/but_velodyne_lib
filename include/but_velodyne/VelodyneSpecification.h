@@ -97,7 +97,7 @@ public:
     }
   }
 
-  static const float KITTI_HEIGHT = 1.73;        // m
+  static const float KITTI_HEIGHT;
 
 
   /**!
