@@ -47,7 +47,7 @@ void RegistrationCrossValidation::keepConselsus(void) {
   }
   float best_consensus_distance = INFINITY;
   vector<int> best_consensus_indices;
-  KdTreeFLANN<PointXYZ> tree(transformed_samples);
+  KdTreeFLANN<PointXYZ> tree;
   tree.setInputCloud(transformed_samples);
   for(PointCloud<PointXYZ>::const_iterator seed = transformed_samples->begin(); seed < transformed_samples->end(); seed++) {
     vector<float> distances(consensus_size);
