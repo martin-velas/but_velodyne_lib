@@ -123,9 +123,6 @@ target_link_libraries(estimate-planar-noise but_velodyne)
 add_executable(overlaping-keyframes src/apps/overlaping-keyframes.cpp)
 target_link_libraries(overlaping-keyframes but_velodyne)
 
-add_executable(overlaping-volumes src/apps/overlaping-volumes.cpp)
-target_link_libraries(overlaping-volumes but_velodyne)
-
 add_executable(overlaping-projections src/apps/overlaping-projections.cpp)
 target_link_libraries(overlaping-projections but_velodyne)
 
