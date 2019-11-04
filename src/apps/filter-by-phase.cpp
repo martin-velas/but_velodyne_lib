@@ -106,9 +106,10 @@ int main(int argc, char** argv) {
     VelodyneMultiFrame multiframe = file_sequence.getNext();
     for(int sensor_i = 0; sensor_i < calibration.sensorsCount(); sensor_i++) {
       VelodynePointCloud cloud = *multiframe.clouds[sensor_i];
-      filter.filter(cloud);
+      VelodynePointCloud slice;
+      filter.filter(cloud, slice);
       boost::filesystem::path cloud_fn(multiframe.filenames[sensor_i]);
-      io::savePCDFileBinary(out_dir + "/" + cloud_fn.filename().string(), cloud);
+      io::savePCDFileBinary(out_dir + "/" + cloud_fn.filename().string(), slice);
     }
     cout << endl;
   }

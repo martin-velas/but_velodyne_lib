@@ -545,6 +545,14 @@ public:
     }
   }
 
+  void filter(const VelodynePointCloud &input, VelodynePointCloud &slice) const {
+    for(VelodynePointCloud::const_iterator p = input.begin(); p < input.end(); p++) {
+      if(min_phase <= p->phase && p->phase < max_phase) {
+        slice.push_back(*p);
+      }
+    }
+  }
+
   void filter(VelodyneMultiFrame &multiframe) const {
     for(std::vector<VelodynePointCloud::Ptr>::iterator cloud = multiframe.clouds.begin();
         cloud < multiframe.clouds.end(); cloud++) {
