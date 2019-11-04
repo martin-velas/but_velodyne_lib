@@ -459,10 +459,10 @@ void CollarLinesRegistration::getWeightingMatrix(WeightsMatrix &weighting_matrix
   float weights_normalization = 1.0 / correspondences_weights.sum();
   correspondences_weights *= weights_normalization;
 
+  weighting_matrix.diagonal() = correspondences_weights;
+
   assert(weighting_matrix.rows() == correspondences_weights.size());
   assert(weighting_matrix.cols() == correspondences_weights.size());
-
-  weighting_matrix.diagonal() = correspondences_weights;
 }
 
 
