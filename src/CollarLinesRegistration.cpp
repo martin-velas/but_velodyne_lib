@@ -49,8 +49,8 @@ std::istream& operator>> (std::istream &in, CollarLinesRegistration::Weights &we
   in >> token;
 
   boost::to_upper(token);
-  if (token == "DISTANCE_WEIGHTS") {
-    weightning = CollarLinesRegistration::DISTANCE_WEIGHTS;
+  if (token == "RANGE_WEIGHTS") {
+    weightning = CollarLinesRegistration::RANGE_WEIGHTS;
   } else if (token == "VERTICAL_ANGLE_WEIGHTS") {
     weightning = CollarLinesRegistration::VERTICAL_ANGLE_WEIGHTS;
   } else if (token == "NO_WEIGHTS") {
@@ -105,7 +105,7 @@ void CollarLinesRegistration::Parameters::prepareForLoading(po::options_descript
       ("normalize_error_by_threshold", po::bool_switch(&this->normalize_error_by_threshold),
           "Normalize error by the portion of lines taken for registration. Median threshold will cause error/=0.5.")
       ("line_weightning", po::value<CollarLinesRegistration::Weights>(&this->weighting)->default_value(this->weighting),
-          "How the weights are assigned to the line matches - prefer vertical lines, close or treat matches as equal. Possible values: DISTANCE_WEIGHTS|VERTICAL_ANGLE_WEIGHTS|NO_WEIGHTS")
+          "How the weights are assigned to the line matches - prefer vertical lines, close or treat matches as equal. Possible values: RANGE_WEIGHTS|VERTICAL_ANGLE_WEIGHTS|NO_WEIGHTS")
       ("translation_only", po::bool_switch(&this->estimate_translation_only),
           "Estimate only the translation (rotation should be presented as the initial pose)")
       ("no_roll_pitch", po::bool_switch(&this->dont_estimate_roll_pitch),
@@ -118,6 +118,8 @@ void CollarLinesRegistration::Parameters::prepareForLoading(po::options_descript
           "Do not match lines across the sensors.")
       ("phase_weights_max", po::value<float>(&this->phase_weights_max)->default_value(this->phase_weights_max),
           "The matches are weighted by the phase (which phase is considered most significant)")
+      ("phase_weights_power", po::value<float>(&this->phase_weights_power)->default_value(this->phase_weights_power),
+         "Power of the phase difference. weight = diff^power;")
   ;
 }
 
@@ -351,7 +353,7 @@ float CollarLinesRegistration::getMatchesMean() {
 }
 
 float CollarLinesRegistration::getPhaseWeight(const float phase) const {
-  return pow(1.0 - fabs(phase - params.phase_weights_max), 4);
+  return pow(1.0 - fabs(phase - params.phase_weights_max), params.phase_weights_power);
 }
 
 void CollarLinesRegistration::getCorrespondingPoints(
@@ -386,8 +388,8 @@ void CollarLinesRegistration::getCorrespondingPoints(
     float weight;
     if(params.weighting == VERTICAL_ANGLE_WEIGHTS) {
       weight = getVerticalWeight(source_line.orientation, target_line.orientation);
-    } else if(params.weighting == DISTANCE_WEIGHTS) {
-      weight = 1.0/match->distance;
+    } else if(params.weighting == RANGE_WEIGHTS) {
+      weight = MAX(source_cloud[match->trainIdx].range, target_cloud[match->queryIdx].range);
     } else if(params.phase_weights_max > -0.0001) {
       const float source_phase = source_cloud[match->trainIdx].phase;
       const float target_phase = target_cloud[match->queryIdx].phase;
@@ -396,7 +398,6 @@ void CollarLinesRegistration::getCorrespondingPoints(
       } else {
         weight = 0;
       }
-      // cerr << "params.phase_weights_max: " << params.phase_weights_max << " weight: " << weight << " source_phase: " << source_phase << " target_phase: " << target_phase << endl;
     } else {
       assert(params.weighting == NO_WEIGHTS);
       weight = 1.0;

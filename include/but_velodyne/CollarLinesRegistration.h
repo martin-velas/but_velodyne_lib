@@ -64,7 +64,7 @@ public:
    * How the weights are assigned to the collar line matches.
    */
   enum Weights {
-    DISTANCE_WEIGHTS,           // matches of close lines are more significant
+    RANGE_WEIGHTS,           // matches of close lines are more significant
     VERTICAL_ANGLE_WEIGHTS,     // matches of vertical lines are more significant
     NO_WEIGHTS                  // all line matches are equal
   };
@@ -105,7 +105,8 @@ public:
         bool dont_estimate_roll_pitch_ = false,
         bool rejection_by_line_distances_ = false,
         bool separate_sensors_ = false,
-        float phase_weights_max_ = -1.0) :
+        float phase_weights_max_ = -1.0,
+        float phase_weights_power_ = 4.0) :
         distance_threshold(distance_threshold_),
         distance_threshold_decay(distance_threshold_decay_),
         distance_threshold_value(distance_threshold_value_),
@@ -116,7 +117,8 @@ public:
         dont_estimate_roll_pitch(dont_estimate_roll_pitch_),
         rejection_by_line_distances(rejection_by_line_distances_),
         separate_sensors(separate_sensors_),
-        phase_weights_max(phase_weights_max_) {
+        phase_weights_max(phase_weights_max_),
+        phase_weights_power(phase_weights_power_) {
     }
     Threshold distance_threshold;       /// how is the threshold of line matches distance estimated
     float distance_threshold_decay;
@@ -129,6 +131,7 @@ public:
     bool rejection_by_line_distances;
     bool separate_sensors;
     float phase_weights_max;
+    float phase_weights_power;
 
     void prepareForLoading(boost::program_options::options_description &options_desc);
 

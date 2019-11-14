@@ -71,13 +71,15 @@ void estimate_normals(const vector<PointCloudLine> &lines, vector<Eigen::Vector3
 
 LineCloud::PointCloudLineWithMiddleAndOrigin LineCloud::PointCloudLineWithMiddleAndOrigin::transform(
     const Eigen::Affine3f &t) const {
-  return PointCloudLineWithMiddleAndOrigin (
+  PointCloudLineWithMiddleAndOrigin transformed = PointCloudLineWithMiddleAndOrigin (
     this->line.transform(t.matrix()),
     transformPoint(this->middle, t),
     this->sensor_id,
     t.rotation() * this->normal,
     this->phase
   );
+  transformed.range = this->range;
+  return transformed;
 }
 
 LineCloud::LineCloud(const PolarGridOfClouds &polar_grid,
