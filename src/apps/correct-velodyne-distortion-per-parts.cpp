@@ -22,18 +22,15 @@
  */
 
 #include <cstdlib>
-#include <cstdio>
 
 #include <boost/program_options.hpp>
 
 #include <but_velodyne/VelodynePointCloud.h>
-#include <but_velodyne/Visualizer3D.h>
 #include <but_velodyne/KittiUtils.h>
 #include <but_velodyne/InterpolationSE3.h>
 
 #include <pcl/common/eigen.h>
 #include <pcl/common/transforms.h>
-#include <pcl/registration/transformation_estimation_svd.h>
 
 using namespace std;
 using namespace pcl;
@@ -101,7 +98,12 @@ boost::shared_ptr< vector<VelodynePointCloud> > split_by_phase(
   boost::shared_ptr< vector<VelodynePointCloud> > slices(new vector<VelodynePointCloud>(slices_cnt));
   const float slice_size = 1.0 / slices_cnt;
   for(VelodynePointCloud::const_iterator p = in_cloud.begin(); p < in_cloud.end(); p++) {
-    const int slice_i = int (floor(p->phase / slice_size));
+    int slice_i;
+    if(0.9999 < p->phase && p->phase < 1.0001) {
+      slice_i = slices_cnt-1;
+    } else {
+      slice_i = int (floor(p->phase / slice_size));
+    }
     slices->at(slice_i).push_back(*p);
   }
   return slices;
@@ -125,7 +127,6 @@ void get_control_points(const vector<Eigen::Affine3f> &slice_poses, const int t1
     control_points.push_back(relative_pose_inv*slice_poses[i]);
   }
 }
-
 
 int main(int argc, char** argv) {
 

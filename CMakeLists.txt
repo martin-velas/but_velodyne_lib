@@ -235,8 +235,8 @@ target_link_libraries(fit-bsplines-to-registrations but_velodyne)
 
 ########################## Loops detection/closure: ##########################
 
-add_executable(extract-vfh src/apps/extract-vfh.cpp)
-target_link_libraries(extract-vfh but_velodyne)
+add_executable(sync-velodyne-clouds-by-angle src/apps/sync-velodyne-clouds-by-angle.cpp)
+target_link_libraries(sync-velodyne-clouds-by-angle but_velodyne)
 
 add_executable(filter-by-angle src/apps/filter-by-angle.cpp)
 target_link_libraries(filter-by-angle but_velodyne)
@@ -334,8 +334,7 @@ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/but_velodyne-config.cmake" "${CMAKE_C
     DESTINATION "lib${LIB_SUFFIX}/cmake/${BUT_VELODYNE_CMAKE_INSTALL_DIR}" COMPONENT ${COMPONENT_PREFIX}dev)
 
 install(
-TARGETS but_velodyne collar-lines-odom show-kitti-poses show_correspondences extract-vfh
-    slampp-solution-to-poses
+TARGETS but_velodyne collar-lines-odom show-kitti-poses slampp-solution-to-poses
 RUNTIME DESTINATION bin/
 LIBRARY DESTINATION lib/
 INCLUDES DESTINATION include/
