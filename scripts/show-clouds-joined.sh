@@ -18,6 +18,6 @@ do
 	joined_clouds="$joined_clouds $joined_cloud"
 done
 
-pcl_viewer -multiview 1 $joined_clouds
+pcl_viewer -bc 1,1,1 -multiview 1 $joined_clouds
 
 rm $joined_clouds
