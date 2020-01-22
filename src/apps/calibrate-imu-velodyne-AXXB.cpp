@@ -41,7 +41,7 @@ namespace po = boost::program_options;
 bool parse_arguments(int argc, char **argv,
                      vector<Eigen::Affine3f> &A,
                      vector<Eigen::Affine3f> &B,
-                     float &max_angle, int &samples) {
+                     float &max_angle, float &max_t, int &samples) {
   string A_filename, B_filename;
 
   po::options_description desc("IMU Velodyne calibration with evolution strategy\n"
@@ -55,6 +55,7 @@ bool parse_arguments(int argc, char **argv,
     ("A,a", po::value<string>(&A_filename)->required(), "A affine transformations.")
     ("B,b", po::value<string>(&B_filename)->required(), "B affine transformations.")
     ("max_angle,r", po::value<float>(&max_angle)->default_value(0), "Maximal rotation [deg].")
+    ("max_t,t", po::value<float>(&max_t)->default_value(0), "Maximal translation [m].")
     ("samples,s", po::value<int>(&samples)->default_value(1000000), "Samples.")
   ;
 
@@ -86,19 +87,21 @@ bool parse_arguments(int argc, char **argv,
   return true;
 }
 
-void generate_sphere(const float r_rad, const int samples, PointCloud<PointXYZ> &sphere) {
+Eigen::Affine3f get_sample(const float max_R_rad, const float max_t) {
   cv::RNG& rng = cv::theRNG();
   rng.state = cv::getTickCount();
 
-  while(sphere.size() < samples) {
-    PointXYZ pt;
-    pt.x = rng.uniform(-r_rad, r_rad);
-    pt.y = rng.uniform(-r_rad, r_rad);
-    pt.z = rng.uniform(-r_rad, r_rad);
+  Eigen::Vector3f sample_R, sample_t;
+  do {
+    for(int i = 0; i < 3; i++) {
+      sample_R(i) = rng.uniform(-max_R_rad, max_R_rad);
+      sample_t(i) = rng.uniform(-max_t, max_t);
+    }
+  } while(sample_R.norm() > max_R_rad || sample_t.norm() > max_t);
 
-    if(pt.getVector3fMap().norm() <= r_rad)
-      sphere.push_back(pt);
-  }
+  const float angle = sample_R.norm();
+  sample_R.normalize();
+  return Eigen::Affine3f(Eigen::Translation3f(sample_t) * Eigen::AngleAxisf(angle, sample_R));
 }
 
 // AX = XB
@@ -118,11 +121,12 @@ float eval_calibration(const Eigen::Affine3f &X, const vector<Eigen::Affine3f> &
 int main(int argc, char** argv) {
 
   vector<Eigen::Affine3f> A, B;
-  float max_R;
+  float max_R, max_t;
   int samples;
-  if(!parse_arguments(argc, argv, A, B, max_R, samples)) {
+  if(!parse_arguments(argc, argv, A, B, max_R, max_t, samples)) {
     return EXIT_FAILURE;
   }
+  const float max_R_rad = DEG2RAD(max_R);
 
   vector<Eigen::Affine3f> A_inv;
   for(vector<Eigen::Affine3f>::const_iterator a = A.begin(); a < A.end(); a++) {
@@ -132,24 +136,17 @@ int main(int argc, char** argv) {
   cerr << "A_inv transformations: " << A_inv.size() << endl;
   cerr << "B transformations: " << B.size() << endl;
 
-  PointCloud<PointXYZ> sphere;
-  generate_sphere(DEG2RAD(max_R), samples, sphere);
-  // Visualizer3D().addPointCloud(sphere).show();
-
   float min_error = INFINITY;
-  Eigen::Affine3f best_R;
+  Eigen::Affine3f best_X = Eigen::Affine3f::Identity();
   int iterations = 0;
-  for(PointCloud<PointXYZ>::iterator pt = sphere.begin(); pt < sphere.end(); pt++) {
-    Eigen::Vector3f axis = pt->getVector3fMap();
-    const float angle = axis.norm();
-    axis.normalize();
-    Eigen::Affine3f R(Eigen::AngleAxisf(angle, axis));
+  for(int i = 0; i < samples; i++) {
+    Eigen::Affine3f X = get_sample(max_R_rad, max_t);
 
-    const float error = eval_calibration(R, A_inv, B);
+    const float error = eval_calibration(X, A_inv, B);
     if(error < min_error) {
-      cerr << error << endl << R << endl;
+      cerr << error << endl << X << endl;
       min_error = error;
-      best_R = R;
+      best_X = X;
     }
 
     if(++iterations%10000 == 1) {
@@ -157,7 +154,7 @@ int main(int argc, char** argv) {
     }
   }
 
-  cout << best_R << endl;
+  cout << best_X << endl;
 
   return EXIT_SUCCESS;
 }
