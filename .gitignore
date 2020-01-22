@@ -8,3 +8,4 @@ lib/
 .settings/
 .pydevproject
 *.pyc
+cmake-build-debug/

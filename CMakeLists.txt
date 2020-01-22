@@ -59,7 +59,7 @@ src/VelodynePointCloud.cpp src/Visualizer2D.cpp src/Visualizer3D.cpp
 src/VelodyneSpecification.cpp src/CollarLinesFilter.cpp src/GroundDetectionDataGenerator.cpp
 src/EigenUtils.cpp src/GlobalOptimization.cpp src/common.cpp src/Clustering.cpp src/NormalsEstimation.cpp
 src/SubseqRegistration.cpp src/KittiUtils.cpp src/RegistrationCrossValidation.cpp src/CollarLinesValidation.cpp
-src/Overlap.cpp src/InterpolationSE3.cpp)
+src/Overlap.cpp src/InterpolationSE3.cpp src/Calibration.cpp src/AdaptiveIntensitiesNormalization.cpp)
 target_include_directories(but_velodyne PUBLIC ${PROJECT_SOURCE_DIR}/include)
 target_link_libraries(but_velodyne ${PCL_LIBRARIES})
 target_link_libraries(but_velodyne ${OpenCV_LIBS})
@@ -165,8 +165,14 @@ target_link_libraries(sync-velodyne-clouds but_velodyne)
 add_executable(calibrate-imu-velodyne-by-normals src/apps/calibrate-imu-velodyne-by-normals.cpp)
 target_link_libraries(calibrate-imu-velodyne-by-normals but_velodyne)
 
-add_executable(calibrate-imu-velodyne-evolution src/apps/calibrate-imu-velodyne-evolution.cpp)
-target_link_libraries(calibrate-imu-velodyne-evolution but_velodyne)
+add_executable(calibrate-imu-velodyne-wall-normals src/apps/calibrate-imu-velodyne-wall-normals.cpp)
+target_link_libraries(calibrate-imu-velodyne-wall-normals but_velodyne)
+
+add_executable(calibrate-imu-velodyne-manual src/apps/calibrate-imu-velodyne-manual.cpp)
+target_link_libraries(calibrate-imu-velodyne-manual but_velodyne)
+
+add_executable(calibrate-imu-velodyne-AXXB src/apps/calibrate-imu-velodyne-AXXB.cpp)
+target_link_libraries(calibrate-imu-velodyne-AXXB but_velodyne)
 
 add_executable(get-ranges src/apps/get-ranges.cpp)
 target_link_libraries(get-ranges but_velodyne)

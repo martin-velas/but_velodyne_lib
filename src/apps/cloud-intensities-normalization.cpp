@@ -24,27 +24,18 @@
  */
 
 #include <cstdlib>
-#include <cstdio>
 
 #include <boost/program_options.hpp>
 
 #include <but_velodyne/Visualizer3D.h>
 #include <but_velodyne/KittiUtils.h>
 #include <but_velodyne/EigenUtils.h>
-#include <but_velodyne/common.h>
-#include <but_velodyne/GlobalOptimization.h>
+#include <but_velodyne/AdaptiveIntensitiesNormalization.h>
 
 #include <pcl/PCLPointCloud2.h>
 #include <pcl/common/eigen.h>
-#include <pcl/common/transforms.h>
 #include <pcl/io/pcd_io.h>
-#include <pcl/point_types.h>
-#include <pcl/filters/impl/extract_indices.hpp>
-#include <pcl/filters/impl/filter.hpp>
-#include <pcl/impl/pcl_base.hpp>
-#include <pcl/filters/impl/random_sample.hpp>
 
-#include <cv.h>
 #include <cxeigen.hpp>
 
 using namespace std;
@@ -53,9 +44,6 @@ using namespace cv;
 using namespace velodyne_pointcloud;
 using namespace but_velodyne;
 namespace po = boost::program_options;
-
-static const int DATA_CHANNELS = 2;
-static const float DISTANCE_RES = 0.2;
 
 typedef PointWithSource PointType;
 
@@ -67,30 +55,30 @@ bool parse_arguments(int argc, char **argv,
   string pose_filename, sensor_poses_filename;
 
   po::options_description desc("Global optimization: print pose graph\n"
-      "======================================\n"
-      " * Allowed options");
+                               "======================================\n"
+                               " * Allowed options");
   desc.add_options()
-    ("help,h", "produce help message")
-    ("pose_file,p", po::value<string>(&pose_filename)->required(), "KITTI poses file.")
-    ("sensor_poses,s", po::value<string>(&sensor_poses_filename)->default_value(""), "Sensor poses (calibration).")
-    ("in_filename,i", po::value<string>(&sum_cloud_filename)->required(), "Input cloud PCD file.")
-    ("expected_mean,m", po::value<float>(&expected_mean)->default_value(300.0), "Target mean of intensities.")
-    ("expected_std_dev,d", po::value<float>(&expected_std_dev)->default_value(1.0), "Target standard deviation of intensities.")
-    ("out_filename,o", po::value<string>(&out_filename)->required(), "Output normalized cloud filename.")
-  ;
+          ("help,h", "produce help message")
+          ("pose_file,p", po::value<string>(&pose_filename)->required(), "KITTI poses file.")
+          ("sensor_poses,s", po::value<string>(&sensor_poses_filename)->default_value(""), "Sensor poses (calibration).")
+          ("in_filename,i", po::value<string>(&sum_cloud_filename)->required(), "Input cloud PCD file.")
+          ("expected_mean,m", po::value<float>(&expected_mean)->default_value(300.0), "Target mean of intensities.")
+          ("expected_std_dev,d", po::value<float>(&expected_std_dev)->default_value(1.0), "Target standard deviation of intensities.")
+          ("out_filename,o", po::value<string>(&out_filename)->required(), "Output normalized cloud filename.")
+          ;
   po::variables_map vm;
   po::parsed_options parsed = po::parse_command_line(argc, argv, desc);
   po::store(parsed, vm);
 
   if (vm.count("help")) {
-      std::cerr << desc << std::endl;
-      return false;
+    std::cerr << desc << std::endl;
+    return false;
   }
   try {
-      po::notify(vm);
+    po::notify(vm);
   } catch(std::exception& e) {
-      std::cerr << "Error: " << e.what() << std::endl << std::endl << desc << std::endl;
-      return false;
+    std::cerr << "Error: " << e.what() << std::endl << std::endl << desc << std::endl;
+    return false;
   }
 
   poses = KittiUtils::load_kitti_poses(pose_filename);
@@ -102,78 +90,6 @@ bool parse_arguments(int argc, char **argv,
   }
 
   return true;
-}
-
-class BinIndex {
-public:
-  int ring, dist;
-
-  BinIndex(const int ring_, const int dist_) :
-    ring(ring_), dist(dist_) {
-  }
-
-  bool operator=(const BinIndex &o) const {
-    return this->ring == o.ring && this->dist == o.dist;
-  }
-
-  bool operator<(const BinIndex &o) const {
-    if(this->ring == o.ring) {
-        return this->dist < o.dist;
-    } else {
-      return this->ring < o.ring;
-    }
-  }
-};
-
-float transform_gauss(float x1, float u1, float s1, float u2, float s2) {
-  float x2;
-  if(s1 < 0.01) {
-    x2 = x1 - u1 + u2;
-  } else {
-    x2 = ((x1-u1) / s1) * s2 + u2;
-  }
-
-  /*cerr << "x1: " << x1 << "; " <<
-      "u1: " << u1 << "; " <<
-      "s1: " << s1 << "; " <<
-      "u2: " << u2 << "; " <<
-      "s2: " << s2 << "; " <<
-      "x2: " << x2 << endl;*/
-
-  return MIN(MAX(x2, 0.0), 2*u2);
-}
-
-void normalize_intensities(const Mat &data, PointCloud<PointType> &cloud,
-    float expected_mean, float expected_std_dev) {
-  typedef map< BinIndex, vector<float> > GridT;
-  GridT desc_grid;
-  for(int i = 0; i < data.rows; i++) {
-    BinIndex bin(data.at<int>(i, 0), data.at<int>(i, 1));
-    desc_grid[bin].push_back(cloud[i].intensity);
-  }
-
-  for(GridT::iterator bin = desc_grid.begin(); bin != desc_grid.end(); bin++) {
-    float mean = accumulate(bin->second.begin(), bin->second.end(), 0.0) / bin->second.size();
-    float variance = 0;
-    for(vector<float>::iterator x = bin->second.begin(); x < bin->second.end(); x++) {
-      variance += pow(*x-mean, 2);
-    }
-    variance /= bin->second.size();
-    bin->second.clear();
-    bin->second.push_back(mean);
-    bin->second.push_back(sqrt(variance));
-  }
-
-  for(int i = 0; i < data.rows; i++) {
-    BinIndex bin(data.at<int>(i, 0), data.at<int>(i, 1));
-    cloud[i].intensity = transform_gauss(cloud[i].intensity,
-        desc_grid[bin][0], desc_grid[bin][1],
-        expected_mean, expected_std_dev);
-  }
-}
-
-int quantize(float value, float resolution) {
-  return floor(value/resolution);
 }
 
 int main(int argc, char** argv) {
@@ -192,50 +108,12 @@ int main(int argc, char** argv) {
   PointCloud<PointType>::Ptr sum_cloud(new PointCloud<PointType>);
   io::loadPCDFile(sum_cloud_filename, *sum_cloud);
 
-  PointCloud<PointXYZ> sum_origin_positions;
-  sum_origin_positions.resize(sum_cloud->size());
-  for(int i = 0; i < sum_cloud->size(); i++) {
-    Origin o = Origin::fromPointSource(sum_cloud->at(i).source, poses.size());
-    sum_origin_positions[i].getVector3fMap() = calibration.getSensorPose(poses[o.pose_id], o.sensor_id).translation();
-  }
-  cerr << "Computed " << sum_origin_positions.size() << " origins." << endl;
-
-  cerr << "Compute data for normalization ..." << endl;
-  Mat data(sum_cloud->size(), DATA_CHANNELS, CV_32SC1);
-  //Visualizer3D vis;
-  PointCloud<PointType>::Ptr vis_cloud(new PointCloud<PointType>);
-  *vis_cloud += *sum_cloud;
-  subsample_cloud<PointType>(vis_cloud, 0.01);
-  //vis.setColor(200, 200, 200).addPointCloud(*vis_cloud);
-  //cv::RNG& rng(cv::theRNG());
-  for(int pi = 0; pi < sum_cloud->size(); pi++) {
-    PointType pt = sum_cloud->at(pi);
-    Eigen::Vector3f pt_to_origin = sum_origin_positions[pi].getVector3fMap() - pt.getVector3fMap();
-    float distance = pt_to_origin.norm();
-
-    /*cout << pt.ring << " " << angle << " " << distance << " " << pt.intensity << endl;
-
-    if(angle > 1.8) {
-      cerr << "sensor: " << sum_origins[pi].sensor_id << endl;
-      PointCloudLine normal_line(pt.getVector3fMap(), normal);
-      PointCloudLine pt_to_origin_line(pt.getVector3fMap(), pt_to_origin);
-      unsigned r = rng(256);
-      unsigned g = rng(256);
-      unsigned b = rng(256);
-      vis.getViewer()->removeAllShapes();
-      vis.setColor(r, g, b).addArrow(normal_line);
-      vis.setColor(r, g, b).addArrow(pt_to_origin_line).show();
-    }*/
-
-    data.at<int>(pi, 0) = pt.ring;
-    data.at<int>(pi, 1) = quantize(distance, DISTANCE_RES);
-  }
-
-  cerr << "Intensities normalization ..." << endl;
-  normalize_intensities(data, *sum_cloud, expected_mean, expected_std_dev);
+  AdaptiveIntensitiesNormalization normalization(expected_mean, expected_std_dev);
+  PointCloud<PointType>::Ptr normalized_cloud(new PointCloud<PointType>);
+  normalization.run(sum_cloud, calibration, poses, normalized_cloud);
 
   cerr << "Saving output ..." << endl;
-  io::savePCDFileBinary(out_filename, *sum_cloud);
+  io::savePCDFileBinary(out_filename, *normalized_cloud);
 
   return EXIT_SUCCESS;
 }
