@@ -69,7 +69,7 @@ namespace but_velodyne {
                                PointCloud<PointType>::Ptr &out_cloud) {
       *out_cloud = in_cloud;
 
-      typedef map <BinIndex, vector<float>> GridT;
+      typedef map < BinIndex, vector<float> > GridT;
       GridT desc_grid;
       for (int i = 0; i < data.rows; i++) {
         BinIndex bin(data.at<int>(i, 0), data.at<int>(i, 1));
