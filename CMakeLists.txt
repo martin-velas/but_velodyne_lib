@@ -247,6 +247,9 @@ target_link_libraries(sync-velodyne-clouds-by-angle but_velodyne)
 add_executable(filter-by-angle src/apps/filter-by-angle.cpp)
 target_link_libraries(filter-by-angle but_velodyne)
 
+add_executable(filter-multiframe-overlap src/apps/filter-multiframe-overlap.cpp)
+target_link_libraries(filter-multiframe-overlap but_velodyne)
+
 add_executable(filter-by-phase src/apps/filter-by-phase.cpp)
 target_link_libraries(filter-by-phase but_velodyne)
 
