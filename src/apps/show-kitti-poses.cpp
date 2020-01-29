@@ -83,7 +83,7 @@ bool parse_arguments(int argc, char **argv,
                      SensorsCalibration &calibration,
                      bool &index_by_cloud_name,
                      bool &color_by_phase,
-                     bool &show_indices) {
+                     bool &show_indices, bool &single) {
   string pose_filename, calibration_filename;
 
   po::options_description desc("Poses and point clouds visualization\n"
@@ -96,6 +96,7 @@ bool parse_arguments(int argc, char **argv,
     ("index_by_cloud_name,i", po::bool_switch(&index_by_cloud_name), "Get cloud index from filename.")
     ("color_by_phase", po::bool_switch(&color_by_phase), "Color clouds by rotor phase.")
     ("show_indices", po::bool_switch(&show_indices), "Show indices over poses.")
+    ("single,s", po::bool_switch(&single), "Show each frame separately.")
   ;
   po::variables_map vm;
   po::parsed_options parsed = po::parse_command_line(argc, argv, desc);
@@ -124,14 +125,23 @@ bool parse_arguments(int argc, char **argv,
   return true;
 }
 
+void add_pose_index(const Eigen::Affine3f &pose, const int idx, Visualizer3D &visualizer) {
+  stringstream ss;
+  ss << idx;
+  PointXYZ pt;
+  pt.getVector3fMap() = pose.translation();
+  pt.y -= visualizer.rngF() * 0.05 + 0.01;
+  visualizer.getViewer()->addText3D(ss.str(), pt, 0.02, 0.8, 0.0, 0.8, "idx_" + ss.str());
+}
+
 int main(int argc, char** argv) {
 
   vector<Eigen::Affine3f> poses;
   vector<string> clouds_fnames;
   SensorsCalibration calibration;
-  bool index_by_cloud_name, color_by_phase, show_indices;
+  bool index_by_cloud_name, color_by_phase, show_indices, single_view;
   if(!parse_arguments(argc, argv, poses, clouds_fnames, calibration,
-      index_by_cloud_name, color_by_phase, show_indices)) {
+      index_by_cloud_name, color_by_phase, show_indices, single_view)) {
     return EXIT_FAILURE;
   }
 
@@ -157,18 +167,17 @@ int main(int argc, char** argv) {
     } else {
       visualizer.addPointCloud(cloud, poses[pose_i].matrix());
     }
+    if(single_view) {
+      visualizer.keepOnlyClouds(1).show();
+    }
   }
 
   if(show_indices) {
     for(int i = 0; i < poses.size(); i++) {
-      stringstream ss;
-      ss << i;
-      PointXYZ pt;
-      pt.getVector3fMap() = poses[i].translation();
-      pt.y -= visualizer.rngF() * 0.05 + 0.01;
-      visualizer.getViewer()->addText3D(ss.str(), pt, 0.01, 0.8, 0.0, 0.8);
+      add_pose_index(poses[i], i, visualizer);
     }
   }
+
   visualizer.addPoses(poses, 0.2).show();
 
   return EXIT_SUCCESS;
