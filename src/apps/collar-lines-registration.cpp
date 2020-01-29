@@ -163,7 +163,7 @@ int main(int argc, char** argv) {
   Visualizer3D::Ptr vis;
   PointCloud<PointXYZ> src_cloud, trg_cloud;
   if(visualization) {
-    vis.reset(new Visualizer3D);
+    vis = Visualizer3D::getCommonVisualizer();
     src_frame->joinTo(src_cloud);
     trg_frame->joinTo(trg_cloud);
     vis->setColor(255, 0, 0).addPointCloud(src_cloud)

@@ -421,22 +421,22 @@ void CollarLinesRegistration::getCorrespondingPoints(
 //  vis.show();
 
   //visualization of correspondences:
-/*
-  static Visualizer3D vis;
-  vis.getViewer()->removeAllShapes();
-  vis.keepOnlyClouds(0)
+  /*
+  Visualizer3D::Ptr vis = Visualizer3D::getCommonVisualizer();
+  vis->getViewer()->removeAllShapes();
+  vis->keepOnlyClouds(0)
           .setColor(255, 0, 0).addPointCloud(*source_cloud.getMiddles())
           .setColor(0, 0, 255).addPointCloud(*target_cloud.getMiddles())
           .show();
   for(int i = 0; i < matches.size(); i++) {
     if(i%10 == 0) {
       const PointCloudLine &source_line = source_cloud[matches[i].trainIdx].line;
-      vis.addLine(source_line);
+      vis->addLine(source_line);
     }
   }
   cerr << endl << endl;
-  vis.show();
-*/
+  vis->show();
+  */
 }
 
 float CollarLinesRegistration::getVerticalWeight(const Vector3f &source_line_orient,
