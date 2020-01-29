@@ -144,7 +144,9 @@ int main(int argc, char** argv) {
 
     const float error = eval_calibration(X, A_inv, B);
     if(error < min_error) {
-      cerr << error << endl << X << endl;
+      float tx, ty, tz, rx, ry, rz;
+      getTranslationAndEulerAngles(X, tx, ty, tz, rx, ry, rz);
+      cerr << error << endl << X << "; t: " << sqrt(tx*tx + ty*ty + tz*tz) << ", R: " << RAD2DEG(Eigen::AngleAxisf(X.rotation()).angle()) << endl;
       min_error = error;
       best_X = X;
     }
