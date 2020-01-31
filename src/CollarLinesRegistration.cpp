@@ -277,6 +277,13 @@ void CollarLinesRegistration::findClosestMatchesByMiddles() {
         distance = min_distance[i];
       }
 
+      if(params.phase_weights_max > -0.0001) {
+        const float source_phase = source_cloud[source_index].phase;
+        const float target_phase = target_cloud[target_index].phase;
+        const float weight = getPhaseWeight(source_phase, target_phase);
+        distance /= (weight + 0.01);
+      }
+
       DMatch match(target_index, source_index, distance);
       matches.push_back(match);
     }
@@ -352,11 +359,19 @@ float CollarLinesRegistration::getMatchesMean() {
   return sum / matches.size();
 }
 
-float CollarLinesRegistration::getPhaseWeight(const float phase) const {
-  return pow(1.0 - fabs(phase - params.phase_weights_max), params.phase_weights_power);
-}
+  float CollarLinesRegistration::getPhaseWeight(const float phase) const {
+    return pow(1.0 - fabs(phase - params.phase_weights_max), params.phase_weights_power);
+  }
 
-void CollarLinesRegistration::getCorrespondingPoints(
+  float CollarLinesRegistration::getPhaseWeight(const float source_phase, const float target_phase) const {
+    if(isnan(source_phase) || isnan(target_phase)) {
+      return 0.0;
+    } else {
+      return MAX(getPhaseWeight(source_phase), getPhaseWeight(target_phase));
+    }
+  }
+
+  void CollarLinesRegistration::getCorrespondingPoints(
     MatrixOfPoints &source_coresp_points,
     MatrixOfPoints &target_coresp_points) {
 
@@ -393,11 +408,7 @@ void CollarLinesRegistration::getCorrespondingPoints(
     } else if(params.phase_weights_max > -0.0001) {
       const float source_phase = source_cloud[match->trainIdx].phase;
       const float target_phase = target_cloud[match->queryIdx].phase;
-      if(!isnan(source_phase) && !isnan(target_phase)) {
-        weight = MAX(getPhaseWeight(source_phase), getPhaseWeight(target_phase));
-      } else {
-        weight = 0;
-      }
+      weight = getPhaseWeight(source_phase, target_phase);
     } else {
       assert(params.weighting == NO_WEIGHTS);
       weight = 1.0;

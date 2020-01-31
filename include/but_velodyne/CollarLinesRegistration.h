@@ -229,6 +229,8 @@ protected:
 
   float getPhaseWeight(const float phase) const;
 
+  float getPhaseWeight(const float source_phase, const float target_phase) const;
+
   void getCorrespondingPoints(MatrixOfPoints &source_coresp_points,
                               MatrixOfPoints &target_coresp_points);
 

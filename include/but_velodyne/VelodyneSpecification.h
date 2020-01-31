@@ -67,7 +67,7 @@ public:
     case HDL64:
       return 64;
     default:
-      throw std::invalid_argument("Unknown Velodyne model");
+      throw std::invalid_argument("Unknown Velodyne model (ring estimation)");
     }
   }
 
@@ -80,7 +80,7 @@ public:
     case HDL64:
       return 62.13;
     default:
-      throw std::invalid_argument("Unknown Velodyne model");
+      throw std::invalid_argument("Unknown Velodyne model (min angle estimation)");
     }
   }
 
@@ -93,7 +93,7 @@ public:
     case HDL64:
       return 92.00;
     default:
-      throw std::invalid_argument("Unknown Velodyne model");
+      throw std::invalid_argument("Unknown Velodyne model (max angle estimation)");
     }
   }
 
