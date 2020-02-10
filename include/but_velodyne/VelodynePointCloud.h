@@ -427,6 +427,8 @@ public:
     velodyne_model = velodyneModel;
   }
 
+  void copyTo(VelodynePointCloud &dest) const;
+
 protected:
   VelodynePointCloud discartWeakPoints(float threshold);
 
@@ -468,6 +470,11 @@ public:
       const SensorsCalibration &calibration_,
       bool transform_pcd_files_ = false);
 
+  VelodyneMultiFrame(const std::vector<std::string> &filenames_,
+          const std::vector<VelodynePointCloud::Ptr> &clouds_,
+          const SensorsCalibration &calibration_) : filenames(filenames_), clouds(clouds_), calibration(calibration_) {
+  }
+
   void joinTo(pcl::PointCloud<PointWithSource> &output) const;
 
   void joinTo(pcl::PointCloud<velodyne_pointcloud::VelodynePoint> &output, bool distinguish_rings = false) const;
@@ -477,6 +484,8 @@ public:
   void joinTo(pcl::PointCloud<pcl::PointXYZ> &output) const;
 
   void subsample(float ratio);
+
+  VelodyneMultiFrame::Ptr replaceSuffixFromPreviousFrame(const VelodyneMultiFrame &previous, const float portion) const;
 
   std::vector<std::string> filenames;
   std::vector<VelodynePointCloud::Ptr> clouds;
@@ -493,7 +502,9 @@ public:
 
   VelodyneMultiFrame getNext(void);
 
-  void reset(void);
+  VelodyneMultiFrame::Ptr getNextPtr(void);
+
+    void reset(void);
 
   void next(void);
 
@@ -501,7 +512,9 @@ public:
 
   VelodyneMultiFrame getPrev(void);
 
-  int size(void) const {
+  VelodyneMultiFrame::Ptr getPrevPtr(void);
+
+    int size(void) const {
     return filenames.size() / calibration.sensorsCount();
   }
 
@@ -509,7 +522,7 @@ public:
     return index;
   }
 
-  VelodyneMultiFrame operator[](const int i) const;
+  VelodyneMultiFrame::Ptr operator[](const int i) const;
 
 private:
   const std::vector<std::string> filenames;

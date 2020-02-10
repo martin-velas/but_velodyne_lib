@@ -153,9 +153,9 @@ int main(int argc, char** argv) {
     if(source_index >= 0) {
       i = source_index;
     }
-    VelodyneMultiFrame src_frame = sequence[i];
+    VelodyneMultiFrame::Ptr src_frame = sequence[i];
     PointCloud<VelodynePoint> src_cloud;
-    src_frame.joinTo(src_cloud);
+    src_frame->joinTo(src_cloud);
     transformPointCloud(src_cloud, src_cloud, Eigen::Affine3f(poses[i].rotation()));
     SphericalZbuffer src_zbuffer(src_cloud, 180, 90, depth_quantile);
 
@@ -163,9 +163,9 @@ int main(int argc, char** argv) {
       int frames_distace = get_frames_distance(i, j, sequence.size(), circular);
       if(expected_frames_dist <= frames_distace && frames_distace <= max_frames_dist) {
 
-        VelodyneMultiFrame trg_frame = sequence[j];
+        VelodyneMultiFrame::Ptr trg_frame = sequence[j];
         PointCloud<VelodynePoint> trg_cloud;
-        trg_frame.joinTo(trg_cloud);
+        trg_frame->joinTo(trg_cloud);
         transformPointCloud(trg_cloud, trg_cloud, Eigen::Affine3f(poses[j].rotation()));
         Eigen::Vector3f translation = poses[j].translation() - poses[i].translation();
         transformPointCloud(trg_cloud, trg_cloud, translation, Eigen::Quaternionf::Identity());

@@ -38,13 +38,13 @@ namespace but_velodyne {
     void visualize_registration(const VelodynePointCloud &src_cloud, const VelodynePointCloud &trg_cloud,
                                 const Eigen::Affine3f &T);
 
-    void register_clouds_parts(const VelodynePointCloud &src_cloud, const VelodynePointCloud &trg_cloud,
+    void register_clouds_parts(const VelodyneMultiFrame &src_frame, const VelodyneMultiFrame &trg_frame,
                                CollarLinesRegistration::Parameters registration_parameters,
                                CollarLinesRegistrationPipeline::Parameters pipeline_parameters,
                                const size_t parts,
                                const bool visualization, vector<RegistrationOutcome> &results);
 
-    void append_end_to_next_frame(const VelodynePointCloud &previous, VelodynePointCloud &next, float portion);
+    void replace_suffix_from_previous_frame(const VelodynePointCloud &previous, VelodynePointCloud &next, float portion);
 }
 
 #endif //BUT_VELODYNE_LIB_COLLARLINESREGISTRATIONPERPART_H

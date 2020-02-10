@@ -161,17 +161,17 @@ int main(int argc, char** argv) {
   VelodyneFileSequence sequence(filenames, calibration);
 
   for(int src_i = 0; src_i+1 < sequence.size();) {
-    VelodyneMultiFrame src_frame = sequence[src_i];
+    VelodyneMultiFrame::Ptr src_frame = sequence[src_i];
     PointCloud<VelodynePoint> src_cloud;
-    src_frame.joinTo(src_cloud);
+    src_frame->joinTo(src_cloud);
     transformPointCloud(src_cloud, src_cloud, Eigen::Affine3f(poses[src_i].rotation()));
     SphericalZbuffer src_zbuffer(src_cloud, 180, 90, depth_quantile);
 
     float previous_overlap = threshold;
     for(int trg_i = src_i+1; trg_i < sequence.size(); trg_i++) {
-      VelodyneMultiFrame trg_frame = sequence[trg_i];
+      VelodyneMultiFrame::Ptr trg_frame = sequence[trg_i];
       PointCloud<VelodynePoint> trg_cloud;
-      trg_frame.joinTo(trg_cloud);
+      trg_frame->joinTo(trg_cloud);
       transformPointCloud(trg_cloud, trg_cloud, Eigen::Affine3f(poses[trg_i].rotation()));
       Eigen::Vector3f translation = poses[trg_i].translation() - poses[src_i].translation();
       transformPointCloud(trg_cloud, trg_cloud, translation, Eigen::Quaternionf::Identity());

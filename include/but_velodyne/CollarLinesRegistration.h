@@ -222,14 +222,15 @@ public:
   // time counters measuring how much the each step of registration process costs
   float matching_time, correnspondences_time, tranformation_time, error_time;
 
-protected:
-  int getMatches(const int target_index, vector<int> &closest_index, vector<float> &min_distance) const;
-
-  void findClosestMatchesByMiddles();
-
   float getPhaseWeight(const float phase) const;
 
   float getPhaseWeight(const float source_phase, const float target_phase) const;
+
+  int getMatches(const int target_index, vector<int> &closest_index, vector<float> &min_distance) const;
+
+protected:
+
+  void findClosestMatchesByMiddles();
 
   void getCorrespondingPoints(MatrixOfPoints &source_coresp_points,
                               MatrixOfPoints &target_coresp_points);

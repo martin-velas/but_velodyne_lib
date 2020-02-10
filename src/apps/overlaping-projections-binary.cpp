@@ -149,15 +149,15 @@ void estimateOverlapBinary(const int min_i, const int max_i,
     return;
   }
 
-  VelodyneMultiFrame src_frame = sequence[min_i];
+  VelodyneMultiFrame::Ptr src_frame = sequence[min_i];
   PointCloud<VelodynePoint> src_cloud;
-  src_frame.joinTo(src_cloud);
+  src_frame->joinTo(src_cloud);
   transformPointCloud(src_cloud, src_cloud, Eigen::Affine3f(poses[min_i].rotation()));
   SphericalZbuffer src_zbuffer(src_cloud, 180, 90, depth_quantile);
 
-  VelodyneMultiFrame trg_frame = sequence[max_i];
+  VelodyneMultiFrame::Ptr trg_frame = sequence[max_i];
   PointCloud<VelodynePoint> trg_cloud;
-  trg_frame.joinTo(trg_cloud);
+  trg_frame->joinTo(trg_cloud);
   transformPointCloud(trg_cloud, trg_cloud, Eigen::Affine3f(poses[max_i].rotation()));
   Eigen::Vector3f translation = poses[max_i].translation() - poses[min_i].translation();
   transformPointCloud(trg_cloud, trg_cloud, translation, Eigen::Quaternionf::Identity());

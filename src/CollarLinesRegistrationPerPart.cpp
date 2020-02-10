@@ -35,21 +35,26 @@ void visualize_registration(const VelodynePointCloud &src_cloud, const VelodyneP
   transformPointCloud(trg_cloud, trg_cloud_transformed, T);
   Visualizer3D::getCommonVisualizer()->keepOnlyClouds(0)
           .addColorPointCloud(Visualizer3D::colorizeCloudByPhase(src_cloud))
-          .setColor(0, 0, 255).addPointCloud(trg_cloud_transformed)
+          .addColorPointCloud(Visualizer3D::colorizeCloudByPhase(trg_cloud_transformed))
+          //.setColor(0, 0, 255).addPointCloud(trg_cloud_transformed)
           .show();
 }
 
-void register_clouds_parts(const VelodynePointCloud &src_cloud, const VelodynePointCloud &trg_cloud,
+void register_clouds_parts(const VelodyneMultiFrame &source, const VelodyneMultiFrame &target,
                            CollarLinesRegistration::Parameters registration_parameters,
                            CollarLinesRegistrationPipeline::Parameters pipeline_parameters,
                            const size_t parts,
                            const bool visualization, vector<RegistrationOutcome> &results) {
+  VelodynePointCloud src_vis_cloud, trg_vis_cloud;
+  source.joinTo(src_vis_cloud);
+  target.joinTo(trg_vis_cloud);
+
   if (visualization) {
-    visualize_registration(src_cloud, trg_cloud, Eigen::Affine3f::Identity());
+    visualize_registration(src_vis_cloud, trg_vis_cloud, Eigen::Affine3f::Identity());
   }
 
-  PolarGridOfClouds src_grid(src_cloud);
-  PolarGridOfClouds trg_grid(trg_cloud);
+  PolarGridOfClouds src_grid(source.clouds, source.calibration);
+  PolarGridOfClouds trg_grid(target.clouds, target.calibration);
 
   LinearMoveEstimator null_estimator(0);
   ofstream null_file("/dev/null");
@@ -60,7 +65,7 @@ void register_clouds_parts(const VelodynePointCloud &src_cloud, const VelodynePo
   RegistrationOutcome result_whole;
   registration.registerTwoGrids(src_grid, trg_grid, Eigen::Matrix4f::Identity(), result_whole);
   if (visualization) {
-    visualize_registration(src_cloud, trg_cloud, result_whole.transformation);
+    visualize_registration(src_vis_cloud, trg_vis_cloud, result_whole.transformation);
   }
 
   for (float max_phase = 0.0; max_phase < 0.99; max_phase += 1.0 / parts) {
@@ -75,19 +80,23 @@ void register_clouds_parts(const VelodynePointCloud &src_cloud, const VelodynePo
     results.push_back(result_part);
     cerr << "Max phase: " << max_phase << endl;
     if (visualization) {
-      visualize_registration(src_cloud, trg_cloud, result_part.transformation);
+      visualize_registration(src_vis_cloud, trg_vis_cloud, result_part.transformation);
     }
   }
 }
 
-void append_end_to_next_frame(const VelodynePointCloud &previous, VelodynePointCloud &next, float portion) {
-  PhaseFilter filter(1.0 - portion, 1.0);
+void replace_suffix_from_previous_frame(const VelodynePointCloud &previous, VelodynePointCloud &current, float portion) {
+  PhaseFilter slice_previous(1.0 - portion, 1.0);
   VelodynePointCloud slice;
-  filter.filter(previous, slice);
+  slice_previous.filter(previous, slice);
+
   for (VelodynePointCloud::iterator p = slice.begin(); p < slice.end(); p++) {
     p->phase -= 1.0;
   }
-  next += slice;
+
+  PhaseFilter filter_current(0.0, 1.0 - portion);  filter_current.filter(current);
+
+  current += slice;
 }
 
 }

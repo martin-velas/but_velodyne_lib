@@ -35,6 +35,8 @@
 
 #include <velodyne_pointcloud/point_types.h>
 
+#include <but_velodyne/CollarLinesRegistrationPerPart.h>
+
 using namespace pcl;
 using namespace velodyne_pointcloud;
 using namespace std;
@@ -118,6 +120,12 @@ VelodyneSpecification::Model VelodynePointCloud::estimateModel() {
     velodyne_model = VelodyneSpecification::Unknown;
   }
   return velodyne_model;
+}
+
+void VelodynePointCloud::copyTo(VelodynePointCloud &dest) const {
+  dest += *this;
+  dest.velodyne_model = this->velodyne_model;
+  dest.axis_correction = this->axis_correction;
 }
 
 VelodynePointCloud VelodynePointCloud::discartWeakPoints(float threshold) {
@@ -501,6 +509,18 @@ void VelodyneMultiFrame::subsample(float ratio) {
   }
 }
 
+VelodyneMultiFrame::Ptr VelodyneMultiFrame::replaceSuffixFromPreviousFrame(const VelodyneMultiFrame &previous,
+        const float portion) const {
+  std::vector<VelodynePointCloud::Ptr> replaced_suffixex;
+  for(int i = 0; i < this->clouds.size(); i++) {
+    VelodynePointCloud::Ptr replaced(new VelodynePointCloud);
+    this->clouds[i]->copyTo(*replaced);
+    replace_suffix_from_previous_frame(*previous.clouds[i], *replaced, portion);
+    replaced_suffixex.push_back(replaced);
+  }
+  return VelodyneMultiFrame::Ptr(new VelodyneMultiFrame(
+          this->filenames, replaced_suffixex, this->calibration));
+}
 
 VelodyneFileSequence::VelodyneFileSequence(const std::vector<std::string> &filenames_,
     const SensorsCalibration &calibration_,
@@ -515,18 +535,21 @@ bool VelodyneFileSequence::hasNext(void) {
   return (index+1)*calibration.sensorsCount() <= filenames.size();
 }
 
-VelodyneMultiFrame VelodyneFileSequence::operator[](const int i) const {
+VelodyneMultiFrame::Ptr VelodyneFileSequence::operator[](const int i) const {
   vector<string>::const_iterator first = filenames.begin() + i*calibration.sensorsCount();
   vector<string>::const_iterator last = first + calibration.sensorsCount();
   vector<string> frame_filenames(first, last);
-  return VelodyneMultiFrame(frame_filenames, calibration, transform_pcd_files);
+  return VelodyneMultiFrame::Ptr(new VelodyneMultiFrame(frame_filenames, calibration, transform_pcd_files));
 }
 
 VelodyneMultiFrame VelodyneFileSequence::getNext(void) {
   assert(hasNext());
-  VelodyneMultiFrame frame = (*this)[index];
-  index++;
-  return frame;
+  return *getNextPtr();
+}
+
+VelodyneMultiFrame::Ptr VelodyneFileSequence::getNextPtr(void) {
+  assert(hasNext());
+  return (*this)[index++];
 }
 
 void VelodyneFileSequence::next(void) {
@@ -543,8 +566,12 @@ bool VelodyneFileSequence::hasPrev(void) {
 
 VelodyneMultiFrame VelodyneFileSequence::getPrev(void) {
   assert(hasPrev());
-  index--;
-  return (*this)[index];
+  return *getPrevPtr();
+}
+
+VelodyneMultiFrame::Ptr VelodyneFileSequence::getPrevPtr(void) {
+  assert(hasPrev());
+  return (*this)[--index];
 }
 
 }
