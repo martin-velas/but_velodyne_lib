@@ -35,8 +35,6 @@
 
 #include <velodyne_pointcloud/point_types.h>
 
-#include <but_velodyne/CollarLinesRegistrationPerPart.h>
-
 using namespace pcl;
 using namespace velodyne_pointcloud;
 using namespace std;
@@ -507,19 +505,6 @@ void VelodyneMultiFrame::subsample(float ratio) {
   for(int i = 0; i < clouds.size(); i++) {
     subsample_cloud<velodyne_pointcloud::VelodynePoint>(clouds[i], ratio);
   }
-}
-
-VelodyneMultiFrame::Ptr VelodyneMultiFrame::replaceSuffixFromPreviousFrame(const VelodyneMultiFrame &previous,
-        const float portion) const {
-  std::vector<VelodynePointCloud::Ptr> replaced_suffixex;
-  for(int i = 0; i < this->clouds.size(); i++) {
-    VelodynePointCloud::Ptr replaced(new VelodynePointCloud);
-    this->clouds[i]->copyTo(*replaced);
-    replace_suffix_from_previous_frame(*previous.clouds[i], *replaced, portion);
-    replaced_suffixex.push_back(replaced);
-  }
-  return VelodyneMultiFrame::Ptr(new VelodyneMultiFrame(
-          this->filenames, replaced_suffixex, this->calibration));
 }
 
 VelodyneFileSequence::VelodyneFileSequence(const std::vector<std::string> &filenames_,

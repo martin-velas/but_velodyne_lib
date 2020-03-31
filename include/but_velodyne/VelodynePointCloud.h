@@ -485,8 +485,6 @@ public:
 
   void subsample(float ratio);
 
-  VelodyneMultiFrame::Ptr replaceSuffixFromPreviousFrame(const VelodyneMultiFrame &previous, const float portion) const;
-
   std::vector<std::string> filenames;
   std::vector<VelodynePointCloud::Ptr> clouds;
   SensorsCalibration calibration;

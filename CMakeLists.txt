@@ -59,7 +59,7 @@ src/VelodynePointCloud.cpp src/Visualizer2D.cpp src/Visualizer3D.cpp
 src/VelodyneSpecification.cpp src/CollarLinesFilter.cpp src/GroundDetectionDataGenerator.cpp
 src/EigenUtils.cpp src/GlobalOptimization.cpp src/common.cpp src/Clustering.cpp src/NormalsEstimation.cpp
 src/SubseqRegistration.cpp src/KittiUtils.cpp src/RegistrationCrossValidation.cpp src/CollarLinesValidation.cpp
-src/Overlap.cpp src/InterpolationSE3.cpp src/Calibration.cpp src/AdaptiveIntensitiesNormalization.cpp src/CollarLinesRegistrationPerPart.cpp)
+src/Overlap.cpp src/InterpolationSE3.cpp src/Calibration.cpp src/AdaptiveIntensitiesNormalization.cpp)
 target_include_directories(but_velodyne PUBLIC ${PROJECT_SOURCE_DIR}/include)
 target_link_libraries(but_velodyne ${PCL_LIBRARIES})
 target_link_libraries(but_velodyne ${OpenCV_LIBS})
@@ -72,9 +72,6 @@ file(MAKE_DIRECTORY ${EXECUTABLE_OUTPUT_PATH}/tests)
 # Link runTests with what we want to test and the GTest and pthread library
 add_executable(tests/RegistrationCrossValidation-test src/tests/RegistrationCrossValidation-test.cpp)
 target_link_libraries(tests/RegistrationCrossValidation-test ${GTEST_LIBRARIES} pthread but_velodyne)
-
-add_executable(tests/collar-lines-registrations-per-parts-test src/apps/tests/collar-lines-registrations-per-parts-test.cpp)
-target_link_libraries(tests/collar-lines-registrations-per-parts-test ${GTEST_LIBRARIES} pthread but_velodyne)
 
 ########################### Odometry estimation: #############################
 
