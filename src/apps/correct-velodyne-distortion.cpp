@@ -22,20 +22,14 @@
  */
 
 #include <cstdlib>
-#include <cstdio>
-
 #include <boost/program_options.hpp>
-
-#include <but_velodyne/VelodynePointCloud.h>
-#include <but_velodyne/Visualizer3D.h>
-#include <but_velodyne/KittiUtils.h>
-#include <but_velodyne/InterpolationSE3.h>
 
 #include <pcl/common/eigen.h>
 #include <pcl/common/transforms.h>
-#include <pcl/filters/voxel_grid.h>
-#include <pcl/filters/passthrough.h>
-#include <pcl/registration/transformation_estimation_svd.h>
+
+#include <but_velodyne/VelodynePointCloud.h>
+#include <but_velodyne/KittiUtils.h>
+#include <but_velodyne/InterpolationSE3.h>
 
 using namespace std;
 using namespace pcl;
@@ -89,33 +83,35 @@ bool parse_arguments(
 }
 
 void getSlices(const VelodynePointCloud &in_cloud, vector<VelodynePointCloud> &slices) {
-  float polar_bin_size = 1.0 / slices.size();
+  map<float, VelodynePointCloud> slices_map;
   for(VelodynePointCloud::const_iterator pt = in_cloud.begin(); pt < in_cloud.end(); pt++) {
-    int bin = floor(pt->phase/polar_bin_size);
-    if(bin >= slices.size()) {
-      // cerr << pt->phase << endl;
-    } else {
-      slices[bin].push_back(*pt);
-    }
+    slices_map[pt->phase].push_back(*pt);
+  }
+  for(map<float, VelodynePointCloud>::const_iterator s = slices_map.begin(); s != slices_map.end(); s++) {
+    slices.push_back(s->second);
   }
 }
 
-void fix_cloud(const VelodynePointCloud &in_cloud,
+int phaseToInt(const float phase) {
+  return MIN(phase*100, 99);
+}
+
+void fix_cloud(const int frame_idx, const VelodynePointCloud &in_cloud,
     const Eigen::Affine3f &sensor_pose,
     const Eigen::Affine3f &delta_pose,
     VelodynePointCloud &out_cloud) {
   VelodynePointCloud in_cloud_calibrated;
   transformPointCloud(in_cloud, in_cloud_calibrated, sensor_pose);
 
-  static const int SLICES_COUNT = 36;
-  vector<VelodynePointCloud> slices(SLICES_COUNT);
+  vector<VelodynePointCloud> slices;
   getSlices(in_cloud_calibrated, slices);
 
   LinearInterpolationSE3 interpolation(Eigen::Affine3f::Identity(), delta_pose);
   for(int i = 0; i < slices.size(); i++) {
-    Eigen::Affine3f t = interpolation.estimate(((float) i)/SLICES_COUNT);
+    Eigen::Affine3f t = interpolation.estimate(((float) i)/slices.size());
     transformPointCloud(slices[i], slices[i], t);
     out_cloud += slices[i];
+    cout << frame_idx << " " << phaseToInt(slices[i].front().phase) << " " << t << endl;
   }
 
   transformPointCloud(out_cloud, out_cloud, sensor_pose.inverse());
@@ -124,15 +120,28 @@ void fix_cloud(const VelodynePointCloud &in_cloud,
   }
 }
 
-void fix_cloud(const VelodynePointCloud &in_cloud,
+void fix_cloud(const int frame_idx, const VelodynePointCloud &in_cloud,
     const BSplineSE3 &spline,
     const Eigen::Affine3f &sensor_pose,
     VelodynePointCloud &out_cloud) {
   transformPointCloud(in_cloud, out_cloud, sensor_pose);
+
+  typedef map<float, Eigen::Affine3f> CB;
+  CB code_book;
   const Eigen::Affine3f &T0_inv = spline.estimate(0.0).inverse();
   for(VelodynePointCloud::iterator p = out_cloud.begin(); p < out_cloud.end(); p++) {
-    *p = transformPoint(*p, T0_inv*spline.estimate(p->phase));
+    Eigen::Affine3f t;
+    CB::iterator t_found = code_book.find(p->phase);
+    if(t_found == code_book.end()) {
+      t = T0_inv*spline.estimate(p->phase);
+      code_book[p->phase] = t;
+      cout << frame_idx << " " << phaseToInt(p->phase) << " " << t << endl;
+    } else {
+      t = t_found->second;
+    }
+    *p = transformPoint(*p, t);
   }
+
   transformPointCloud(out_cloud, out_cloud, sensor_pose.inverse());
 }
 
@@ -158,10 +167,10 @@ int main(int argc, char** argv) {
       if(frame_i > 0 && frame_i+2 < poses.size()) {
         vector<Eigen::Affine3f> control_poses(poses.begin()+(frame_i-1), poses.begin()+(frame_i+3));
         const BSplineSE3 spline(control_poses);
-        fix_cloud(*multiframe.clouds[sensor_i], spline, sensor_pose, out_cloud);
+        fix_cloud(frame_i, *multiframe.clouds[sensor_i], spline, sensor_pose, out_cloud);
       } else {
         const Eigen::Affine3f poses_delta = poses[frame_i].inverse()*poses[frame_i+1];
-        fix_cloud(*multiframe.clouds[sensor_i], sensor_pose, poses_delta, out_cloud);
+        fix_cloud(frame_i, *multiframe.clouds[sensor_i], sensor_pose, poses_delta, out_cloud);
       }
 
       boost::filesystem::path first_cloud(multiframe.filenames[sensor_i]);
