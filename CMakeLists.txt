@@ -120,17 +120,11 @@ target_link_libraries(print-graph-from-points-picked but_velodyne)
 add_executable(estimate-planar-noise src/apps/estimate-planar-noise.cpp)
 target_link_libraries(estimate-planar-noise but_velodyne)
 
-add_executable(overlaping-keyframes src/apps/overlaping-keyframes.cpp)
-target_link_libraries(overlaping-keyframes but_velodyne)
+add_executable(overlaping-frame-sequences src/apps/overlaping-frame-sequences.cpp)
+target_link_libraries(overlaping-frame-sequences but_velodyne)
 
 add_executable(overlaping-projections src/apps/overlaping-projections.cpp)
 target_link_libraries(overlaping-projections but_velodyne)
-
-add_executable(overlaping-projections-intra-keyframes src/apps/overlaping-projections-intra-keyframes.cpp)
-target_link_libraries(overlaping-projections-intra-keyframes but_velodyne)
-
-add_executable(overlaping-projections-binary src/apps/overlaping-projections-binary.cpp)
-target_link_libraries(overlaping-projections-binary but_velodyne)
 
 add_executable(overlaping-projections-keyframes src/apps/overlaping-projections-keyframes.cpp)
 target_link_libraries(overlaping-projections-keyframes but_velodyne)
