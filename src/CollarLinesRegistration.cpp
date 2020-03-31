@@ -194,7 +194,7 @@ float CollarLinesRegistration::computeError(
 
 const void CollarLinesRegistration::getLastMatches(std::vector<CLSMatch> &out_matches) const {
   out_matches = last_point_matches;
-  Eigen::Affine3f untransform(last_refinement.inverse() * transformation * initial_transformation);
+  Eigen::Affine3f untransform(transformation * initial_transformation);
   untransform = untransform.inverse();
   for(vector<CLSMatch>::iterator m = out_matches.begin(); m < out_matches.end(); m++) {
     m->trg = transformPoint(m->trg, untransform);
@@ -284,8 +284,9 @@ void CollarLinesRegistration::findClosestMatchesByMiddles() {
       if(params.phase_weights_max > -0.0001) {
         const float source_phase = source_cloud[source_index].phase;
         const float target_phase = target_cloud[target_index].phase;
-        const float weight = getPhaseWeight(source_phase, target_phase);
-        distance /= (weight + 0.01);
+        const float phase_dist = MAX(1.0 - getPhaseWeight(source_phase, target_phase), 0.0);
+
+        distance *= phase_dist;
       }
 
       DMatch match(target_index, source_index, distance);
@@ -400,7 +401,8 @@ float CollarLinesRegistration::getMatchesMean() {
     PointCloudLine target_line = target_meta_line.line;
 
     Vector3f source_line_pt, target_line_pt;
-    source_line.closestPointsWith(target_line, source_line_pt, target_line_pt);
+    float source_q, target_q;
+    source_line.closestPointsWith(target_line, source_line_pt, target_line_pt, source_q, target_q);
     RNG &rng = theRNG();
 
     if(!(EigenUtils::allFinite(target_line_pt) && EigenUtils::allFinite(source_line_pt))) {
@@ -411,8 +413,10 @@ float CollarLinesRegistration::getMatchesMean() {
     source_coresp_points.block(0, index, TPoint3D::RowsAtCompileTime, 1) = source_line_pt;
     target_coresp_points.block(0, index, TPoint3D::RowsAtCompileTime, 1) = target_line_pt;
 
-    last_point_matches.push_back(CLSMatch(source_line_pt, source_cloud[match->trainIdx].sensor_id,
-        target_line_pt, target_cloud[match->queryIdx].sensor_id));
+    last_point_matches.push_back(CLSMatch(source_line_pt, source_meta_line.sensor_id,
+                                          target_line_pt, target_meta_line.sensor_id,
+                                          source_meta_line.phase, target_meta_line.phase,
+                                          source_q, target_q, source_meta_line.frame_id, target_meta_line.frame_id));
 
     float weight;
     if(params.weighting == VERTICAL_ANGLE_WEIGHTS) {

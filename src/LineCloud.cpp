@@ -123,6 +123,13 @@ void LineCloud::push_back(const vector<PointCloudLine> &lines, const int sensor_
   }
 }
 
+void LineCloud::append(const LineCloud& other, const int frame_id) {
+  LineCloud::iterator new_it = this->data.insert(this->data.end(), other.data.begin(), other.data.end());
+  for(; new_it < this->data.end(); new_it++) {
+    new_it->frame_id = frame_id;
+  }
+}
+
 pcl::PointCloud<pcl::PointXYZ>::Ptr LineCloud::getMiddles(void) const {
   pcl::PointCloud<pcl::PointXYZ>::Ptr middles(new pcl::PointCloud<pcl::PointXYZ>);
   for(std::vector<PointCloudLineWithMiddleAndOrigin>::const_iterator l = data.begin(); l < data.end(); l++) {

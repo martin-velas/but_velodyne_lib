@@ -51,7 +51,7 @@ public:
         const int sensor_id_, const Eigen::Vector3f &normal_,
         const float phase_) :
       line(line_), middle(middle_), sensor_id(sensor_id_), normal(normal_), phase(phase_),
-      range(middle_.getVector3fMap().norm()) {
+      range(middle_.getVector3fMap().norm()), frame_id(-1) {
     }
 
     PointCloudLineWithMiddleAndOrigin transform(const Eigen::Affine3f &t) const;
@@ -62,6 +62,7 @@ public:
     Eigen::Vector3f normal;
     float phase;
     float range;
+    int frame_id;
   };
 
   typedef std::vector<PointCloudLineWithMiddleAndOrigin>::iterator iterator;
@@ -136,6 +137,8 @@ public:
     this->data.insert(this->data.end(), other.data.begin(), other.data.end());
     return *this;
   }
+
+  void append(const LineCloud& other, const int frame_id);
 
   void push_back(const PointCloudLine &line, const int sensor_id,
       const Eigen::Vector3f &normal, const float phase);

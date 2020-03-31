@@ -108,6 +108,11 @@ class Odometry:
         inverted.setDofFromM()
         return inverted
 
+    def transform_pt(self, pt):
+        pt_col = np.transpose(np.matrix(pt + [1]))
+        pt_transformed = np.dot(self.M, pt_col)
+        return np.array(np.transpose(pt_transformed)).flatten().tolist()
+
 def load_kitti_poses(file):
     poses = []
     if not hasattr(file, "readlines"):

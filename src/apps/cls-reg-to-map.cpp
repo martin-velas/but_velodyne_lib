@@ -68,8 +68,8 @@ public:
     return all_lines.size();
   }
 
-  void add(const LineCloud &lines) {
-    all_lines += lines;
+  void add(const LineCloud &lines, const int frame_id) {
+    all_lines.append(lines, frame_id);
     cerr << "all: " << all_lines.size() << "; new: " << lines.size() << endl;
   }
 
@@ -92,33 +92,26 @@ public:
                                  filter(pipeline_params_.linesPerCellPreserved),
                                  params(pipeline_params_),
                                  registration_params(registration_params_),
-                                 prune_ratio(prune_ratio_), indexed(false) {
+                                 prune_ratio(prune_ratio_), indexed(false), last_frame_id(-1) {
     if(visualization) {
       vis = Visualizer3D::getCommonVisualizer();
     }
   }
 
   void addToMap(const std::vector<VelodynePointCloud::Ptr> &point_clouds,
-      const SensorsCalibration &calibration, const Eigen::Matrix4f &pose) {
+      const SensorsCalibration &calibration, const Eigen::Affine3f &pose) {
     PolarGridOfClouds polar_grid(point_clouds, calibration);
     LineCloud line_cloud(polar_grid, params.linesPerCellGenerated, filter);
     addToMap(line_cloud, pose);
   }
 
-  void addToMap(const LineCloud &line_cloud,
-      const Eigen::Matrix4f &pose) {
-    LineCloud line_cloud_transformed;
-    line_cloud.transform(pose, line_cloud_transformed);
-    lines_map.add(line_cloud_transformed);
-    indexed = false;
-  }
-
-  Eigen::Matrix4f runMapping(const VelodyneMultiFrame &multiframe,
-      const SensorsCalibration &calibration, const Eigen::Matrix4f &init_pose) {
+  Eigen::Affine3f runMapping(const VelodyneMultiFrame &multiframe,
+      const SensorsCalibration &calibration, const Eigen::Affine3f &init_pose,
+      vector<CLSMatch> &matches) {
     PointCloud<PointXYZ> target_cloud_vis;
     if(vis) {
       multiframe.joinTo(target_cloud_vis);
-      vis->keepOnlyClouds(0).setColor(200,0,200).addPointCloud(target_cloud_vis, init_pose)
+      vis->keepOnlyClouds(0).setColor(200,0,200).addPointCloud(target_cloud_vis, init_pose.matrix())
           .setColor(150,150,150).addPointCloud(*lines_map.all_lines.getMiddles()).show();
     }
 
@@ -127,7 +120,7 @@ public:
     }
     PolarGridOfClouds target_polar_grid(multiframe.clouds, calibration);
     LineCloud target_line_cloud(target_polar_grid, params.linesPerCellGenerated, filter);
-    Eigen::Matrix4f refined_pose = registerLineCloud(target_line_cloud, init_pose);
+    Eigen::Affine3f refined_pose = registerLineCloud(target_line_cloud, init_pose, matches);
     addToMap(target_line_cloud, refined_pose);
     if(lines_map.size()*prune_ratio > target_line_cloud.size()) {
       cerr << "[DEBUG] Before pruning: " << lines_map.size() << endl;
@@ -138,7 +131,7 @@ public:
 
     if(vis) {
       vis->keepOnlyClouds(1).setColor(0,200,0)
-          .addPointCloud(target_cloud_vis, refined_pose).show();
+          .addPointCloud(target_cloud_vis, refined_pose.matrix()).show();
     }
 
     return refined_pose;
@@ -146,23 +139,32 @@ public:
 
 protected:
 
+  void addToMap(const LineCloud &line_cloud,
+                const Eigen::Affine3f &pose) {
+    LineCloud line_cloud_transformed;
+    line_cloud.transform(pose.matrix(), line_cloud_transformed);
+    lines_map.add(line_cloud_transformed, ++last_frame_id);
+    indexed = false;
+  }
+
   void buildKdTree(void) {
     map_kdtree.setInputCloud(lines_map.getMiddlesPtr());
     indexed = true;
   }
 
-  Eigen::Matrix4f registerLineCloud(const LineCloud &target,
-      const Eigen::Matrix4f &initial_transformation) {
+  Eigen::Affine3f registerLineCloud(const LineCloud &target,
+      const Eigen::Affine3f &initial_transformation, vector<CLSMatch> &matches) {
     Termination termination(params.term_params);
-    Eigen::Matrix4f transformation = initial_transformation;
+    Eigen::Matrix4f transformation = initial_transformation.matrix();
+    CollarLinesRegistration icl_fitting(lines_map.all_lines, map_kdtree, target,
+                                        registration_params, transformation);
     while (!termination()) {
-      CollarLinesRegistration icl_fitting(lines_map.all_lines, map_kdtree, target,
-          registration_params, transformation);
       float error = icl_fitting.refine();
       termination.addNewError(error);
       transformation = icl_fitting.getTransformation();
     }
-    return transformation;
+    icl_fitting.getLastMatches(matches);
+    return Eigen::Affine3f(transformation);
   }
 
 private:
@@ -172,13 +174,15 @@ private:
   pcl::KdTreeFLANN<pcl::PointXYZ> map_kdtree;
   bool indexed;
   Visualizer3D::Ptr vis;
+  int last_frame_id;
 };
 
 bool parse_arguments(int argc, char **argv,
     CollarLinesRegistration::Parameters &registration_parameters,
     CollarLinesRegistrationPipeline::Parameters &pipeline_parameters,
     vector<Eigen::Affine3f> &init_poses, SensorsCalibration &calibration,
-    vector<string> &clouds_to_process, float &prune_ratio, bool &visualization) {
+    vector<string> &clouds_to_process, float &prune_ratio, bool &visualization,
+    string &matches_output_file, float &matches_portion) {
   string pose_file, sensors_pose_file;
 
   po::options_description desc("Collar Lines Registration of Velodyne scans against the map\n"
@@ -197,6 +201,10 @@ bool parse_arguments(int argc, char **argv,
         "How many lines (portion) should be discarted from the map.")
     ("visualize", po::bool_switch(&visualization),
         "Run visualization")
+    ("matches_output", po::value<string>(&matches_output_file)->default_value(""),
+        "Output file for the matches used in final registration.")
+    ("matches_portion", po::value<float>(&matches_portion)->default_value(0.9),
+        "Keep this portion of best matches (by the distance)")
   ;
 
   po::variables_map vm;
@@ -240,29 +248,58 @@ int main(int argc, char** argv) {
   SensorsCalibration calibration;
   float prune_ratio;
   bool visualization;
+  string matches_output_filename;
+  float matches_portion;
 
   if (!parse_arguments(argc, argv,
-      registration_parameters, pipeline_parameters,
-      init_poses, calibration, clouds_filenames,
-      prune_ratio, visualization)) {
+      registration_parameters, pipeline_parameters, init_poses, calibration,
+      clouds_filenames, prune_ratio, visualization, matches_output_filename, matches_portion)) {
     return EXIT_FAILURE;
   }
 
   CollarLinesRegistrationToMap registration(
       pipeline_parameters, registration_parameters, prune_ratio, visualization);
 
+  ofstream matches_output;
+  if(!matches_output_filename.empty()) {
+    matches_output.open(matches_output_filename.c_str());
+  }
+  CLSMatchByCoeffComparator clsMatchByCoeffComparator;
+
   VelodyneFileSequence sequence(clouds_filenames, calibration);
-  Eigen::Matrix4f last_refined_pose;
+  vector<Eigen::Affine3f> refined_poses;
   for (int frame_i = 0; sequence.hasNext(); frame_i++) {
+
     VelodyneMultiFrame multiframe = sequence.getNext();
+
+    Eigen::Affine3f pose;
     if(frame_i == 0) {
-      last_refined_pose = init_poses.front().matrix();
-      registration.addToMap(multiframe.clouds, calibration, last_refined_pose);
+      pose = init_poses.front().matrix();
+      registration.addToMap(multiframe.clouds, calibration, pose);
+
     } else {
-      Eigen::Matrix4f init_pose = last_refined_pose * (init_poses[frame_i-1].inverse() * init_poses[frame_i]).matrix();
-      last_refined_pose = registration.runMapping(multiframe, calibration, init_pose);
+      Eigen::Affine3f init_pose = refined_poses.back() * (init_poses[frame_i-1].inverse() * init_poses[frame_i]);
+      vector<CLSMatch> matches;
+      pose = registration.runMapping(multiframe, calibration, init_pose, matches);
+      cerr << "Matches (unfiltered): " << matches.size() << endl;
+
+      sort(matches.begin(), matches.end(), clsMatchByCoeffComparator);
+      matches.erase(matches.begin() + matches_portion*matches.size(), matches.end());
+      cerr << "Matches (filtered " << matches_portion*100 << "%): " << matches.size() << endl;
+
+      if(matches_output.is_open()) {
+        for(vector<CLSMatch>::const_iterator m = matches.begin(); m < matches.end(); m++) {
+          PointXYZ real_src_point = transformPoint(m->src, refined_poses[m->src_frame_id].inverse());
+          matches_output
+            << m->src_frame_id << " "
+            << real_src_point.x << " " << real_src_point.y << " " << real_src_point.z << " "
+            << frame_i << " "
+            << m->trg.x << " " << m->trg.y << " " << m->trg.z << endl;
+        }
+      }
     }
-    KittiUtils::printPose(std::cout, last_refined_pose);
+    refined_poses.push_back(pose);
+    std::cout << pose << endl;
   }
 
   return EXIT_SUCCESS;

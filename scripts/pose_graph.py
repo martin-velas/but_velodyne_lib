@@ -1,24 +1,37 @@
 #! /usr/bin/env python
 
+class PrecisionMatrix:
+    def __init__(self, diagonal_):
+        assert len(diagonal_) == 3 or len(diagonal_) == 6
+        self.diagonal = diagonal_
+
+    def to_upper_matrix(self):
+        if len(self.diagonal) == 3:
+            return [self.diagonal[0], 0.0, 0.0,
+                         self.diagonal[1], 0.0,
+                              self.diagonal[2]]
+        elif len(self.diagonal) == 6:
+            return [self.diagonal[0], 0.0, 0.0, 0.0, 0.0, 0.0,
+                         self.diagonal[1], 0.0, 0.0, 0.0, 0.0,
+                              self.diagonal[2], 0.0, 0.0, 0.0,
+                                   self.diagonal[3], 0.0, 0.0,
+                                        self.diagonal[4], 0.0,
+                                             self.diagonal[5]]
+        else:
+            assert False
+
+    def __str__(self):
+        output = ""
+        for m in self.to_upper_matrix():
+            output += "%s " % m
+        return output
+
 class Edge3D:
-    def __init__(self, src_id, trg_id, dof6, inf_matrix_diagonal = None):
+    def __init__(self, src_id, trg_id, dof6, inf_matrix_diagonal=[100]*6):
         self.srcId = src_id
         self.trgId = trg_id
         self.dof6 = dof6
-        if inf_matrix_diagonal is None:
-            self.inf_matrix_upper_half = [99.1304, -0.869565, -0.869565, -1.73913, -1.73913, -1.73913,
-                                                    99.13040, -0.869565, -1.73913, -1.73913, -1.73913,
-                                                               99.13050, -1.73913, -1.73913, -1.73913,
-                                                                          96.5217, -3.47826, -3.47826,
-                                                                                    96.5217, -3.47826,
-                                                                                             96.52170]
-        else:
-            self.inf_matrix_upper_half = [inf_matrix_diagonal[0], 0.0, 0.0, 0.0, 0.0, 0.0,
-                                               inf_matrix_diagonal[1], 0.0, 0.0, 0.0, 0.0,
-                                                    inf_matrix_diagonal[2], 0.0, 0.0, 0.0,
-                                                         inf_matrix_diagonal[3], 0.0, 0.0,
-                                                              inf_matrix_diagonal[4], 0.0,
-                                                                   inf_matrix_diagonal[5]]
+        self.precision_matrix = PrecisionMatrix(inf_matrix_diagonal)
 
     def __gt__(self, other):
         if self.srcId > other.srcId:
@@ -32,8 +45,7 @@ class Edge3D:
         output = "EDGE3 %s %s " % (self.srcId, self.trgId)
         for d in self.dof6:
             output += "%s " % d
-        for m in self.inf_matrix_upper_half:
-            output += "%s " % m
+        output += str(self.precision_matrix)
         return output
 
 
@@ -67,3 +79,29 @@ class EdgesGenerator:
         edges += self.genEdgesToNewVertex(trg_idx_from, trg_idx_to)
         edges.append(Edge3D(self.max_vertex-1, self.max_vertex, self.reg_pose.dof))
         return edges
+
+
+class BsplineEdge:
+    def __init__(self, n0_, n1_, n2_, n3_, t_, n_ref_, inf_matrix_diagonal_):
+        self.n0 = n0_
+        self.n1 = n1_
+        self.n2 = n2_
+        self.n3 = n3_
+        self.t = t_
+        self.n_ref = n_ref_
+        self.inf_matrix_diagonal = tuple(inf_matrix_diagonal_)
+
+    def __str__(self):
+        return ("BSPLINE_CONSTR %d %d %d %d %f %d" + " %s"*6) % \
+               ((self.n0, self.n1, self.n2, self.n3, self.t, self.n_ref) + self.inf_matrix_diagonal)
+
+class EdgeToFeature:
+    def __init__(self, src_i_, feat_i_, translation_, inf_matrix_diagonal_):
+        self.src_i = src_i_
+        self.feat_i = feat_i_
+        self.t = translation_
+        self.precision_matrix = PrecisionMatrix(inf_matrix_diagonal_)
+
+    def __str__(self):
+        return "EDGE_SE3_XYZ %d %d %f %f %f %s" % \
+               (self.src_i, self.feat_i, self.t[0], self.t[1], self.t[2], self.precision_matrix)

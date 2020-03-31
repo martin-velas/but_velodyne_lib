@@ -502,7 +502,7 @@ public:
 
   VelodyneMultiFrame::Ptr getNextPtr(void);
 
-    void reset(void);
+  void reset(void);
 
   void next(void);
 

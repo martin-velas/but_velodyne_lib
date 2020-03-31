@@ -16,4 +16,4 @@ if __name__ == "__main__":
     map_indices_str = json.load(open(args.map_json))
     map_indices = {int(k): int(v) for k, v in map_indices_str.items()}
     for i in sorted(map_indices.keys()):
-        print lines[map_indices[i]]
+        print lines[map_indices[i]].strip()

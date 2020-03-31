@@ -188,7 +188,8 @@ public:
    * @return true iff both points belong to the line segments
    */
   bool closestPointsWith(const PointCloudLine &other,
-                         Eigen::Vector3f &this_pt, Eigen::Vector3f &other_pt) const;
+                         Eigen::Vector3f &this_pt, Eigen::Vector3f &other_pt,
+                         float &source_q, float &target_q) const;
 
   /**!
    * @param other second line segment

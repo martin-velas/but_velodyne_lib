@@ -52,7 +52,8 @@ bool parse_arguments(int argc, char **argv,
                      CollarLinesRegistrationPipeline::Parameters &pipeline_parameters,
                      SensorsCalibration &calibration, Eigen::Affine3f &init_transform,
                      VelodyneMultiFrame::Ptr &src_frame, VelodyneMultiFrame::Ptr &trg_frame,
-                     bool &visualization, string &matches_output) {
+                     bool &visualization, string &matches_output, float &matches_portion,
+                     bool &visualize_output_matches) {
   string sensors_pose_file, init_poses_file;
   bool index_by_cloud_name;
 
@@ -77,9 +78,12 @@ bool parse_arguments(int argc, char **argv,
         "Run visualization")
     ("matches_output", po::value<string>(&matches_output)->default_value(""),
         "Save matches of CLS to this file")
+    ("matches_portion", po::value<float>(&matches_portion)->default_value(0.9),
+         "Keep this portion of best matches (by the distance)")
     ("index_by_cloud_name", po::bool_switch(&index_by_cloud_name),
-        "Get cloud index from filename.")
-
+         "Get cloud index from filename.")
+    ("visualize_output_matches", po::bool_switch(&visualize_output_matches),
+         "Visualize output matches.")
   ;
 
   po::variables_map vm;
@@ -134,6 +138,31 @@ bool parse_arguments(int argc, char **argv,
   return true;
 }
 
+int phaseToInt(const float phase) {
+  return MIN(phase*100, 99);
+}
+
+void show_output_matches(const PointCloud<PointXYZ> &src_cloud,
+                         const PointCloud<PointXYZ> &trg_cloud,
+                         const Eigen::Affine3f &transformation,
+                         const vector<CLSMatch> &matches) {
+  Visualizer3D::Ptr vis = Visualizer3D::getCommonVisualizer();
+  vis->keepOnlyClouds(0);
+  vis->getViewer()->removeAllShapes();
+  vis->setColor(255, 220, 220);
+  vis->addPointCloud(src_cloud);
+  vis->setColor(220, 220, 255);
+  vis->addPointCloud(trg_cloud);
+
+  for (vector<CLSMatch>::const_iterator m = matches.begin(); m < matches.end(); m++) {
+    if (!isnan(m->src_phase) && !isnan(m->trg_phase)) {
+      PointCloudLine line(m->src, m->trg);
+      vis->addLine(line);
+    }
+  }
+  vis->show();
+}
+
 /**
  * ./collar-lines-odom $(ls *.bin | sort | xargs)
  */
@@ -144,11 +173,13 @@ int main(int argc, char** argv) {
   SensorsCalibration calibration;
   Eigen::Affine3f init_transform;
   VelodyneMultiFrame::Ptr src_frame, trg_frame;
-  bool visualization;
+  bool visualization, visualize_output_matches;
   string matches_output_fn;
+  float matches_portion;
 
   if (!parse_arguments(argc, argv, registration_parameters, pipeline_parameters,
-      calibration, init_transform, src_frame, trg_frame, visualization, matches_output_fn)) {
+      calibration, init_transform, src_frame, trg_frame, visualization,
+      matches_output_fn, matches_portion, visualize_output_matches)) {
     return EXIT_FAILURE;
   }
 
@@ -162,10 +193,12 @@ int main(int argc, char** argv) {
 
   Visualizer3D::Ptr vis;
   PointCloud<PointXYZ> src_cloud, trg_cloud;
-  if(visualization) {
-    vis = Visualizer3D::getCommonVisualizer();
+  if(visualization || visualize_output_matches) {
     src_frame->joinTo(src_cloud);
     trg_frame->joinTo(trg_cloud);
+  }
+  if(visualization) {
+    vis = Visualizer3D::getCommonVisualizer();
     vis->setColor(255, 0, 0).addPointCloud(src_cloud)
         .setColor(0, 0, 255).addPointCloud(trg_cloud, init_transform.matrix()).show();
   }
@@ -174,18 +207,30 @@ int main(int argc, char** argv) {
   registration.registerTwoGrids(src_grid, trg_grid, init_transform.matrix(), result);
   cout << result << endl;
 
+  CLSMatchByCoeffComparator clsMatchByCoeffComparator;
+
   if(!matches_output_fn.empty()) {
     vector<CLSMatch> matches = registration.getLastMatches();
-    cerr << "Matches: " << matches.size() << endl;
+    cerr << "Matches (unfiltered): " << matches.size() << endl;
+
+    sort(matches.begin(), matches.end(), clsMatchByCoeffComparator);
+    matches.erase(matches.begin() + matches_portion*matches.size(), matches.end());
+    cerr << "Matches (filtered " << matches_portion*100 << "%): " << matches.size() << endl;
+
     ofstream matches_stream(matches_output_fn.c_str());
+    int not_nan_matches = 0;
     for(vector<CLSMatch>::iterator m = matches.begin(); m < matches.end(); m++) {
-      PointXYZ src_pt = transformPoint(m->src, calibration.ofSensor(m->src_sensor_id).inverse());
-      PointXYZ trg_pt = transformPoint(m->trg, calibration.ofSensor(m->trg_sensor_id).inverse());
-      matches_stream <<
-          m->src_sensor_id << " " <<
-          src_pt.x << " " << src_pt.y << " " << src_pt.z << " " <<
-          m->trg_sensor_id << " " <<
-          trg_pt.x << " " << trg_pt.y << " " << trg_pt.z << " " << endl;
+      if(!isnan(m->src_phase) && !isnan(m->trg_phase)) {
+        matches_stream << phaseToInt(m->src_phase) << " " << m->src.x << " " << m->src.y << " " << m->src.z << " " <<
+                          phaseToInt(m->trg_phase) << " " << m->trg.x << " " << m->trg.y << " " << m->trg.z << " " <<
+                          m->src_q << " " << m->trg_q << endl;
+        not_nan_matches++;
+      }
+    }
+    cerr << "Matches (no NaN phases): " << not_nan_matches << endl;
+
+    if(visualize_output_matches) {
+      show_output_matches(src_cloud, trg_cloud, result.transformation, matches);
     }
   }
 
