@@ -120,6 +120,10 @@ void CollarLinesRegistration::Parameters::prepareForLoading(po::options_descript
           "The matches are weighted by the phase (which phase is considered most significant)")
       ("phase_weights_power", po::value<float>(&this->phase_weights_power)->default_value(this->phase_weights_power),
          "Power of the phase difference. weight = diff^power;")
+      ("visualize_cls_weights", po::bool_switch(&this->visualize_cls_weights),
+         "Visualize weights for CLS registration.")
+      ("visualize_cls_correspondences", po::bool_switch(&this->visualize_cls_correspondences),
+         "Visualize CLS correspondences.")
   ;
 }
 
@@ -289,6 +293,10 @@ void CollarLinesRegistration::findClosestMatchesByMiddles() {
     }
   }
 
+  if(params.verbose) {
+    cerr << "Matches found: " << matches.size() << endl;
+  }
+
   float effective_threshold;
   if(params.distance_threshold == MEAN_THRESHOLD) {
     effective_threshold = getMatchesMean();
@@ -304,6 +312,10 @@ void CollarLinesRegistration::findClosestMatchesByMiddles() {
     effective_threshold = getMatchesPortion(thresholdTypeToFraction()*getEffectiveDecay());
   }
   filterMatchesByThreshold(effective_threshold);
+
+  if(params.verbose) {
+    cerr << "Matches filtered: " << matches.size() << endl;
+  }
 }
 
 void CollarLinesRegistration::filterMatchesByThreshold(const float threshold) {
@@ -375,15 +387,17 @@ float CollarLinesRegistration::getMatchesMean() {
     MatrixOfPoints &source_coresp_points,
     MatrixOfPoints &target_coresp_points) {
 
-//  PointCloud<PointXYZRGB>::Ptr src_vis_cloud(new PointCloud<PointXYZRGB>(matches.size(), 1));
-//  PointCloud<PointXYZRGB>::Ptr trg_vis_cloud(new PointCloud<PointXYZRGB>(matches.size(), 1));
+  PointCloud<PointXYZRGB>::Ptr src_vis_cloud(new PointCloud<PointXYZRGB>(matches.size(), 1));
+  PointCloud<PointXYZRGB>::Ptr trg_vis_cloud(new PointCloud<PointXYZRGB>(matches.size(), 1));
 
   correspondences_weights = VectorXf(matches.size());
   int index = 0;
   last_point_matches.clear();
   for(vector<DMatch>::iterator match = matches.begin(); match < matches.end(); match++, index++) {
-    PointCloudLine source_line = source_cloud[match->trainIdx].line;
-    PointCloudLine target_line = target_cloud[match->queryIdx].line;
+    const LineCloud::PointCloudLineWithMiddleAndOrigin &source_meta_line = source_cloud[match->trainIdx];
+    PointCloudLine source_line = source_meta_line.line;
+    const LineCloud::PointCloudLineWithMiddleAndOrigin &target_meta_line = target_cloud[match->queryIdx];
+    PointCloudLine target_line = target_meta_line.line;
 
     Vector3f source_line_pt, target_line_pt;
     source_line.closestPointsWith(target_line, source_line_pt, target_line_pt);
@@ -415,39 +429,39 @@ float CollarLinesRegistration::getMatchesMean() {
     }
     correspondences_weights.data()[index] = weight;
 
-//    src_vis_cloud->at(index).getVector3fMap() = source_line.point;
-//    trg_vis_cloud->at(index).getVector3fMap() = target_line.point;
-//    src_vis_cloud->at(index).r = 255*weight;
-//    src_vis_cloud->at(index).g = src_vis_cloud->at(index).b = 0;
-//    trg_vis_cloud->at(index).r = 255*weight;
-//    trg_vis_cloud->at(index).g = trg_vis_cloud->at(index).b = 0;
+    src_vis_cloud->at(index).getVector3fMap() = source_line.point;
+    trg_vis_cloud->at(index).getVector3fMap() = target_line.point;
+    src_vis_cloud->at(index).r = 255*weight;
+    src_vis_cloud->at(index).g = src_vis_cloud->at(index).b = 0;
+    trg_vis_cloud->at(index).r = 255*weight;
+    trg_vis_cloud->at(index).g = trg_vis_cloud->at(index).b = 0;
   }
 
-  // visualization of weights
-//  static Visualizer3D vis;
-//  vis.getViewer()->removeAllShapes();
-//  vis.keepOnlyClouds(0);
-//  vis.addColorPointCloud(src_vis_cloud);
-//  vis.addColorPointCloud(trg_vis_cloud);
-//  vis.show();
+  if(params.visualize_cls_weights || params.visualize_cls_correspondences) {
+    Visualizer3D::Ptr vis = Visualizer3D::getCommonVisualizer();
+    vis->getViewer()->removeAllShapes();
+    vis->keepOnlyClouds(0);
+  }
 
-  //visualization of correspondences:
-  /*
-  Visualizer3D::Ptr vis = Visualizer3D::getCommonVisualizer();
-  vis->getViewer()->removeAllShapes();
-  vis->keepOnlyClouds(0)
-          .setColor(255, 0, 0).addPointCloud(*source_cloud.getMiddles())
-          .setColor(0, 0, 255).addPointCloud(*target_cloud.getMiddles())
-          .show();
-  for(int i = 0; i < matches.size(); i++) {
-    if(i%10 == 0) {
-      const PointCloudLine &source_line = source_cloud[matches[i].trainIdx].line;
-      vis->addLine(source_line);
+  if(params.visualize_cls_weights) {
+    Visualizer3D::Ptr vis = Visualizer3D::getCommonVisualizer();
+    vis->addColorPointCloud(src_vis_cloud)
+        .addColorPointCloud(trg_vis_cloud);
+  }
+
+  if(params.visualize_cls_correspondences) {
+    Visualizer3D::Ptr vis = Visualizer3D::getCommonVisualizer();
+    for (int i = 0; i < matches.size(); i++) {
+      if (i % 5 == 0) {
+        const PointCloudLine &source_line = source_cloud[matches[i].trainIdx].line;
+        vis->addLine(source_line);
+      }
     }
   }
-  cerr << endl << endl;
-  vis->show();
-  */
+
+  if(params.visualize_cls_weights || params.visualize_cls_correspondences) {
+    Visualizer3D::getCommonVisualizer()->show();
+  }
 }
 
 float CollarLinesRegistration::getVerticalWeight(const Vector3f &source_line_orient,

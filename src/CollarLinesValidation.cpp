@@ -12,7 +12,7 @@ namespace but_velodyne {
 
 CollarLinesValidation::CollarLinesValidation(const LineCloud &src_cloud_, const LineCloud &trg_cloud_,
     const CollarLinesRegistration::Parameters &registration_params_) :
-        src_cloud(src_cloud_), trg_cloud(trg_cloud_), registration_params(registration_params_) {
+        src_cloud(src_cloud_), trg_cloud(trg_cloud_), registration_params(registration_params_.discardDebug()) {
   if(src_cloud.size() != 0) {
     src_kdtree.setInputCloud(src_cloud.getMiddles());
   }

@@ -106,7 +106,10 @@ public:
         bool rejection_by_line_distances_ = false,
         bool separate_sensors_ = false,
         float phase_weights_max_ = -1.0,
-        float phase_weights_power_ = 4.0) :
+        float phase_weights_power_ = 4.0,
+        bool visualize_cls_weights_ = false,
+        bool visualize_cls_correspondences_ = false,
+        bool verbose_ = false) :
         distance_threshold(distance_threshold_),
         distance_threshold_decay(distance_threshold_decay_),
         distance_threshold_value(distance_threshold_value_),
@@ -118,7 +121,10 @@ public:
         rejection_by_line_distances(rejection_by_line_distances_),
         separate_sensors(separate_sensors_),
         phase_weights_max(phase_weights_max_),
-        phase_weights_power(phase_weights_power_) {
+        phase_weights_power(phase_weights_power_),
+        visualize_cls_weights(visualize_cls_weights_),
+        visualize_cls_correspondences(visualize_cls_correspondences_),
+        verbose(verbose_) {
     }
     Threshold distance_threshold;       /// how is the threshold of line matches distance estimated
     float distance_threshold_decay;
@@ -132,8 +138,19 @@ public:
     bool separate_sensors;
     float phase_weights_max;
     float phase_weights_power;
+    bool visualize_cls_weights;
+    bool visualize_cls_correspondences;
+    bool verbose;
 
     void prepareForLoading(boost::program_options::options_description &options_desc);
+
+    Parameters discardDebug(void) const {
+      Parameters noDebug = *this;
+      noDebug.visualize_cls_weights = false;
+      noDebug.visualize_cls_correspondences = false;
+      noDebug.verbose = false;
+      return noDebug;
+    }
 
   } params;
 

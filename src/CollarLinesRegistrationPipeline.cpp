@@ -85,6 +85,10 @@ void CollarLinesRegistrationPipeline::registerTwoGrids(const PolarGridOfClouds &
       LineCloud validation_source_line_cloud(source, validation_lines_generated, validation_filter);
       LineCloud target_line_cloud(target, pipeline_params.linesPerCellGenerated, registration_filter);
       LineCloud validation_target_line_cloud(target, validation_lines_generated, validation_filter);
+      if(pipeline_params.verbose) {
+        cerr << "Source lines: " << source_line_cloud.size() << " (" << validation_source_line_cloud.size() << ") for validation." << endl;
+        cerr << "Target lines: " << target_line_cloud.size() << " (" << validation_target_line_cloud.size() << ") for validation." << endl;
+      }
       registerLineClouds(source_line_cloud, target_line_cloud, validation_source_line_cloud, validation_target_line_cloud,
                          initial_transformation, termination, nfold_outcomes[fold]);
       initial_transformation = nfold_outcomes[fold].transformation.matrix();
@@ -135,10 +139,13 @@ float registerLineClouds(const LineCloud &source_line_cloud, const LineCloud &ta
                          const CollarLinesRegistration::Parameters &registration_params,
                          const CollarLinesRegistrationPipeline::Parameters &pipeline_params,
                          Termination &termination, RegistrationOutcome &output_result, std::vector<CLSMatch> &matches) {
+  CollarLinesRegistration::Parameters registration_params_effective = registration_params;
+  registration_params_effective.verbose = pipeline_params.verbose;
+
   CollarLinesRegistration cls_fitting(source_line_cloud, target_line_cloud,
-                                      registration_params, initial_transformation.matrix());
+                                      registration_params_effective, initial_transformation.matrix());
   CollarLinesValidation cls_validation(validation_source_line_cloud, validation_target_line_cloud,
-                                      registration_params);
+                                       registration_params_effective);
   for(int sampling_it = 0;
       (sampling_it < pipeline_params.term_params.iterationsPerSampling) && !termination();
       sampling_it++) {
