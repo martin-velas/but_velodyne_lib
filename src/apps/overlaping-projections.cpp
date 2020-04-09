@@ -32,12 +32,10 @@
 #include <but_velodyne/KittiUtils.h>
 #include <but_velodyne/Overlap.h>
 
-#include <pcl/PCLPointCloud2.h>
 #include <pcl/common/eigen.h>
 #include <pcl/common/transforms.h>
 #include <pcl/kdtree/kdtree_flann.h>
 
-#include <cv.h>
 #include <opencv2/opencv.hpp>
 #include <cxeigen.hpp>
 
@@ -110,22 +108,6 @@ bool parse_arguments(int argc, char **argv,
   }
 
   return true;
-}
-
-int get_frames_distance(const int i, const int j, const int frames_count, const bool circular) {
-  if(!circular) {
-    return abs(i-j);
-  } else {
-    return MIN(abs(i-j), frames_count-abs(i-j));
-  }
-}
-
-float harmonic_avg(const float a, const float b) {
-  if(-0.0001 < a+b && a+b < 0.0001) {
-    return 0;
-  } else {
-    return 2.0*a*b/(a+b);
-  }
 }
 
 int main(int argc, char** argv) {

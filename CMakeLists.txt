@@ -81,6 +81,12 @@ target_link_libraries(collar-lines-odom but_velodyne)
 add_executable(collar-lines-registration src/apps/collar-lines-registration.cpp)
 target_link_libraries(collar-lines-registration but_velodyne)
 
+add_executable(register-dense-clouds src/apps/register-dense-clouds.cpp)
+target_link_libraries(register-dense-clouds but_velodyne)
+
+add_executable(overlaping-dense-clouds src/apps/overlaping-dense-clouds.cpp)
+target_link_libraries(overlaping-dense-clouds but_velodyne)
+
 add_executable(translation-by-mean src/apps/translation-by-mean.cpp)
 target_link_libraries(translation-by-mean but_velodyne)
 

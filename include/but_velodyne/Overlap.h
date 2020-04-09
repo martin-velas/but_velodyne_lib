@@ -56,6 +56,10 @@ private:
   int cells_occupied;
 };
 
+int get_frames_distance(const int i, const int j, const int frames_count, const bool circular);
+
+float harmonic_avg(const float a, const float b);
+
 } /* namespace but_velodyne */
 
 #endif /* OVERLAP_H_ */
