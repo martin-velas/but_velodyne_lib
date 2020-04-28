@@ -38,6 +38,10 @@ add_definitions(${PCL_DEFINITIONS})
 find_package(Eigen3 REQUIRED)
 include_directories(EIGEN3_INCLUDE_DIR)
 
+include_directories(${SLAM_P_P_DIR}/include ${SLAM_P_P_DIR}/include/cholmod/SuiteSparse)
+set(SLAM_P_P_LIBS ${SLAM_P_P_DIR}/lib/libslampp_base.a ${SLAM_P_P_DIR}/lib/libcamd_dlong.a ${SLAM_P_P_DIR}/lib/libcholmod.a
+        ${SLAM_P_P_DIR}/lib/libcsparse.a ${SLAM_P_P_DIR}/lib/libcxsparse.a ${SLAM_P_P_DIR}/lib/libeigen.a)
+
 FIND_PACKAGE(Boost 1.40 COMPONENTS program_options REQUIRED )
 INCLUDE_DIRECTORIES( ${Boost_INCLUDE_DIR} )
 
@@ -65,6 +69,9 @@ target_link_libraries(but_velodyne ${PCL_LIBRARIES})
 target_link_libraries(but_velodyne ${OpenCV_LIBS})
 target_link_libraries(but_velodyne ${Boost_LIBRARIES})
 
+add_library(slampp_wrapper STATIC src/SlamPlusPlus.cpp)
+target_link_libraries(slampp_wrapper ${SLAM_P_P_LIBS})
+
 ########################### Tests: #########################################
 
 file(MAKE_DIRECTORY ${EXECUTABLE_OUTPUT_PATH}/tests)
@@ -73,7 +80,10 @@ file(MAKE_DIRECTORY ${EXECUTABLE_OUTPUT_PATH}/tests)
 add_executable(tests/RegistrationCrossValidation-test src/tests/RegistrationCrossValidation-test.cpp)
 target_link_libraries(tests/RegistrationCrossValidation-test ${GTEST_LIBRARIES} pthread but_velodyne)
 
-########################### Odometry estimation: #############################
+add_executable(tests/SlamPlusPlus-test src/tests/SlamPlusPlus-test.cpp)
+target_link_libraries(tests/SlamPlusPlus-test ${GTEST_LIBRARIES} pthread but_velodyne slampp_wrapper)
+
+########################### Odometry estimation: #############################w
 
 add_executable(collar-lines-odom src/apps/collar-lines-odom.cpp)
 target_link_libraries(collar-lines-odom but_velodyne)
