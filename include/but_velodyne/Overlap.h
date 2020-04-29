@@ -10,6 +10,7 @@
 
 #include <pcl/common/common.h>
 #include <velodyne_pointcloud/point_types.h>
+#include <boost/program_options.hpp>
 
 #include <but_velodyne/Visualizer3D.h>
 
@@ -59,6 +60,44 @@ private:
 int get_frames_distance(const int i, const int j, const int frames_count, const bool circular);
 
 float harmonic_avg(const float a, const float b);
+
+class DenseCloudOverlap {
+
+    typedef pcl::PointXYZ PointT;
+
+public:
+
+    class Parameters {
+    public:
+        Parameters(
+                bool visualization_ = false,
+                float leaf_size_ = 0.05,
+                float max_match_distance_ = 0.1) :
+                visualization(visualization_),
+                leaf_size(leaf_size_),
+                max_match_distance(max_match_distance_) {
+        }
+        bool visualization;
+        float leaf_size;
+        float max_match_distance;
+
+        void loadFrom(boost::program_options::options_description &desc);
+
+    } param;
+
+    DenseCloudOverlap(Parameters parameters_) :
+            param(parameters_) {
+    }
+
+    void compute(pcl::PointCloud<PointT>::ConstPtr src_cloud,
+                 pcl::PointCloud<PointT>::ConstPtr trg_cloud,
+                 float &overlapAbsolute, float &overlapRelative) const;
+
+protected:
+
+    size_t computeTrgOverlap(pcl::PointCloud<PointT>::ConstPtr src_cloud,
+                             pcl::PointCloud<PointT>::ConstPtr trg_cloud) const;
+};
 
 } /* namespace but_velodyne */
 

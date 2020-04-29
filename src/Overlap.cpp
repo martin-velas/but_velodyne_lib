@@ -10,6 +10,7 @@
 
 using namespace velodyne_pointcloud;
 using namespace pcl;
+namespace po = boost::program_options;
 
 
 namespace but_velodyne {
@@ -179,5 +180,67 @@ float harmonic_avg(const float a, const float b) {
     return 2.0*a*b/(a+b);
   }
 }
+
+void DenseCloudOverlap::compute(pcl::PointCloud<PointT>::ConstPtr src_cloud,
+             pcl::PointCloud<PointT>::ConstPtr trg_cloud,
+             float &overlapAbsolute, float &overlapRelative) const {
+  PointCloud<PointT>::Ptr src_sampled(new PointCloud<PointT>);
+  subsample_by_voxel_grid(src_cloud, *src_sampled, param.leaf_size);
+  PointCloud<PointT>::Ptr trg_sampled(new PointCloud<PointT>);
+  subsample_by_voxel_grid(trg_cloud, *trg_sampled, param.leaf_size);
+
+  size_t overlap_trg_points = this->computeTrgOverlap(src_sampled, trg_sampled);
+  size_t overlap_src_points = this->computeTrgOverlap(trg_sampled, src_sampled);
+
+  overlapAbsolute = float(overlap_trg_points + overlap_src_points) / 2.0f;
+  overlapRelative = harmonic_avg(overlap_trg_points / float(trg_sampled->size()),
+                                 overlap_src_points / float(src_sampled->size()));
+}
+
+size_t DenseCloudOverlap::computeTrgOverlap(pcl::PointCloud<PointT>::ConstPtr src_cloud,
+                                            pcl::PointCloud<PointT>::ConstPtr trg_cloud) const {
+  KdTreeFLANN<PointT> tree;
+  tree.setInputCloud(src_cloud);
+
+  PointCloud<PointT> trg_overlap, trg_rest;
+  for(PointCloud<PointT>::const_iterator pt = trg_cloud->begin(); pt < trg_cloud->end(); pt++) {
+    vector<int> indices;
+    vector<float> distances;
+    tree.radiusSearch(*pt, param.max_match_distance, indices, distances);
+    if(indices.empty()) {
+      trg_rest.push_back(*pt);
+    } else {
+      trg_overlap.push_back(*pt);
+    }
+  }
+
+  if(param.visualization) {
+    float overlap = trg_overlap.size() / float(trg_cloud->size());
+    cerr << "Overlap: " << overlap << " (src points: " << src_cloud->size() << ", trg_points: " << trg_cloud->size()
+         << ", trg overlapping points: " << trg_overlap.size() << ", trg rest: " << trg_rest.size() << ")" << endl;
+    io::savePCDFileBinary("src_cloud.pcd", *src_cloud);
+    io::savePCDFileBinary("trg_overlap.pcd", trg_overlap);
+    io::savePCDFileBinary("trg_rest.pcd", trg_rest);
+    Visualizer3D::getCommonVisualizer()->keepOnlyClouds(0)
+            .setColor(0, 0, 255).addPointCloud(*src_cloud)
+            .setColor(0, 255, 0).addPointCloud(trg_overlap)
+            .setColor(255, 0, 0).addPointCloud(trg_rest)
+            .show();
+  }
+
+  return trg_overlap.size();
+}
+
+void DenseCloudOverlap::Parameters::loadFrom(boost::program_options::options_description &desc) {
+  desc.add_options()
+          ("visualization,v", po::bool_switch(&visualization),
+           "Show visualization.")
+          ("leaf_size,l", po::value<float>(&leaf_size)->default_value(leaf_size),
+           "Kd-tree leaf size for downsampling.")
+          ("max_match_distance,m", po::value<float>(&max_match_distance)->default_value(max_match_distance),
+           "Correspondence distance threshold.")
+          ;
+}
+
 
 } /* namespace but_velodyne */

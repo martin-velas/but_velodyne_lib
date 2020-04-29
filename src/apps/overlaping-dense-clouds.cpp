@@ -1,10 +1,6 @@
 /*
  * Overlap estimation of dense point clouds.
  *
- * Published in:
- * 	Velas, M. Spanel, M. Herout, A.: Collar Line Segments for
- * 	Fast Odometry Estimation from Velodyne Point Clouds, ICRA 2016
- *
  * Copyright (C) Brno University of Technology (BUT)
  *
  * This file is part of software developed by Robo@FIT group.
@@ -49,87 +45,6 @@ using namespace but_velodyne;
 namespace po = boost::program_options;
 
 typedef PointXYZ PointT;
-
-
-class DenseCloudOverlap {
-
-public:
-
-    class Parameters {
-    public:
-        Parameters(
-                bool visualization_ = false,
-                float leaf_size_ = 0.05,
-                float max_match_distance_ = 0.1) :
-          visualization(visualization_),
-          leaf_size(leaf_size_),
-          max_match_distance(max_match_distance_) {
-        }
-        bool visualization;
-        float leaf_size;
-        float max_match_distance;
-
-        void loadFrom(po::options_description &desc) {
-          desc.add_options()
-              ("visualization,v", po::bool_switch(&visualization),
-                  "Show visualization.")
-              ("leaf_size,l", po::value<float>(&leaf_size)->default_value(leaf_size),
-                  "Kd-tree leaf size for downsampling.")
-              ("max_match_distance,m", po::value<float>(&max_match_distance)->default_value(max_match_distance),
-                  "Correspondence distance threshold.")
-              ;
-        }
-    } param;
-
-    DenseCloudOverlap(Parameters parameters_) :
-        param(parameters_) {
-    }
-
-    float compute(PointCloud<PointT>::ConstPtr src_cloud_,
-                  PointCloud<PointT>::ConstPtr trg_cloud_) const {
-      PointCloud<PointT>::Ptr src_cloud(new PointCloud<PointT>);
-      PointCloud<PointT>::Ptr trg_cloud(new PointCloud<PointT>);
-
-      pcl::VoxelGrid<PointT> grid;
-      grid.setLeafSize(param.leaf_size, param.leaf_size, param.leaf_size);
-      grid.setInputCloud(src_cloud_);
-      grid.filter(*src_cloud);
-      grid.setInputCloud (trg_cloud_);
-      grid.filter(*trg_cloud);
-
-      KdTreeFLANN<PointT> tree;
-      tree.setInputCloud(src_cloud);
-
-      PointCloud<PointT> trg_overlap, trg_rest;
-      for(PointCloud<PointT>::const_iterator pt = trg_cloud->begin(); pt < trg_cloud->end(); pt++) {
-        vector<int> indices;
-        vector<float> distances;
-        tree.radiusSearch(*pt, param.max_match_distance, indices, distances);
-        if(indices.empty()) {
-          trg_rest.push_back(*pt);
-        } else {
-          trg_overlap.push_back(*pt);
-        }
-      }
-
-      float overlap = trg_overlap.size() / float(trg_cloud->size());
-
-      if(param.visualization) {
-        cerr << "Overlap: " << overlap << " (src points: " << src_cloud->size() << ", trg_points: " << trg_cloud->size()
-          << ", trg overlapping points: " << trg_overlap.size() << ", trg rest: " << trg_rest.size() << ")" << endl;
-        io::savePCDFileBinary("src_cloud.pcd", *src_cloud);
-        io::savePCDFileBinary("trg_overlap.pcd", trg_overlap);
-        io::savePCDFileBinary("trg_rest.pcd", trg_rest);
-        Visualizer3D::getCommonVisualizer()->keepOnlyClouds(0)
-            .setColor(0, 0, 255).addPointCloud(*src_cloud)
-            .setColor(0, 255, 0).addPointCloud(trg_overlap)
-            .setColor(255, 0, 0).addPointCloud(trg_rest)
-            .show();
-      }
-
-      return overlap;
-    }
-};
 
 bool parse_arguments(int argc, char **argv,
                      vector<string> &clouds, vector<Eigen::Affine3f> &poses, size_t &frame_distance,
@@ -203,10 +118,10 @@ int main(int argc, char** argv) {
         io::loadPCDFile(clouds_filenames[j], *trg_cloud);
         transformPointCloud(*trg_cloud, *trg_cloud, poses[j]);
 
-        float overlap = harmonic_avg(
-                overlap_estimator.compute(src_cloud, trg_cloud),
-                overlap_estimator.compute(trg_cloud, src_cloud));
-        cout << i << " " << j << " " << overlap << endl;
+        float overlapAbsolute, overlapRelative;
+        overlap_estimator.compute(src_cloud, trg_cloud, overlapAbsolute, overlapRelative);
+
+        cout << i << " " << j << " " << overlapRelative << " " << overlapAbsolute << endl;
       }
     }
   }

@@ -41,6 +41,7 @@
 #include <pcl/filters/impl/filter.hpp>
 #include <pcl/filters/impl/extract_indices.hpp>
 #include <pcl/filters/impl/random_sample.hpp>
+#include <pcl/filters/statistical_outlier_removal.h>
 
 #include <velodyne_pointcloud/point_types.h>
 
@@ -583,6 +584,36 @@ private:
   float min_phase;
   float max_phase;
 };
+
+template <typename T>
+void outlier_removal(typename pcl::PointCloud<T>::ConstPtr cloud,
+                     pcl::PointCloud<T> &cloud_filtered,
+                     const int mean_k, const float std_mul_thresh) {
+  pcl::StatisticalOutlierRemoval<pcl::PointXYZ> filter;
+  filter.setMeanK(mean_k);
+  filter.setStddevMulThresh(std_mul_thresh);
+
+  filter.setInputCloud(cloud);
+  filter.filter(cloud_filtered);
+}
+
+template <typename T>
+void subsample_by_voxel_grid(typename pcl::PointCloud<T>::ConstPtr input, pcl::PointCloud<T> &subsampled,
+                             const float leaf_size) {
+  pcl::VoxelGrid<T> grid;
+  grid.setLeafSize(leaf_size, leaf_size, leaf_size);
+
+  int original_size = input->size();
+  grid.setInputCloud(input);
+  grid.filter(subsampled);
+
+  if(original_size == subsampled.size()) {
+    typename pcl::PointCloud<T>::Ptr inliers(new pcl::PointCloud<T>);
+    outlier_removal(input, *inliers, 10, 10.0);
+    grid.setInputCloud(inliers);
+    grid.filter(subsampled);
+  }
+}
 
 }
 

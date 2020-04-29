@@ -1,10 +1,6 @@
 /*
  * Registration of dense point clouds.
  *
- * Published in:
- * 	Velas, M. Spanel, M. Herout, A.: Collar Line Segments for
- * 	Fast Odometry Estimation from Velodyne Point Clouds, ICRA 2016
- *
  * Copyright (C) Brno University of Technology (BUT)
  *
  * This file is part of software developed by Robo@FIT group.
@@ -31,137 +27,21 @@
 
 #include <pcl/common/eigen.h>
 #include <boost/program_options.hpp>
-#include <cv.h>
 
 #include <pcl/features/normal_3d.h>
-#include <pcl/registration/icp.h>
+#include <pcl/io/pcd_io.h>
 
-#include <but_velodyne/VelodynePointCloud.h>
-#include <but_velodyne/Visualizer3D.h>
+#include <but_velodyne/KittiUtils.h>
+#include <but_velodyne/DenseCloudRegistration.h>
 
 using namespace std;
-using namespace cv;
 using namespace pcl;
-using namespace velodyne_pointcloud;
 using namespace but_velodyne;
 
 namespace po = boost::program_options;
 
 typedef PointXYZ PointT;
-typedef PointNormal PointNormalT;
 
-
-class DenseCloudRegistration {
-
-private:
-    PointCloud<PointNormalT>::Ptr src_cloud;
-    PointCloud<PointNormalT>::Ptr trg_cloud;
-
-public:
-
-    class Parameters {
-    public:
-        Parameters(
-                bool visualization_ = false,
-                float leaf_size_ = 0.05,
-                float epsilon_ = 1e-6,
-                float max_match_distance_ = 0.1,
-                size_t max_iterations_ = 100,
-                size_t neighbours_for_normal_ = 30) :
-          visualization(visualization_),
-          leaf_size(leaf_size_),
-          epsilon(epsilon_),
-          max_match_distance(max_match_distance_),
-          max_iterations(max_iterations_),
-          neighbours_for_normal(neighbours_for_normal_) {
-        }
-        bool visualization;
-        float leaf_size;
-        float epsilon;
-        float max_match_distance;
-        size_t max_iterations;
-        size_t neighbours_for_normal;
-
-        void loadFrom(po::options_description &desc) {
-          desc.add_options()
-              ("visualization,v", po::bool_switch(&visualization),
-                    "Show visualization.")
-              ("leaf_size,l", po::value<float>(&leaf_size)->default_value(leaf_size),
-                    "Kd-tree leaf size for downsampling.")
-              ("epsilon,e", po::value<float>(&epsilon)->default_value(epsilon),
-                   "Termination parameter - transformation change threshold.")
-              ("max_iterations,i", po::value<size_t>(&max_iterations)->default_value(max_iterations),
-                   "Termination parameter - maximum number of iterations.")
-              ("max_match_distance,d", po::value<float>(&max_match_distance)->default_value(max_match_distance),
-                   "Correspondence distance threshold.")
-              ("neighbours_for_normal,n", po::value<size_t>(&neighbours_for_normal)->default_value(neighbours_for_normal),
-                   "How many neighbours are taken in account when the normal is estimated.")
-              ;
-        }
-    } param;
-
-    DenseCloudRegistration(PointCloud<PointT>::ConstPtr src_cloud_,
-            PointCloud<PointT>::ConstPtr trg_cloud_, Parameters parameters_) :
-        src_cloud(new PointCloud<PointNormalT>),
-        trg_cloud(new PointCloud<PointNormalT>),
-        param(parameters_) {
-
-      pcl::VoxelGrid<PointT> grid;
-      grid.setLeafSize(param.leaf_size, param.leaf_size, param.leaf_size);
-      grid.setInputCloud(src_cloud_);
-      PointCloud<PointT>::Ptr src_sampled(new PointCloud<PointT>);
-      grid.filter(*src_sampled);
-      grid.setInputCloud (trg_cloud_);
-      PointCloud<PointT>::Ptr trg_sampled(new PointCloud<PointT>);
-      grid.filter(*trg_sampled);
-
-      pcl::NormalEstimation<PointT, PointNormalT> norm_est;
-      pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<PointT>);
-      norm_est.setSearchMethod (tree);
-      norm_est.setKSearch (param.neighbours_for_normal);
-
-      norm_est.setInputCloud (src_sampled);
-      norm_est.compute(*src_cloud);
-      pcl::copyPointCloud(*src_sampled, *src_cloud);
-
-      norm_est.setInputCloud(trg_sampled);
-      norm_est.compute (*trg_cloud);
-      pcl::copyPointCloud (*trg_sampled, *trg_cloud);
-    }
-
-    Eigen::Affine3f run(void) {
-
-      // pcl::IterativeClosestPoint<PointT, PointT> reg;
-      pcl::IterativeClosestPointWithNormals<PointNormalT, PointNormalT> reg;
-
-      reg.setTransformationEpsilon(param.epsilon);
-      reg.setMaxCorrespondenceDistance(param.max_match_distance);
-      reg.setMaximumIterations(param.max_iterations);
-
-      reg.setInputSource(src_cloud);
-      reg.setInputTarget(trg_cloud);
-
-      if(param.visualization) {
-        Visualizer3D::getCommonVisualizer()->keepOnlyClouds(0)
-                .setColor(255, 0, 0).addPointCloud(*src_cloud)
-                .setColor(0, 0, 255).addPointCloud(*trg_cloud)
-                .show();
-      }
-
-      // Estimate
-      PointCloud<PointNormalT> src_cloud_aligned;
-      reg.align(src_cloud_aligned);
-
-      if(param.visualization) {
-        Visualizer3D::getCommonVisualizer()
-                ->setColor(0, 255, 0).addPointCloud(src_cloud_aligned)
-                .show();
-      }
-
-      // Get the transformation from target to source
-      return Eigen::Affine3f(reg.getFinalTransformation().inverse());
-    }
-};
 
 bool parse_arguments(int argc, char **argv,
                      string &source_pcd_fn, string &target_pcd_fn, Eigen::Affine3f &init_transformation,
@@ -223,6 +103,8 @@ int main(int argc, char** argv) {
                        init_transform, parameters)) {
     return EXIT_FAILURE;
   }
+
+  cerr << "Dense registration:" << endl << " -> " << source_cloud_fn << endl << " -> " << target_cloud_fn << endl;
 
   PointCloud<PointT>::Ptr src_cloud(new PointCloud<PointT>);
   io::loadPCDFile(source_cloud_fn, *src_cloud);
