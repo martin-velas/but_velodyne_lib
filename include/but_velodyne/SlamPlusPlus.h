@@ -24,7 +24,6 @@
 #ifndef BUT_VELODYNE_LIB_SLAMPLUSPLUS_H
 #define BUT_VELODYNE_LIB_SLAMPLUSPLUS_H
 
-
 #include <slam/LinearSolver_UberBlock.h> // linear solver
 #include <slam/ConfigSolvers.h> // nonlinear graph solvers
 #include <slam/SE3_Types.h> // SE(3) types
@@ -51,7 +50,8 @@ private:
 public:
 
     SlamPlusPlus(const size_t max_iterations = 10, const bool verbose = true) :
-            solver(system, 0, 0, max_iterations, 0.01, verbose) {
+            solver(system, 0, 0, max_iterations,
+                   0.01, verbose, CLinearSolverType(), false) {
     }
 
     void addEdge(const int src_i, const int trg_i, const Eigen::Affine3f &T,

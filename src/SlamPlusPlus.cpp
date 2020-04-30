@@ -22,6 +22,7 @@
  */
 
 #include <iostream>
+#include <fstream>
 
 #include <but_velodyne/SlamPlusPlus.h>
 
@@ -38,6 +39,18 @@ void SlamPlusPlus::addEdge(const int src_i, const int trg_i, const Eigen::Affine
   T_coeff.tail(3) = R.axis() * R.angle();
 
   system.r_Add_Edge(CEdgePose3D(src_i, trg_i, T_coeff.cast<double>(), information, system));
+
+  ofstream graph("slampp_dump.graph");
+  graph << "EDGE3:AXISANGLE " << src_i << " " << trg_i;
+  for(int i = 0; i < 6; i++) {
+    graph << " " << T_coeff(i);
+  }
+  for(int i = 0; i < 6; i++) {
+    for(int j = i; j < 6; j++) {
+      graph << " " << information(i, j);
+    }
+  }
+  graph << endl << flush;
 }
 
 void SlamPlusPlus::optimize(vector<Eigen::Affine3f> &poses, vector<Eigen::Vector3f> &features) {
