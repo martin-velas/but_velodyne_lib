@@ -185,9 +185,14 @@ void DenseCloudOverlap::compute(pcl::PointCloud<PointT>::ConstPtr src_cloud,
              pcl::PointCloud<PointT>::ConstPtr trg_cloud,
              float &overlapAbsolute, float &overlapRelative) const {
   PointCloud<PointT>::Ptr src_sampled(new PointCloud<PointT>);
-  subsample_by_voxel_grid(src_cloud, *src_sampled, param.leaf_size);
   PointCloud<PointT>::Ptr trg_sampled(new PointCloud<PointT>);
-  subsample_by_voxel_grid(trg_cloud, *trg_sampled, param.leaf_size);
+  if(param.leaf_size > 0.0) {
+    subsample_by_voxel_grid(src_cloud, *src_sampled, param.leaf_size);
+    subsample_by_voxel_grid(trg_cloud, *trg_sampled, param.leaf_size);
+  } else {
+    *src_sampled += *src_cloud;
+    *trg_sampled += *trg_cloud;
+  }
 
   size_t overlap_trg_points = this->computeTrgOverlap(src_sampled, trg_sampled);
   size_t overlap_src_points = this->computeTrgOverlap(trg_sampled, src_sampled);
@@ -236,7 +241,7 @@ void DenseCloudOverlap::Parameters::loadFrom(boost::program_options::options_des
           ("visualization,v", po::bool_switch(&visualization),
            "Show visualization.")
           ("leaf_size,l", po::value<float>(&leaf_size)->default_value(leaf_size),
-           "Kd-tree leaf size for downsampling.")
+           "Kd-tree leaf size for downsampling. If (size <= 0) then no resampling.")
           ("max_match_distance,m", po::value<float>(&max_match_distance)->default_value(max_match_distance),
            "Correspondence distance threshold.")
           ;

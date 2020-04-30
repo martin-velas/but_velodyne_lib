@@ -41,7 +41,6 @@ using namespace pcl;
 using namespace but_velodyne;
 
 namespace po = boost::program_options;
-namespace po = boost::program_options;
 
 namespace but_velodyne {
 
@@ -50,7 +49,7 @@ void DenseCloudRegistration::Parameters::loadFrom(po::options_description &desc)
           ("visualization,v", po::bool_switch(&visualization),
            "Show visualization.")
           ("leaf_size,l", po::value<float>(&leaf_size)->default_value(leaf_size),
-           "Kd-tree leaf size for downsampling.")
+           "Kd-tree leaf size for downsampling. If (size <= 0) then no resampling.")
           ("epsilon,e", po::value<float>(&epsilon)->default_value(epsilon),
            "Termination parameter - transformation change threshold.")
           ("max_iterations,i", po::value<size_t>(&max_iterations)->default_value(max_iterations),
@@ -69,10 +68,15 @@ DenseCloudRegistration::DenseCloudRegistration(PointCloud<PointT>::ConstPtr src_
     param(parameters_) {
 
   PointCloud<PointT>::Ptr src_sampled(new PointCloud <PointT>);
-  subsample_by_voxel_grid(src_cloud_, *src_sampled, param.leaf_size);
   PointCloud<PointT>::Ptr trg_sampled(new PointCloud <PointT>);
-  subsample_by_voxel_grid(trg_cloud_, *trg_sampled, param.leaf_size);
 
+  if(param.leaf_size > 0.0) {
+    subsample_by_voxel_grid(src_cloud_, *src_sampled, param.leaf_size);
+    subsample_by_voxel_grid(trg_cloud_, *trg_sampled, param.leaf_size);
+  } else {
+    *src_sampled += *src_cloud_;
+    *trg_sampled += *trg_cloud_;
+  }
 
   pcl::NormalEstimation <PointT, PointNormalT> norm_est;
   pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree <PointT>);
