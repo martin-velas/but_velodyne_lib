@@ -44,6 +44,65 @@ namespace po = boost::program_options;
 
 typedef PointWithSource PointType;
 
+class RoNI {
+
+public:
+
+    RoNI(const float x_, const float y_, const float z_, const float radius_) :
+            center(x_, y_, z_), radius(radius_) {
+    }
+
+    static bool load(const string filename, vector<RoNI> &ronis) {
+      std::ifstream ronis_file(filename.c_str());
+      if(!ronis_file.is_open()) {
+        std::perror((std::string("Unable to open file: ") + filename).c_str());
+        return false;
+      }
+
+      while(true) {
+        float x, y, z, radius;
+        ronis_file >> x >> y >> z >> radius;
+        if(ronis_file.eof()) {
+          break;
+        } else {
+          ronis.push_back(RoNI(x, y, z, radius));
+        }
+      }
+      return true;
+    }
+
+    static void filter(const PointCloud<PointType> &input, const vector<RoNI> &ronis, PointCloud<PointType> &output) {
+      if(input.size() != output.size()) {
+        output.resize(input.size());
+      }
+      int out_i = 0;
+      for(PointCloud<PointType>::const_iterator in_pt = input.begin(); in_pt < input.end(); in_pt++) {
+        if(!RoNI::isWithin(*in_pt, ronis)) {
+          output[out_i++] = *in_pt;
+        }
+      }
+      output.erase(output.begin()+out_i, output.end());
+    }
+
+    static bool isWithin(const PointType &pt, const vector<RoNI> &ronis) {
+      for(vector<RoNI>::const_iterator r = ronis.begin(); r < ronis.end(); r++) {
+        if(r->isWithin(pt)) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    bool isWithin(const PointType &pt) const {
+      return (pt.getVector3fMap() - center).norm() < radius;
+    }
+
+private:
+
+    Eigen::Vector3f center;
+    float radius;
+};
+
 bool parse_arguments(int argc, char **argv,
                      float &sampling_ratio,
                      vector<Eigen::Affine3f> &poses,
@@ -52,8 +111,9 @@ bool parse_arguments(int argc, char **argv,
                      string &output_file,
                      vector<bool> &mask,
                      float &range_threshold,
-                     float &range_seg_leaf_size, float &range_seg_relative_diff) {
-  string pose_filename, skip_filename, sensor_poses_filename;
+                     float &range_seg_leaf_size, float &range_seg_relative_diff,
+                     vector<RoNI> &regions_of_no_interest) {
+  string pose_filename, skip_filename, sensor_poses_filename, regions_of_no_interest_file;
 
   po::options_description desc("Collar Lines Registration of Velodyne scans\n"
       "======================================\n"
@@ -69,6 +129,7 @@ bool parse_arguments(int argc, char **argv,
       ("range_threshold,r", po::value<float>(&range_threshold)->default_value(1e10), "Maximal range of the point.")
       ("range_seg_leaf_size", po::value<float>(&range_seg_leaf_size)->default_value(-1.0), "Leaf size for range segmentation (negative = disabled).")
       ("range_seg_relative_diff", po::value<float>(&range_seg_relative_diff)->default_value(2.0), "Relative difference for range segmentation.")
+      ("ronis", po::value<string>(&regions_of_no_interest_file)->default_value(""), "Regions of no interest to be erased. Line: \"x y z radius\".")
   ;
   po::variables_map vm;
   po::parsed_options parsed = po::parse_command_line(argc, argv, desc);
@@ -101,6 +162,12 @@ bool parse_arguments(int argc, char **argv,
     calibration = SensorsCalibration(sensor_poses_filename);
   } else {
     calibration = SensorsCalibration();
+  }
+
+  if(!regions_of_no_interest_file.empty()) {
+    if(!RoNI::load(regions_of_no_interest_file, regions_of_no_interest)) {
+      return false;
+    }
   }
 
   return true;
@@ -167,6 +234,7 @@ int main(int argc, char** argv) {
   float sampling_ratio, range_threshold;
   float range_seg_leaf_size, range_seg_relative_diff;
   vector<bool> mask;
+  vector<RoNI> ronis;
 
   if(!parse_arguments(argc, argv,
       sampling_ratio,
@@ -174,7 +242,8 @@ int main(int argc, char** argv) {
       output_pcd_file,
       mask,
       range_threshold,
-      range_seg_leaf_size, range_seg_relative_diff)) {
+      range_seg_leaf_size, range_seg_relative_diff,
+      ronis)) {
     return EXIT_FAILURE;
   }
 
@@ -190,6 +259,7 @@ int main(int argc, char** argv) {
     VelodyneMultiFrame multiframe = file_sequence.getNext();
     if(mask[frame_i]) {
       multiframe.joinTo(*cloud);
+      RoNI::filter(*cloud, ronis, *cloud);
       filter_by_range(*cloud, *cloud, range_threshold);
       subsample_cloud<PointType>(cloud, sampling_ratio);
       transformPointCloud(*cloud, *cloud, poses[frame_i]);
