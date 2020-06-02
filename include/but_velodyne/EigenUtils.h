@@ -31,6 +31,7 @@
 #include <Eigen/Core>
 
 #include <pcl/point_cloud.h>
+#include <pcl/common/transforms.h>
 
 namespace but_velodyne {
 
@@ -144,6 +145,23 @@ void computeCentroidAndCovariance(const pcl::PointCloud<PointT> &points,
 }
 
 void getEigenvalues(const Eigen::Matrix3f &covariance, std::vector<float> &eigenvalues);
+
+// difference between the two transformations at certain distance
+float tdiff(const Eigen::Affine3f t1, const Eigen::Affine3f t2, const float dist);
+
+template <class PointT>
+float tdiff(const Eigen::Affine3f t1, const Eigen::Affine3f t2, const pcl::PointCloud<PointT> &cloud) {
+  pcl::PointCloud<PointT> cloud_t1, cloud_t2;
+  pcl::transformPointCloud(cloud, cloud_t1, t1);
+  pcl::transformPointCloud(cloud, cloud_t2, t2);
+  float error = 0.0;
+  for(int i = 0; i < cloud.size(); i++) {
+    if(pcl::isFinite(cloud[i])) {
+      error += (cloud_t1[i].getVector3fMap() - cloud_t2[i].getVector3fMap()).norm();
+    }
+  }
+  return error / cloud.size();
+}
 
 }
 

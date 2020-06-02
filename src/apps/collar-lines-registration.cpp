@@ -53,7 +53,7 @@ bool parse_arguments(int argc, char **argv,
                      SensorsCalibration &calibration, Eigen::Affine3f &init_transform,
                      VelodyneMultiFrame::Ptr &src_frame, VelodyneMultiFrame::Ptr &trg_frame,
                      bool &visualization, string &matches_output, float &matches_portion,
-                     bool &visualize_output_matches) {
+                     bool &visualize_output_matches, bool &compute_inv_reg_error) {
   string sensors_pose_file, init_poses_file;
   bool index_by_cloud_name;
 
@@ -72,7 +72,7 @@ bool parse_arguments(int argc, char **argv,
   desc.add_options()
     ("sensors_pose_file", po::value<string>(&sensors_pose_file)->default_value(""),
         "Extrinsic calibration parameters, when multiple Velodyne LiDARs are used")
-    ("init_poses", po::value<string>(&init_poses_file)->default_value(""),
+    ("init_poses", po::value<string>(&init_poses_file)->required(),
         "Initial poses of the frames.")
     ("visualize", po::bool_switch(&visualization),
         "Run visualization")
@@ -84,6 +84,8 @@ bool parse_arguments(int argc, char **argv,
          "Get cloud index from filename.")
     ("visualize_output_matches", po::bool_switch(&visualize_output_matches),
          "Visualize output matches.")
+    ("compute_inv_reg_error", po::bool_switch(&compute_inv_reg_error),
+         "Estimate error by inverse registration (source and target frames are swapped).")
   ;
 
   po::variables_map vm;
@@ -176,10 +178,11 @@ int main(int argc, char** argv) {
   bool visualization, visualize_output_matches;
   string matches_output_fn;
   float matches_portion;
+  bool compute_inv_reg_error;
 
   if (!parse_arguments(argc, argv, registration_parameters, pipeline_parameters,
       calibration, init_transform, src_frame, trg_frame, visualization,
-      matches_output_fn, matches_portion, visualize_output_matches)) {
+      matches_output_fn, matches_portion, visualize_output_matches, compute_inv_reg_error)) {
     return EXIT_FAILURE;
   }
 
@@ -193,19 +196,30 @@ int main(int argc, char** argv) {
 
   Visualizer3D::Ptr vis;
   PointCloud<PointXYZ> src_cloud, trg_cloud;
-  if(visualization || visualize_output_matches) {
-    src_frame->joinTo(src_cloud);
-    trg_frame->joinTo(trg_cloud);
-  }
+  src_frame->joinTo(src_cloud);
+  trg_frame->joinTo(trg_cloud);
+
   if(visualization) {
     vis = Visualizer3D::getCommonVisualizer();
     vis->setColor(255, 0, 0).addPointCloud(src_cloud)
         .setColor(0, 0, 255).addPointCloud(trg_cloud, init_transform.matrix()).show();
+    vis->keepOnlyClouds(0);
   }
 
   RegistrationOutcome result;
   registration.registerTwoGrids(src_grid, trg_grid, init_transform.matrix(), result);
-  cout << result << endl;
+
+  if(compute_inv_reg_error) {
+    RegistrationOutcome inv_result;
+    registration.registerTwoGrids(trg_grid, src_grid, init_transform.inverse().matrix(), inv_result);
+    const float t_error = tdiff(result.transformation, inv_result.transformation.inverse(), trg_cloud);
+    cout << result << " inv_reg_error:" << t_error << endl;
+    if(visualization) {
+      vis->setColor(255, 0, 255).addPointCloud(trg_cloud, inv_result.transformation.inverse().matrix());
+    }
+  } else {
+    cout << result << endl;
+  }
 
   CLSMatchByCoeffComparator clsMatchByCoeffComparator;
 
@@ -235,8 +249,7 @@ int main(int argc, char** argv) {
   }
 
   if(visualization) {
-    vis->keepOnlyClouds(0)
-        .setColor(255, 0, 0).addPointCloud(src_cloud)
+    vis->setColor(255, 0, 0).addPointCloud(src_cloud)
         .setColor(0, 0, 255).addPointCloud(trg_cloud, result.transformation.matrix())
         .addPoses(vector<Eigen::Affine3f>(1, init_transform)).show();
   }

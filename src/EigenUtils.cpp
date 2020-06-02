@@ -13,4 +13,11 @@ void getEigenvalues(const Eigen::Matrix3f &covariance, std::vector<float> &eigen
   sort(eigenvalues.begin(), eigenvalues.end());
 }
 
+float tdiff(const Eigen::Affine3f t1, const Eigen::Affine3f t2, const float dist) {
+  const Eigen::Affine3f delta = t2 * t1.inverse();
+  const float t_error = delta.translation().norm();
+  const float r_error = Eigen::AngleAxisf(delta.rotation()).angle();
+  return t_error + tan(r_error)*dist;
+}
+
 }

@@ -96,6 +96,11 @@ float gauss(const float x, const float mean, const float variance);
 
 float harmonicalAverage(const float a, const float b);
 
+template <typename PointT>
+float distance_pts(const PointT &p1, const PointT &p2) {
+  return (p1.getVector3fMap() - p2.getVector3fMap()).norm();
+}
+
 }
 
 #endif /* COMMON_H_ */

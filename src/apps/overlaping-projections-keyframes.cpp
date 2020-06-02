@@ -32,6 +32,8 @@
 #include <but_velodyne/KittiUtils.h>
 #include <but_velodyne/Overlap.h>
 #include <but_velodyne/common.h>
+#include <but_velodyne/CollarLinesRegistrationPipeline.h>
+#include <but_velodyne/EigenUtils.h>
 
 #include <pcl/PCLPointCloud2.h>
 #include <pcl/common/eigen.h>
@@ -51,10 +53,12 @@ bool parse_arguments(int argc, char **argv,
                      vector<Eigen::Affine3f> &poses,
                      SensorsCalibration &calibration,
                      vector<string> &clouds_to_process,
-                     float &overlap_thresholds,
+                     float &overlap_thresholds, float &max_reg_error,
                      float &depth_quantile,
                      float &depth_relative_tolerance, float &depth_absolute_tolerance,
                      bool &average_with_zbuffer_occupancy,
+                     CollarLinesRegistration::Parameters &registration_parameters,
+                     CollarLinesRegistrationPipeline::Parameters &pipeline_parameters,
                      bool &visualize) {
   string pose_filename, sensor_poses_filename;
 
@@ -64,9 +68,10 @@ bool parse_arguments(int argc, char **argv,
       " * Allowed options");
   desc.add_options()
     ("help,h", "produce help message")
-    ("pose_file,p", po::value<string>(&pose_filename)->required(), "KITTI poses file.")
+    ("poses", po::value<string>(&pose_filename)->required(), "KITTI poses file.")
     ("sensor_poses,s", po::value<string>(&sensor_poses_filename)->default_value(""), "Sensors calibration file.")
     ("overlap_thresholds,t", po::value<float>(&overlap_thresholds)->required(), "Overlap threshold")
+    ("max_reg_error", po::value<float>(&max_reg_error)->required(), "Maximal inverse registration error.")
     ("depth_quantile", po::value<float>(&depth_quantile)->default_value(0.0),
         "Quantile of depth within the bin (0.5 for median, 0.0 for minimum, 1.0 for maximum.")
     ("depth_relative_tolerance", po::value<float>(&depth_relative_tolerance)->default_value(0.1),
@@ -77,6 +82,8 @@ bool parse_arguments(int argc, char **argv,
     ("average_with_zbuffer_occupancy", po::bool_switch(&average_with_zbuffer_occupancy),
         "Average with nuber of occupied cells in the Z-buffer.")
   ;
+  registration_parameters.prepareForLoading(desc);
+  pipeline_parameters.prepareForLoading(desc);
   po::variables_map vm;
   po::parsed_options parsed = po::parse_command_line(argc, argv, desc);
   po::store(parsed, vm);
@@ -142,6 +149,27 @@ float computeOverlap(SphericalZbuffer &src_zbuffer, const PointCloud<VelodynePoi
   return overlap;
 }
 
+float getReverseRegistrationError(const PolarGridOfClouds &src_grid,
+                                  const PolarGridOfClouds &trg_grid,
+                                  const Eigen::Affine3f &init_transform,
+                                  const float overlap,
+                                  const CollarLinesRegistration::Parameters &registration_parameters,
+                                  const CollarLinesRegistrationPipeline::Parameters &pipeline_parameters) {
+  LinearMoveEstimator null_estimator(0);
+  ofstream null_file("/dev/null");
+  CollarLinesRegistration::Parameters reg_parameters_modified = registration_parameters;
+  reg_parameters_modified.distance_threshold = CollarLinesRegistration::PORTION_VALUE_THRESHOLD;
+  reg_parameters_modified.distance_threshold_value = overlap;
+  CollarLinesRegistrationPipeline registration(null_estimator, null_file,
+                                               pipeline_parameters, reg_parameters_modified);
+  RegistrationOutcome result;
+  registration.registerTwoGrids(src_grid, trg_grid, init_transform.matrix(), result);
+
+  RegistrationOutcome inv_result;
+  registration.registerTwoGrids(trg_grid, src_grid, init_transform.inverse().matrix(), inv_result);
+  return tdiff(result.transformation, inv_result.transformation.inverse(), 10.0);
+}
+
 int main(int argc, char** argv) {
 
   vector<string> filenames;
@@ -150,11 +178,15 @@ int main(int argc, char** argv) {
   float threshold;
   float depth_quantile, depth_relative_tolerance, depth_absolute_tolerance;
   bool visualize, average_with_zbuffer_occupancy;
+  CollarLinesRegistration::Parameters registration_parameters;
+  CollarLinesRegistrationPipeline::Parameters pipeline_parameters;
+  float max_reg_error;
 
   if(!parse_arguments(argc, argv,
-      poses, calibration, filenames, threshold,
+      poses, calibration, filenames, threshold, max_reg_error,
       depth_quantile, depth_relative_tolerance, depth_absolute_tolerance,
-      average_with_zbuffer_occupancy, visualize)) {
+      average_with_zbuffer_occupancy, registration_parameters, pipeline_parameters,
+      visualize)) {
     return EXIT_FAILURE;
   }
 
@@ -162,6 +194,7 @@ int main(int argc, char** argv) {
 
   for(int src_i = 0; src_i+1 < sequence.size();) {
     VelodyneMultiFrame::Ptr src_frame = sequence[src_i];
+    PolarGridOfClouds src_grid(src_frame->clouds, calibration);
     PointCloud<VelodynePoint> src_cloud;
     src_frame->joinTo(src_cloud);
     transformPointCloud(src_cloud, src_cloud, Eigen::Affine3f(poses[src_i].rotation()));
@@ -170,6 +203,7 @@ int main(int argc, char** argv) {
     float previous_overlap = threshold;
     for(int trg_i = src_i+1; trg_i < sequence.size(); trg_i++) {
       VelodyneMultiFrame::Ptr trg_frame = sequence[trg_i];
+      PolarGridOfClouds trg_grid(trg_frame->clouds, calibration);
       PointCloud<VelodynePoint> trg_cloud;
       trg_frame->joinTo(trg_cloud);
       transformPointCloud(trg_cloud, trg_cloud, Eigen::Affine3f(poses[trg_i].rotation()));
@@ -177,7 +211,9 @@ int main(int argc, char** argv) {
       transformPointCloud(trg_cloud, trg_cloud, translation, Eigen::Quaternionf::Identity());
       float overlap = computeOverlap(src_zbuffer, src_cloud, trg_cloud,
           depth_relative_tolerance, depth_absolute_tolerance, average_with_zbuffer_occupancy, visualize);
-      if((overlap < threshold && src_i+1 != trg_i) || trg_i == sequence.size()-1) {
+      Eigen::Affine3f init_t = poses[src_i].inverse() * poses[trg_i];
+      float t_error = getReverseRegistrationError(src_grid, trg_grid, init_t, overlap, registration_parameters, pipeline_parameters);
+      if(((overlap < threshold || t_error > max_reg_error) && src_i+1 != trg_i) || trg_i == sequence.size()-1) {
         if(trg_i == sequence.size()-1) {
           cout << src_i << " " << trg_i << " " << previous_overlap << endl;
           return EXIT_SUCCESS;
