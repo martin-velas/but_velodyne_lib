@@ -59,6 +59,7 @@ public:
 
 bool parse_arguments(int argc, char **argv,
                      string &frame_borders_file, int &velodyne_idx,
+                     int &extra_hours_elapsed,
                      string &output_dir, vector<string> &clouds_to_process) {
 
   po::options_description desc("Synchronization of Velodynes in cloud meassurements\n"
@@ -68,6 +69,7 @@ bool parse_arguments(int argc, char **argv,
       ("help,h", "produce help message")
       ("frame_borders,b", po::value<string>(&frame_borders_file)->required(), "File with expected timestamps last rows is time of termination.")
       ("velodyne_idx,i", po::value<int>(&velodyne_idx)->default_value(-1), "Index of the Velodyne sensor.")
+      ("extra_hours_elapsed", po::value<int>(&extra_hours_elapsed)->default_value(0), "Extra hours elapsed for Velodyne sensor.")
       ("output_dir,o", po::value<string>(&output_dir)->required(), "Output dir for PCD files.")
   ;
   po::variables_map vm;
@@ -150,8 +152,10 @@ int main(int argc, char** argv) {
   vector<string> cloud_filenames;
   string frame_borders_filename, output_dir;
   int velodyne_idx;
+  int extra_hours_elapsed;
 
-  if(!parse_arguments(argc, argv, frame_borders_filename, velodyne_idx, output_dir, cloud_filenames)) {
+  if(!parse_arguments(argc, argv, frame_borders_filename, velodyne_idx, extra_hours_elapsed,
+          output_dir, cloud_filenames)) {
     return EXIT_FAILURE;
   }
 
@@ -163,8 +167,8 @@ int main(int argc, char** argv) {
   for(int i = 0; i+1 < frame_borders.size(); i++) {
     VelodynePointCloud slice;
     TimeSpan slice_span;
-    slice_span.from = frame_borders[i];
-    slice_span.to = frame_borders[i+1];
+    slice_span.from = frame_borders[i] + 3600*extra_hours_elapsed;
+    slice_span.to = frame_borders[i+1] + 3600*extra_hours_elapsed;
     bool slice_found = slicer.getSlice(slice_span, slice);
     if(slice_found) {
       string fn = output_dir + "/" + KittiUtils::getKittiFrameName(i, ".pcd", velodyne_idx);
