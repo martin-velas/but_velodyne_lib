@@ -197,6 +197,9 @@ target_link_libraries(eval-4recon-snapshots but_velodyne)
 add_executable(eval-4recon-crop src/apps/eval-4recon-crop.cpp)
 target_link_libraries(eval-4recon-crop but_velodyne)
 
+add_executable(rephase-velodyne-clouds src/apps/rephase-velodyne-clouds.cpp)
+target_link_libraries(rephase-velodyne-clouds but_velodyne)
+
 ########################## Visualization apps: ###############################
 
 add_executable(show-kitti-poses src/apps/show-kitti-poses.cpp)
