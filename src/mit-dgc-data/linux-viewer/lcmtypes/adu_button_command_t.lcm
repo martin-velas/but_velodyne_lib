@@ -1,9 +1,0 @@
-package lcmtypes;
-
-struct adu_button_command_t {
-    int64_t utime;          // utime that the command is sent
-
-    int32_t button_status; // button command, same type as 
-                            // adu_status_t.button_status
-}
-

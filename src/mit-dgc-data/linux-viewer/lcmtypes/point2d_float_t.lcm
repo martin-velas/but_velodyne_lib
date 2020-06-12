@@ -1,7 +1,0 @@
-package lcmtypes;
-
-struct point2d_float_t
-{
-    float x; 
-    float y;
-}	

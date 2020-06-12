@@ -1,6 +1,0 @@
-package lcmtypes;
-
-struct point2d_t {
-    double x;
-    double y;
-}

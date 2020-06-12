@@ -1,8 +1,0 @@
-package lcmtypes;
-
-struct tsim_associations_t {
-    int64_t utime;
-    int32_t nassociations;
-    int64_t tsim_vid[nassociations];
-    int64_t tracker_vid[nassociations];
-}

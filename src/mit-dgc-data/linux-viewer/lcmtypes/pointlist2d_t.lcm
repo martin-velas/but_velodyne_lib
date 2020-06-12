@@ -1,6 +1,0 @@
-package lcmtypes;
-
-struct pointlist2d_t {
-    int32_t npoints;
-    lcmtypes.point2d_t points[npoints];
-}

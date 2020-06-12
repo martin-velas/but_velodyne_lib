@@ -1,6 +1,0 @@
-package lcmtypes;
-
-struct obstacle_list_t {
-    lcmtypes.rect_list_t rects;
-    lcmtypes.track_list_t tracks;
-}
