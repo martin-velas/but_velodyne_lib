@@ -124,7 +124,8 @@ void LineCloud::push_back(const vector<PointCloudLine> &lines, const int sensor_
 }
 
 void LineCloud::append(const LineCloud& other, const int frame_id) {
-  LineCloud::iterator new_it = this->data.insert(this->data.end(), other.data.begin(), other.data.end());
+  this->data.insert(this->data.end(), other.data.begin(), other.data.end());
+  LineCloud::iterator new_it = this->data.begin() + (this->data.size() - other.data.size());
   for(; new_it < this->data.end(); new_it++) {
     new_it->frame_id = frame_id;
   }

@@ -128,7 +128,7 @@ void get_borders(const vector<string> &cloud_filenames, const float start_angle,
   }
 }
 
-struct {
+struct PhaseComparator {
     bool operator()(const VelodynePoint &pt1, const VelodynePoint &pt2) {
       const float a1 = horizontalAngle(pt1);
       const float a2 = horizontalAngle(pt2);
@@ -138,7 +138,7 @@ struct {
         return pt1.phase < pt2.phase;
       }
     }
-} phase_cmp;
+};
 
 void sync_by_angle(const AngleAndPhase &beginning, const AngleAndPhase &end,
                    const VelodynePointCloud &input, VelodynePointCloud &frame_synced) {
@@ -146,6 +146,7 @@ void sync_by_angle(const AngleAndPhase &beginning, const AngleAndPhase &end,
 
   VelodynePointCloud input_sorted;
   input_sorted += input;
+  struct PhaseComparator phase_cmp;
   sort(input_sorted.begin(), input_sorted.end(), phase_cmp);
   bool recording = false;
   int i = 0;
@@ -196,7 +197,7 @@ int main(int argc, char** argv) {
 
   stringstream ss_borders_fn;
   ss_borders_fn << output_dir << "/frame-beginnings." << velodyne_idx << ".txt";
-  ofstream borders_fd(ss_borders_fn.str());
+  ofstream borders_fd(ss_borders_fn.str().c_str());
 
   for(int i = 0; i+1 < borders.size(); i++) {
     const AngleAndPhase &beginning = borders[i];
