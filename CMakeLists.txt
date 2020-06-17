@@ -12,8 +12,6 @@ set (BUT_VELODYNE_SOVERSION ${BUT_VELODYNE_VERSION_MAJOR}.${BUT_VELODYNE_VERSION
 message(STATUS "Compiling But-Velodyne Version ${BUT_VELODYNE_VERSION}, soversion=${BUT_VELODYNE_SOVERSION}")
 
 set(LIB_SUFFIX CACHE STRING "suffix for the library directory need for x86-64 systems that use lib64 ")
-set(BUT_VELODYNE_INCLUDE_INSTALL_DIR "but_velodyne-${BUT_VELODYNE_VERSION_MAJOR}.${BUT_VELODYNE_VERSION_MINOR}" CACHE STRING "Directory name for header files")
-set(BUT_VELODYNE_CMAKE_INSTALL_DIR "but_velodyne-${BUT_VELODYNE_VERSION_MAJOR}.${BUT_VELODYNE_VERSION_MINOR}" CACHE STRING "Directory to install the cmake config files.")
 
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
 #set(CMAKE_BUILD_TYPE RELEASE)
@@ -38,10 +36,6 @@ add_definitions(${PCL_DEFINITIONS})
 find_package(Eigen3 REQUIRED)
 include_directories(EIGEN3_INCLUDE_DIR)
 
-include_directories(${SLAM_P_P_DIR}/include ${SLAM_P_P_DIR}/include/cholmod/SuiteSparse)
-set(SLAM_P_P_LIBS ${SLAM_P_P_DIR}/lib/libslampp_base.a ${SLAM_P_P_DIR}/lib/libcamd_dlong.a ${SLAM_P_P_DIR}/lib/libcholmod.a
-        ${SLAM_P_P_DIR}/lib/libcsparse.a ${SLAM_P_P_DIR}/lib/libcxsparse.a ${SLAM_P_P_DIR}/lib/libeigen.a)
-
 FIND_PACKAGE(Boost 1.40 COMPONENTS program_options REQUIRED )
 INCLUDE_DIRECTORIES( ${Boost_INCLUDE_DIR} )
 
@@ -52,9 +46,9 @@ include_directories(${GTEST_INCLUDE_DIRS})
 ########################### Library: #########################################
 
 file(GLOB header_files ${CMAKE_CURRENT_SOURCE_DIR}/include/but_velodyne/*.h)
-install(FILES ${header_files} DESTINATION include/${BUT_VELODYNE_INCLUDE_INSTALL_DIR}/but_velodyne COMPONENT ${COMPONENT_PREFIX}dev)
+install(FILES ${header_files} DESTINATION include/but_velodyne COMPONENT ${COMPONENT_PREFIX}dev)
 file(GLOB header_files ${CMAKE_CURRENT_SOURCE_DIR}/include/velodyne_pointcloud/*.h)
-install(FILES ${header_files} DESTINATION include/${BUT_VELODYNE_INCLUDE_INSTALL_DIR}/velodyne_pointcloud COMPONENT ${COMPONENT_PREFIX}dev)
+install(FILES ${header_files} DESTINATION include/velodyne_pointcloud COMPONENT ${COMPONENT_PREFIX}dev)
 
 add_library(but_velodyne SHARED src/CollarLinesRegistration.cpp src/CollarLinesRegistrationPipeline.cpp
 src/ImageLine.cpp src/KeypointsCorrespondenceProjector.cpp src/LineCloud.cpp src/MoveEstimation.cpp
@@ -70,9 +64,6 @@ target_link_libraries(but_velodyne ${PCL_LIBRARIES})
 target_link_libraries(but_velodyne ${OpenCV_LIBS})
 target_link_libraries(but_velodyne ${Boost_LIBRARIES})
 
-add_library(slampp_wrapper STATIC src/SlamPlusPlus.cpp)
-target_link_libraries(slampp_wrapper ${SLAM_P_P_LIBS})
-
 ########################### Tests: #########################################
 
 file(MAKE_DIRECTORY ${EXECUTABLE_OUTPUT_PATH}/tests)
@@ -80,9 +71,6 @@ file(MAKE_DIRECTORY ${EXECUTABLE_OUTPUT_PATH}/tests)
 # Link runTests with what we want to test and the GTest and pthread library
 add_executable(tests/RegistrationCrossValidation-test src/tests/RegistrationCrossValidation-test.cpp)
 target_link_libraries(tests/RegistrationCrossValidation-test ${GTEST_LIBRARIES} pthread but_velodyne)
-
-add_executable(tests/SlamPlusPlus-test src/tests/SlamPlusPlus-test.cpp)
-target_link_libraries(tests/SlamPlusPlus-test ${GTEST_LIBRARIES} pthread but_velodyne slampp_wrapper)
 
 ########################### Odometry estimation: #############################w
 
@@ -127,9 +115,6 @@ target_link_libraries(calibrate-imu-velodyne-AXXB but_velodyne)
 
 add_executable(get-ranges src/apps/get-ranges.cpp)
 target_link_libraries(get-ranges but_velodyne)
-
-add_executable(pipeline-dense-merging src/apps/pipeline-dense-merging.cpp)
-target_link_libraries(pipeline-dense-merging but_velodyne slampp_wrapper)
 
 add_executable(rephase-velodyne-clouds src/apps/rephase-velodyne-clouds.cpp)
 target_link_libraries(rephase-velodyne-clouds but_velodyne)
@@ -179,7 +164,7 @@ target_link_libraries(correct-velodyne-distortion-per-parts but_velodyne)
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/but_velodyne-config.cmake.in" "${CMAKE_CURRENT_BINARY_DIR}/but_velodyne-config.cmake" IMMEDIATE @ONLY)
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/but_velodyne-config-version.cmake.in" "${CMAKE_CURRENT_BINARY_DIR}/but_velodyne-config-version.cmake" IMMEDIATE @ONLY)
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/but_velodyne-config.cmake" "${CMAKE_CURRENT_BINARY_DIR}/but_velodyne-config-version.cmake"
-    DESTINATION "lib${LIB_SUFFIX}/cmake/${BUT_VELODYNE_CMAKE_INSTALL_DIR}" COMPONENT ${COMPONENT_PREFIX}dev)
+    DESTINATION "share" COMPONENT ${COMPONENT_PREFIX}dev)
 
 install(
 TARGETS but_velodyne collar-lines-odom show-kitti-poses slampp-solution-to-poses
