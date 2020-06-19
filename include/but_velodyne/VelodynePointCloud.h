@@ -406,7 +406,7 @@ public:
       std::vector<std::vector<int> > &to_cloud_indices,
       std::vector<int> &to_ring_indices) const;
 
-  std::vector<int> removeNanPoints();
+  void removeNanPoints();
 
   Eigen::Matrix4f getAxisCorrection() const {
     return axis_correction;

@@ -421,15 +421,14 @@ float VelodynePointCloud::averageIntensity() const {
   return (count > 0) ? (avg/count) : 0;
 }
 
-std::vector<int> VelodynePointCloud::removeNanPoints() {
-  vector<int> filtered_indices;
-  PointCloud<PointXYZ> dummy_filtered_out;
-  removeNaNFromPointCloud(*this->getXYZCloudPtr(), dummy_filtered_out, filtered_indices);
-  for(int i = 0; i < filtered_indices.size(); i++) {
-    this->at(i) = this->at(filtered_indices[i]);
+void VelodynePointCloud::removeNanPoints() {
+  for(iterator pt = this->begin(); pt < this->end();) {
+    if(isFinite(*pt)) {
+      pt++;
+    } else {
+      pt = this->erase(pt);
+    }
   }
-  this->resize(filtered_indices.size());
-  return filtered_indices;
 }
 
 Eigen::Affine3f SensorsCalibration::getSensorPose(const Eigen::Affine3f system_pose, const int sensor_id) const {
