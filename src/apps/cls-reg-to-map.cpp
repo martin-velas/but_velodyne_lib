@@ -289,12 +289,14 @@ int main(int argc, char** argv) {
 
       if(matches_output.is_open()) {
         for(vector<CLSMatch>::const_iterator m = matches.begin(); m < matches.end(); m++) {
-          PointXYZ real_src_point = transformPoint(m->src, refined_poses[m->src_frame_id].inverse());
+          const int src_frame_id = m->getSourceLine().sensor_id;
+          const PointXYZ &trg_pt = m->getTrgPt();
+          PointXYZ real_src_point = transformPoint(m->getSrcPt(), refined_poses[src_frame_id].inverse());
           matches_output
-            << m->src_frame_id << " "
+            << src_frame_id << " "
             << real_src_point.x << " " << real_src_point.y << " " << real_src_point.z << " "
             << frame_i << " "
-            << m->trg.x << " " << m->trg.y << " " << m->trg.z << endl;
+            << trg_pt.x << " " << trg_pt.y << " " << trg_pt.z << endl;
         }
       }
     }

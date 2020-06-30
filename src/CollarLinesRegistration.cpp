@@ -44,6 +44,11 @@ namespace po = boost::program_options;
 namespace but_velodyne
 {
 
+void CLSMatch::transformTarget(const Eigen::Affine3f &T) {
+  this->trg_pt = transformPoint(this->trg_pt, T);
+  this->target_line = this->target_line.transform(T);
+}
+
 std::istream& operator>> (std::istream &in, CollarLinesRegistration::Weights &weightning) {
   string token;
   in >> token;
@@ -197,7 +202,7 @@ const void CollarLinesRegistration::getLastMatches(std::vector<CLSMatch> &out_ma
   Eigen::Affine3f untransform(transformation * initial_transformation);
   untransform = untransform.inverse();
   for(vector<CLSMatch>::iterator m = out_matches.begin(); m < out_matches.end(); m++) {
-    m->trg = transformPoint(m->trg, untransform);
+    m->transformTarget(untransform);
   }
 }
 
@@ -395,9 +400,9 @@ float CollarLinesRegistration::getMatchesMean() {
   int index = 0;
   last_point_matches.clear();
   for(vector<DMatch>::iterator match = matches.begin(); match < matches.end(); match++, index++) {
-    const LineCloud::PointCloudLineWithMiddleAndOrigin &source_meta_line = source_cloud[match->trainIdx];
+    const CLS &source_meta_line = source_cloud[match->trainIdx];
     PointCloudLine source_line = source_meta_line.line;
-    const LineCloud::PointCloudLineWithMiddleAndOrigin &target_meta_line = target_cloud[match->queryIdx];
+    const CLS &target_meta_line = target_cloud[match->queryIdx];
     PointCloudLine target_line = target_meta_line.line;
 
     Vector3f source_line_pt, target_line_pt;
@@ -413,10 +418,9 @@ float CollarLinesRegistration::getMatchesMean() {
     source_coresp_points.block(0, index, TPoint3D::RowsAtCompileTime, 1) = source_line_pt;
     target_coresp_points.block(0, index, TPoint3D::RowsAtCompileTime, 1) = target_line_pt;
 
-    last_point_matches.push_back(CLSMatch(source_line_pt, source_meta_line.sensor_id,
-                                          target_line_pt, target_meta_line.sensor_id,
-                                          source_meta_line.phase, target_meta_line.phase,
-                                          source_q, target_q, source_meta_line.frame_id, target_meta_line.frame_id));
+    last_point_matches.push_back(CLSMatch(source_meta_line, target_meta_line,
+                                          source_line_pt, target_line_pt,
+                                          source_q, target_q));
 
     float weight;
     if(params.weighting == VERTICAL_ANGLE_WEIGHTS) {

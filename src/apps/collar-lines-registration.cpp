@@ -157,8 +157,8 @@ void show_output_matches(const PointCloud<PointXYZ> &src_cloud,
   vis->addPointCloud(trg_cloud);
 
   for (vector<CLSMatch>::const_iterator m = matches.begin(); m < matches.end(); m++) {
-    if (!isnan(m->src_phase) && !isnan(m->trg_phase)) {
-      PointCloudLine line(m->src, m->trg);
+    if (!isnan(m->getSourceLine().phase) && !isnan(m->getTargetLine().phase)) {
+      PointCloudLine line(m->getSrcPt(), m->getTrgPt());
       vis->addLine(line);
     }
   }
@@ -234,10 +234,14 @@ int main(int argc, char** argv) {
     ofstream matches_stream(matches_output_fn.c_str());
     int not_nan_matches = 0;
     for(vector<CLSMatch>::iterator m = matches.begin(); m < matches.end(); m++) {
-      if(!isnan(m->src_phase) && !isnan(m->trg_phase)) {
-        matches_stream << phaseToInt(m->src_phase) << " " << m->src.x << " " << m->src.y << " " << m->src.z << " " <<
-                          phaseToInt(m->trg_phase) << " " << m->trg.x << " " << m->trg.y << " " << m->trg.z << " " <<
-                          m->src_q << " " << m->trg_q << endl;
+      const CLS &l_src = m->getSourceLine();
+      const CLS &l_trg = m->getTargetLine();
+      if(!isnan(l_src.phase) && !isnan(m->getTargetLine().phase)) {
+        const PointXYZ &src_pt = m->getSrcPt();
+        const PointXYZ &trg_pt = m->getTrgPt();
+        matches_stream << phaseToInt(l_src.phase) << " " << src_pt.x << " " << src_pt.y << " " << src_pt.z << " " <<
+                          phaseToInt(l_trg.phase) << " " << trg_pt.x << " " << trg_pt.y << " " << trg_pt.z << " " <<
+                          m->getSrcQ() << " " << m->getTrgQ() << endl;
         not_nan_matches++;
       }
     }

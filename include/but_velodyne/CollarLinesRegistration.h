@@ -39,34 +39,62 @@ namespace but_velodyne
 
 class CLSMatch {
 public:
-  CLSMatch(const Eigen::Vector3f &src_pt, const int src_sensor_id_,
-      const Eigen::Vector3f &trg_pt, const int trg_sensor_id_,
-      const float src_phase_, const float trg_phase_,
-      const float source_q_, const float target_q_,
-      const int src_frame_id_, const int trg_frame_id_) :
-    src_sensor_id(src_sensor_id_), trg_sensor_id(trg_sensor_id_),
-    src_phase(src_phase_), trg_phase(trg_phase_),
-    src_q(source_q_), trg_q(target_q_), src_frame_id(src_frame_id_), trg_frame_id(trg_frame_id_) {
-    src.getVector3fMap() = src_pt;
-    trg.getVector3fMap() = trg_pt;
-    distance = (src_pt - trg_pt).norm();
+  CLSMatch(const CLS &source_line_,
+           const CLS &target_line_,
+           const Eigen::Vector3f &src_pt_,
+           const Eigen::Vector3f &trg_pt_,
+           const float source_q_, const float target_q_) :
+    source_line(source_line_), target_line(target_line_) {
+    src_pt.getVector3fMap() = src_pt_;
+    trg_pt.getVector3fMap() = trg_pt_;
+    distance = (src_pt_ - trg_pt_).norm();
   }
 
   bool operator< (const CLSMatch &other) const {
     return this->distance < other.distance;
   }
 
-  pcl::PointXYZ src, trg;
-  int src_sensor_id, trg_sensor_id;
-  float src_phase, trg_phase;
+  const CLS &getSourceLine() const {
+    return source_line;
+  }
+
+  const CLS &getTargetLine() const {
+    return target_line;
+  }
+
+  const pcl::PointXYZ &getSrcPt() const {
+    return src_pt;
+  }
+
+  const pcl::PointXYZ &getTrgPt() const {
+    return trg_pt;
+  }
+
+  float getDistance() const {
+    return distance;
+  }
+
+  float getSrcQ() const {
+    return src_q;
+  }
+
+  float getTrgQ() const {
+    return trg_q;
+  }
+
+  void transformTarget(const Eigen::Affine3f &T);
+
+private:
+
+  CLS source_line, target_line;
+  pcl::PointXYZ src_pt, trg_pt;
   float distance;
   float src_q, trg_q;
-  int src_frame_id, trg_frame_id;
 };
 
 struct CLSMatchByCoeffComparator {
     bool operator ()(const CLSMatch &m1, const CLSMatch &m2) {
-      return MAX(fabs(m1.src_q), fabs(m1.trg_q)) < MAX(fabs(m2.src_q), fabs(m2.trg_q));
+      return MAX(fabs(m1.getSrcQ()), fabs(m1.getTrgQ())) < MAX(fabs(m2.getSrcQ()), fabs(m2.getTrgQ()));
     }
 };
 

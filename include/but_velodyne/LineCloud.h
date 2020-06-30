@@ -174,6 +174,8 @@ private:
   std::vector<PointCloudLineWithMiddleAndOrigin> data;       ///! collar line segments
 };
 
+typedef LineCloud::PointCloudLineWithMiddleAndOrigin CLS;
+
 } /* namespace but_velodyne */
 
 #endif /* LINESCLOUD_H_ */
