@@ -50,6 +50,10 @@ public:
     distance = (src_pt_ - trg_pt_).norm();
   }
 
+  bool isValid(void) const {
+    return !isnan(source_line.phase) && !isnan(target_line.phase);
+  }
+
   bool operator< (const CLSMatch &other) const {
     return this->distance < other.distance;
   }

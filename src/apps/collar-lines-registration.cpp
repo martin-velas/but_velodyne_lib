@@ -33,6 +33,7 @@
 
 #include <pcl/common/eigen.h>
 #include <boost/program_options.hpp>
+#include <boost/format.hpp>
 #include <cv.h>
 
 #include <but_velodyne/VelodynePointCloud.h>
@@ -52,7 +53,8 @@ bool parse_arguments(int argc, char **argv,
                      CollarLinesRegistrationPipeline::Parameters &pipeline_parameters,
                      SensorsCalibration &calibration, Eigen::Affine3f &init_transform,
                      VelodyneMultiFrame::Ptr &src_frame, VelodyneMultiFrame::Ptr &trg_frame,
-                     bool &visualization, string &matches_output, float &matches_portion,
+                     bool &visualization,
+                     string &matches_output, float &matches_portion, bool &matches_output_as_lines,
                      bool &visualize_output_matches, bool &compute_inv_reg_error) {
   string sensors_pose_file, init_poses_file;
   bool index_by_cloud_name;
@@ -86,6 +88,8 @@ bool parse_arguments(int argc, char **argv,
          "Visualize output matches.")
     ("compute_inv_reg_error", po::bool_switch(&compute_inv_reg_error),
          "Estimate error by inverse registration (source and target frames are swapped).")
+    ("matches_output_as_lines", po::bool_switch(&matches_output_as_lines),
+         "Print matches in the form of CLS pairs.")
   ;
 
   po::variables_map vm;
@@ -165,6 +169,25 @@ void show_output_matches(const PointCloud<PointXYZ> &src_cloud,
   vis->show();
 }
 
+void printMatchXYZ(ofstream &stream, const CLSMatch &match) {
+  const CLS &l_src = match.getSourceLine();
+  const CLS &l_trg = match.getTargetLine();
+  const PointXYZ &src_pt = match.getSrcPt();
+  const PointXYZ &trg_pt = match.getTrgPt();
+  stream << phaseToInt(l_src.phase) << " " << src_pt.x << " " << src_pt.y << " " << src_pt.z << " " <<
+            phaseToInt(l_trg.phase) << " " << trg_pt.x << " " << trg_pt.y << " " << trg_pt.z << " " <<
+            match.getSrcQ() << " " << match.getTrgQ() << endl;
+}
+
+// sensor_id phase [x] [o]
+inline std::ostream& operator<<(std::ostream& stream, const CLS &l) {
+  const Eigen::Vector3f &p = l.line.point;
+  const Eigen::Vector3f &o = l.line.orientation;
+  stream << boost::format("%1% %2% %3% %4% %5% %6% %7% %8%") %
+    l.sensor_id % l.phase % p.x() % p.y() % p.z() % o.x() % o.y() % o.z();
+  return stream;
+}
+
 /**
  * ./collar-lines-odom $(ls *.bin | sort | xargs)
  */
@@ -178,11 +201,13 @@ int main(int argc, char** argv) {
   bool visualization, visualize_output_matches;
   string matches_output_fn;
   float matches_portion;
+  bool matches_output_as_lines;
   bool compute_inv_reg_error;
 
   if (!parse_arguments(argc, argv, registration_parameters, pipeline_parameters,
       calibration, init_transform, src_frame, trg_frame, visualization,
-      matches_output_fn, matches_portion, visualize_output_matches, compute_inv_reg_error)) {
+      matches_output_fn, matches_portion, matches_output_as_lines,
+      visualize_output_matches, compute_inv_reg_error)) {
     return EXIT_FAILURE;
   }
 
@@ -234,14 +259,12 @@ int main(int argc, char** argv) {
     ofstream matches_stream(matches_output_fn.c_str());
     int not_nan_matches = 0;
     for(vector<CLSMatch>::iterator m = matches.begin(); m < matches.end(); m++) {
-      const CLS &l_src = m->getSourceLine();
-      const CLS &l_trg = m->getTargetLine();
-      if(!isnan(l_src.phase) && !isnan(m->getTargetLine().phase)) {
-        const PointXYZ &src_pt = m->getSrcPt();
-        const PointXYZ &trg_pt = m->getTrgPt();
-        matches_stream << phaseToInt(l_src.phase) << " " << src_pt.x << " " << src_pt.y << " " << src_pt.z << " " <<
-                          phaseToInt(l_trg.phase) << " " << trg_pt.x << " " << trg_pt.y << " " << trg_pt.z << " " <<
-                          m->getSrcQ() << " " << m->getTrgQ() << endl;
+      if(m->isValid()) {
+        if(matches_output_as_lines) {
+          matches_stream << m->getSourceLine() << " " << m->getTargetLine() << endl;
+        } else {
+          printMatchXYZ(matches_stream, *m);
+        }
         not_nan_matches++;
       }
     }
