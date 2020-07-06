@@ -92,8 +92,7 @@ def weightedAverageQuaternions(Q, w):
     return numpy.real(eigenVectors[:,0].A1)
 
 
-if __name__ == "__main__":
-    poses = load_kitti_poses(sys.stdin)
+def averagePoses(poses):
     quaternions = numpy.zeros((len(poses), 4))
     positions_sum = numpy.zeros((3,1))
     for i,p in enumerate(poses):
@@ -106,4 +105,10 @@ if __name__ == "__main__":
     o.M = quaternion_to_matrix(avg)
     o.M[0:3, 3] = (positions_sum / len(poses)).ravel()
     o.setDofFromM()
-    print o
+
+    return o
+
+
+if __name__ == "__main__":
+
+    print averagePoses(load_kitti_poses(sys.stdin))

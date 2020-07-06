@@ -6,28 +6,8 @@ import sys
 import eulerangles_lib
 import random
 
-def horizontal_split(data, division, overlay, features, height, width):
-    output = np.empty([division * features, height, width / division + overlay * 2])
-    for d in range(division):
-        start = d * (width / division) - (width / division / 2 + overlay)
-        end = d * (width / division) + (width / division / 2 + overlay) - 1
-        start = (start + width) % width
-        end = (end + width) % width
-        for f in range(features):
-            if start > end:
-                output[d * features + f, ..., (width / division / 2 + overlay):] = data[f, ..., start:width]
-                output[d * features + f, ..., 0:(width / division / 2 + overlay)] = data[f, ..., 0:end + 1]
-            else:
-                output[d * features + f, ..., ...] = data[f, ..., start:end + 1]
-    return output
+from transformations import matrix_to_axis_angle
 
-def schema_to_dic(data_schema):
-    data_dic = {i:[] for i in set(reduce(lambda x,y: x+y,data_schema))}
-    for frame_i in range(len(data_schema)):
-        for slot_i in range(len(data_schema[frame_i])):
-            data_dic[data_schema[frame_i][slot_i]].append({"slot":slot_i, "frame":frame_i})
-
-    return data_dic
 
 def odom_rad_to_deg(odom):
     return odom[0:3] + [odom[i]*180.0/math.pi for i in range(3, 6)]
@@ -179,6 +159,17 @@ def mask_list(list, mask):
         if mask[i] != 0:
             output.append(list[i])
     return output
+
+
+def poses_diff(A, B, distance):
+    delta = A.inv() * B
+    return pose_magnitude(delta, distance)
+
+
+def pose_magnitude(P, distance):
+    axis, angle = matrix_to_axis_angle(P.M)
+    return (math.tan(angle) * distance) + np.linalg.norm(P.M[0:3, 3])
+
 
 if __name__ == "__main__":
     dof = [1, 2, 3, -4.807891009/57.3, -20.324063515/57.3, -5.047515356/57.3]
