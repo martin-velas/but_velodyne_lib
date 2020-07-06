@@ -277,17 +277,7 @@ int main(int argc, char** argv) {
     io::savePCDFileBinary(output_pcd_file + ".removed.pcd", *removed_points);
   }
 
-  pcl::PointCloud<pcl::PointXYZRGB>::Ptr rgb_cloud;
-  rgb_cloud = Visualizer3D::colorizeCloud(*sum_cloud, true);
-
   io::savePCDFileBinary(output_pcd_file, *sum_cloud);
-  io::savePCDFileBinary(output_pcd_file + ".rgb.pcd", *rgb_cloud);
-
-  PointCloud<PointXYZ> poses_cloud;
-  for(vector<Eigen::Affine3f>::const_iterator p = poses.begin(); p < poses.end(); p++) {
-    poses_cloud.push_back(KittiUtils::positionFromPose(*p));
-  }
-  io::savePCDFileBinary(output_pcd_file + ".poses.pcd", poses_cloud);
 
   return EXIT_SUCCESS;
 }
