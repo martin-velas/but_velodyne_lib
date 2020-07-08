@@ -45,7 +45,7 @@ typedef PointXYZ PointT;
 
 bool parse_arguments(int argc, char **argv,
                      string &source_pcd_fn, string &target_pcd_fn, Eigen::Affine3f &init_transformation,
-                     DenseCloudRegistration::Parameters &parameters) {
+                     DenseCloudRegistration::Parameters &parameters, float &removed_points_distance) {
   string init_poses_file;
 
   po::options_description desc("Dense point cloud registration.\n"
@@ -56,6 +56,8 @@ bool parse_arguments(int argc, char **argv,
       ("source,s", po::value<string>(&source_pcd_fn)->required(), "Source pcd file.")
       ("target,t", po::value<string>(&target_pcd_fn)->required(), "Target pcd file.")
       ("init_poses,p", po::value<string>(&init_poses_file)->default_value(""), "Initial poses (2) of the PCDs.")
+      ("removed_pts_dist", po::value<float>(&removed_points_distance)->default_value(-1.0),
+              "From target point cloud, the points are removed with no correspondence in src cloud beyond this distance.")
       ;
 
   parameters.loadFrom(desc);
@@ -98,9 +100,10 @@ int main(int argc, char** argv) {
   string source_cloud_fn, target_cloud_fn;
   Eigen::Affine3f init_transform;
   DenseCloudRegistration::Parameters parameters;
+  float removed_points_distance;
 
   if (!parse_arguments(argc, argv, source_cloud_fn, target_cloud_fn,
-                       init_transform, parameters)) {
+                       init_transform, parameters, removed_points_distance)) {
     return EXIT_FAILURE;
   }
 
@@ -111,6 +114,31 @@ int main(int argc, char** argv) {
   PointCloud<PointT>::Ptr trg_cloud(new PointCloud<PointT>);
   io::loadPCDFile(target_cloud_fn, *trg_cloud);
   transformPointCloud(*trg_cloud, *trg_cloud, init_transform);
+
+  if(removed_points_distance > 0.0) {
+    KdTreeFLANN<PointT> trg_tree;
+    trg_tree.setInputCloud(trg_cloud);
+
+    vector<bool> trg_keep_mask(trg_cloud->size(), false);
+
+    for(PointCloud<PointT>::iterator src_pt = src_cloud->begin(); src_pt < src_cloud->end(); src_pt++) {
+      vector<int> indices;
+      vector<float> sq_distances;
+      trg_tree.radiusSearch(*src_pt, removed_points_distance, indices, sq_distances);
+
+      for(vector<int>::iterator i = indices.begin(); i < indices.end(); i++) {
+        trg_keep_mask[*i] = true;
+      }
+   }
+
+    PointCloud<PointT>::Ptr trg_cloud_filtered(new PointCloud<PointT>);
+    for(int i = 0; i < trg_cloud->size(); i++) {
+      if(trg_keep_mask[i]) {
+        trg_cloud_filtered->push_back(trg_cloud->at(i));
+      }
+    }
+    trg_cloud = trg_cloud_filtered;
+  }
 
   DenseCloudRegistration registration(src_cloud, trg_cloud, parameters);
   Eigen::Affine3f t = registration.run();
