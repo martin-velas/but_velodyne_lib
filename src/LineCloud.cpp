@@ -24,6 +24,7 @@
 #include <algorithm>
 #include <boost/algorithm/string.hpp>
 #include <boost/program_options/errors.hpp>
+#include <boost/format.hpp>
 
 #include <but_velodyne/Visualizer3D.h>
 #include <but_velodyne/LineCloud.h>
@@ -224,6 +225,89 @@ void LineCloud::transform(const Eigen::Matrix4f &t_matrix) {
   Eigen::Affine3f transformation(t_matrix);
   for(vector<PointCloudLineWithMiddleAndOrigin>::iterator l = data.begin(); l < data.end(); l++) {
     *l = l->transform(transformation);
+  }
+}
+
+std::ostream& operator<<(std::ostream& stream, const CLS &l) {
+  const Eigen::Vector3f &p = l.line.point;
+  const Eigen::Vector3f &o = l.line.orientation;
+  const pcl::PointXYZ &m = l.middle;
+  const Eigen::Vector3f &n = l.normal;
+
+  stream << boost::format("%1% %2% %3% %4% %5% %6% %7% %8% %9% %10% %11% %12% %13% %14% %15% %16%") %
+            p.x() %
+            p.y() %
+            p.z() %
+
+            o.x() %
+            o.y() %
+            o.z() %
+
+            m.x %
+            m.y %
+            m.z %
+
+            l.sensor_id %
+
+            n.x() %
+            n.y() %
+            n.z() %
+
+            l.phase %
+            l.range %
+            l.frame_id;
+
+  return stream;
+}
+
+std::ostream& operator<<(std::ostream& stream, const LineCloud &lcd) {
+  for(LineCloud::const_iterator l = lcd.begin(); l < lcd.end(); l++) {
+    stream << *l << endl;
+  }
+  return stream;
+}
+
+std::istream& operator>>(std::istream &stream, CLS &l) {
+  Eigen::Vector3f &p = l.line.point;
+  Eigen::Vector3f &o = l.line.orientation;
+  pcl::PointXYZ &m = l.middle;
+  Eigen::Vector3f &n = l.normal;
+
+  stream >> p.x() >>
+         p.y() >>
+         p.z() >>
+
+         o.x() >>
+         o.y() >>
+         o.z() >>
+
+         m.x >>
+         m.y >>
+         m.z >>
+
+         l.sensor_id >>
+
+         n.x() >>
+         n.y() >>
+         n.z() >>
+
+         l.phase >>
+         l.range >>
+         l.frame_id;
+
+  return stream;
+}
+
+std::istream& operator>>(std::istream &stream, LineCloud &lcd) {
+  CLS line(PointCloudLine(), PointXYZ(), -1, Eigen::Vector3f::Zero(), -1);
+
+  while(true) {
+    stream >> line;
+    if(stream.eof()) {
+      break;
+    } else {
+      lcd.push_back(line);
+    }
   }
 }
 

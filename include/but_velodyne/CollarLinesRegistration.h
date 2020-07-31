@@ -297,6 +297,10 @@ public:
 
   int getMatches(const int target_index, vector<int> &closest_index, vector<float> &min_distance) const;
 
+  const vector<cv::DMatch> &getMatches() const {
+    return matches;
+  }
+
 protected:
 
   void findClosestMatchesByMiddles();

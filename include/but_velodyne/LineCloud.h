@@ -146,6 +146,10 @@ public:
   void push_back(const std::vector<PointCloudLine> &lines, const int sensor_id,
       const std::vector<Eigen::Vector3f> &normals, std::vector<float> &phases);
 
+  void push_back(const PointCloudLineWithMiddleAndOrigin &line_with_metadata) {
+    data.push_back(line_with_metadata);
+  }
+
   int size(void) const {
     return this->data.size();
   }
@@ -175,6 +179,14 @@ private:
 };
 
 typedef LineCloud::PointCloudLineWithMiddleAndOrigin CLS;
+
+std::ostream& operator<<(std::ostream& stream, const CLS &l);
+
+std::ostream& operator<<(std::ostream& stream, const LineCloud &lcd);
+
+std::istream& operator>>(std::istream &stream, CLS &l);
+
+std::istream& operator>>(std::istream &stream, LineCloud &lcd);
 
 } /* namespace but_velodyne */
 

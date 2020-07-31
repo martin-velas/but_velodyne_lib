@@ -122,6 +122,12 @@ target_link_libraries(rephase-velodyne-clouds but_velodyne)
 add_executable(interpolate-poses src/apps/interpolate-poses.cpp)
 target_link_libraries(interpolate-poses but_velodyne)
 
+add_executable(collar-lines-registration-line-clouds src/apps/collar-lines-registration-line-clouds.cpp)
+target_link_libraries(collar-lines-registration-line-clouds but_velodyne)
+
+add_executable(point-to-line-cloud src/apps/point-to-line-cloud.cpp)
+target_link_libraries(point-to-line-cloud but_velodyne)
+
 ########################## Visualization apps: ###############################
 
 add_executable(show-kitti-poses src/apps/show-kitti-poses.cpp)

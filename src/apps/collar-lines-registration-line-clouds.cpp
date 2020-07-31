@@ -1,5 +1,5 @@
 /*
- * Registration of the Velodyne point clouds by Collar Line Segments.
+ * Registration of the LineClouds by Collar Line Segments.
  *
  * Published in:
  * 	Velas, M. Spanel, M. Herout, A.: Collar Line Segments for
@@ -52,10 +52,9 @@ bool parse_arguments(int argc, char **argv,
                      CollarLinesRegistration::Parameters &registration_parameters,
                      CollarLinesRegistrationPipeline::Parameters &pipeline_parameters,
                      SensorsCalibration &calibration, Eigen::Affine3f &init_transform,
-                     VelodyneMultiFrame::Ptr &src_frame, VelodyneMultiFrame::Ptr &trg_frame,
+                     vector<string> &src_filenames, vector<string> &trg_filenames,
                      bool &visualization,
-                     string &matches_output, float &matches_portion, bool &matches_output_as_lines,
-                     bool &visualize_output_matches, bool &compute_inv_reg_error) {
+                     string &matches_output, bool &visualize_output_matches, bool &compute_inv_reg_error) {
   string sensors_pose_file, init_poses_file;
   bool index_by_cloud_name;
 
@@ -80,16 +79,12 @@ bool parse_arguments(int argc, char **argv,
         "Run visualization")
     ("matches_output", po::value<string>(&matches_output)->default_value(""),
         "Save matches of CLS to this file")
-    ("matches_portion", po::value<float>(&matches_portion)->default_value(0.9),
-         "Keep this portion of best matches (by the distance)")
     ("index_by_cloud_name", po::bool_switch(&index_by_cloud_name),
          "Get cloud index from filename.")
     ("visualize_output_matches", po::bool_switch(&visualize_output_matches),
          "Visualize output matches.")
     ("compute_inv_reg_error", po::bool_switch(&compute_inv_reg_error),
          "Estimate error by inverse registration (source and target frames are swapped).")
-    ("matches_output_as_lines", po::bool_switch(&matches_output_as_lines),
-         "Print matches in the form of CLS pairs.")
   ;
 
   po::variables_map vm;
@@ -122,19 +117,16 @@ bool parse_arguments(int argc, char **argv,
         clouds_to_process.size() << endl;
     return false;
   }
-  vector<string> src_clouds(clouds_to_process.begin(), clouds_to_process.begin()+calibration.sensorsCount());
-  src_frame.reset(new VelodyneMultiFrame(src_clouds, calibration));
-
-  vector<string> trg_clouds(clouds_to_process.begin()+calibration.sensorsCount(), clouds_to_process.end());
-  trg_frame.reset(new VelodyneMultiFrame(trg_clouds, calibration));
+  src_filenames = vector<string>(clouds_to_process.begin(), clouds_to_process.begin()+calibration.sensorsCount());
+  trg_filenames = vector<string>(clouds_to_process.begin()+calibration.sensorsCount(), clouds_to_process.end());
 
   vector<Eigen::Affine3f> init_poses = KittiUtils::load_kitti_poses(init_poses_file);
   if(init_poses.size() != 2 && !index_by_cloud_name) {
     cerr << "ERROR, expected exactly two initial poses." << endl;
     return false;
   } else if(index_by_cloud_name) {
-    int src_i = KittiUtils::kittiNameToIndex(src_clouds.front());
-    int trg_i = KittiUtils::kittiNameToIndex(trg_clouds.front());
+    int src_i = KittiUtils::kittiNameToIndex(src_filenames.front());
+    int trg_i = KittiUtils::kittiNameToIndex(trg_filenames.front());
     cerr << "Using initial transformation: poses[" << src_i << "]^-1 * poses[" << trg_i << "]" << endl;
     init_transform = init_poses[src_i].inverse() * init_poses[trg_i];
   } else {
@@ -144,14 +136,10 @@ bool parse_arguments(int argc, char **argv,
   return true;
 }
 
-int phaseToInt(const float phase) {
-  return MIN(phase*100, 99);
-}
-
 void show_output_matches(const PointCloud<PointXYZ> &src_cloud,
                          const PointCloud<PointXYZ> &trg_cloud,
                          const Eigen::Affine3f &transformation,
-                         const vector<CLSMatch> &matches) {
+                         const vector<DMatch> &matches) {
   Visualizer3D::Ptr vis = Visualizer3D::getCommonVisualizer();
   vis->keepOnlyClouds(0);
   vis->getViewer()->removeAllShapes();
@@ -160,126 +148,138 @@ void show_output_matches(const PointCloud<PointXYZ> &src_cloud,
   vis->setColor(220, 220, 255);
   vis->addPointCloud(trg_cloud);
 
-  for (vector<CLSMatch>::const_iterator m = matches.begin(); m < matches.end(); m++) {
-    if (!isnan(m->getSourceLine().phase) && !isnan(m->getTargetLine().phase)) {
-      PointCloudLine line(m->getSrcPt(), m->getTrgPt());
-      vis->addLine(line);
-    }
+  for (vector<DMatch>::const_iterator m = matches.begin(); m < matches.end(); m++) {
+    PointCloudLine line(src_cloud[m->trainIdx], trg_cloud[m->queryIdx]);
+    vis->addLine(line);
   }
   vis->show();
 }
 
-void printMatchXYZ(ofstream &stream, const CLSMatch &match) {
-  const CLS &l_src = match.getSourceLine();
-  const CLS &l_trg = match.getTargetLine();
-  const PointXYZ &src_pt = match.getSrcPt();
-  const PointXYZ &trg_pt = match.getTrgPt();
-  stream << phaseToInt(l_src.phase) << " " << src_pt.x << " " << src_pt.y << " " << src_pt.z << " " <<
-            phaseToInt(l_trg.phase) << " " << trg_pt.x << " " << trg_pt.y << " " << trg_pt.z << " " <<
-            match.getSrcQ() << " " << match.getTrgQ() << endl;
+void load_line_multiframe(const vector<string> &filenames, const SensorsCalibration &calibration,
+                          LineCloud::Ptr output_line_cloud) {
+  assert(filenames.size() == calibration.sensorsCount());
+
+  for(int i = 0; i < filenames.size(); i++) {
+    LineCloud part;
+    ifstream line_cloud_file(filenames[i].c_str());
+    line_cloud_file >> part;
+    cerr << "Loaded " << part.size() << " points from " << filenames[i] << endl;
+
+    part.transform(calibration.ofSensor(i).matrix());
+
+    *output_line_cloud += part;
+  }
 }
 
-// sensor_id phase [x] [o]
-void printCls(std::ostream& stream, const CLS &l) {
-  const Eigen::Vector3f &p = l.line.point;
-  const Eigen::Vector3f &o = l.line.orientation;
-  stream << boost::format("%1% %2% %3% %4% %5% %6% %7% %8%") %
-    l.sensor_id % l.phase % p.x() % p.y() % p.z() % o.x() % o.y() % o.z();
+void registerLineClouds(const LineCloud &source_line_cloud, const LineCloud &target_line_cloud,
+                        const Eigen::Matrix4f &initial_transformation,
+                        const CollarLinesRegistration::Parameters &registration_params,
+                        const CollarLinesRegistrationPipeline::Parameters &pipeline_params,
+                        RegistrationOutcome &output_result, std::vector<DMatch> &matches) {
+  CollarLinesRegistration::Parameters registration_params_effective = registration_params;
+  registration_params_effective.verbose = pipeline_params.verbose;
+
+  CollarLinesRegistration cls_fitting(source_line_cloud, target_line_cloud,
+                                      registration_params_effective, initial_transformation.matrix());
+  Termination termination(pipeline_params.term_params);
+  float best_error = 1e9;
+  for(int sampling_it = 0;
+      (sampling_it < pipeline_params.term_params.iterationsPerSampling) && !termination();
+      sampling_it++) {
+    float fitting_error = cls_fitting.refine();
+    Eigen::Matrix4f transformation = cls_fitting.getTransformation();
+    termination.addNewError(fitting_error);
+    RegistrationOutcome current_result;
+    current_result.transformation = Eigen::Affine3f(transformation);
+    current_result.error = fitting_error;
+    current_result.error_deviation = termination.getErrorDeviation();
+    if(pipeline_params.verbose) {
+      cerr << "Current result: " << current_result << endl;
+    }
+    if(!pipeline_params.pick_by_lowest_error || current_result.error < best_error) {
+      output_result = current_result;
+      best_error = current_result.error;
+      if(pipeline_params.verbose) {
+        cerr << "Was picked as BEST." << endl;
+      }
+    }
+  }
+  output_result.term_reason = termination.why();
+  matches.clear();
+  const vector<cv::DMatch> &last_matches = cls_fitting.getMatches();
+  for(vector<cv::DMatch>::const_iterator m = last_matches.begin(); m < last_matches.end(); m++) {
+    matches.push_back(*m);
+  }
 }
 
-/**
- * ./collar-lines-odom $(ls *.bin | sort | xargs)
- */
 int main(int argc, char** argv) {
 
   CollarLinesRegistration::Parameters registration_parameters;
   CollarLinesRegistrationPipeline::Parameters pipeline_parameters;
   SensorsCalibration calibration;
   Eigen::Affine3f init_transform;
-  VelodyneMultiFrame::Ptr src_frame, trg_frame;
+  vector<string> src_filenames, trg_filenames;
   bool visualization, visualize_output_matches;
   string matches_output_fn;
-  float matches_portion;
-  bool matches_output_as_lines;
   bool compute_inv_reg_error;
 
   if (!parse_arguments(argc, argv, registration_parameters, pipeline_parameters,
-      calibration, init_transform, src_frame, trg_frame, visualization,
-      matches_output_fn, matches_portion, matches_output_as_lines,
-      visualize_output_matches, compute_inv_reg_error)) {
+      calibration, init_transform, src_filenames, trg_filenames, visualization,
+      matches_output_fn, visualize_output_matches, compute_inv_reg_error)) {
     return EXIT_FAILURE;
   }
 
-  LinearMoveEstimator null_estimator(0);
-  ofstream null_file("/dev/null");
-  CollarLinesRegistrationPipeline registration(null_estimator, null_file,
-      pipeline_parameters, registration_parameters);
-
-  PolarGridOfClouds src_grid(src_frame->clouds, calibration);
-  PolarGridOfClouds trg_grid(trg_frame->clouds, calibration);
+  LineCloud::Ptr src_line_cloud(new LineCloud), trg_line_cloud(new LineCloud);
+  load_line_multiframe(src_filenames, calibration, src_line_cloud);
+  load_line_multiframe(trg_filenames, calibration, trg_line_cloud);
 
   Visualizer3D::Ptr vis;
-  PointCloud<PointXYZ> src_cloud, trg_cloud;
-  src_frame->joinTo(src_cloud);
-  trg_frame->joinTo(trg_cloud);
+  PointCloud<PointXYZ>::Ptr src_cloud, trg_cloud;
+  src_cloud = src_line_cloud->getMiddles();
+  trg_cloud = trg_line_cloud->getMiddles();
 
   if(visualization) {
     vis = Visualizer3D::getCommonVisualizer();
-    vis->setColor(255, 0, 0).addPointCloud(src_cloud)
-        .setColor(0, 0, 255).addPointCloud(trg_cloud, init_transform.matrix()).show();
+    vis->setColor(255, 0, 0).addPointCloud(*src_cloud)
+        .setColor(0, 0, 255).addPointCloud(*trg_cloud, init_transform.matrix()).show();
     vis->keepOnlyClouds(0);
   }
 
   RegistrationOutcome result;
-  registration.registerTwoGrids(src_grid, trg_grid, init_transform.matrix(), result);
+  vector<cv::DMatch> matches;
+  registerLineClouds(*src_line_cloud, *trg_line_cloud,
+                     init_transform.matrix(), registration_parameters, pipeline_parameters,
+                    result, matches);
 
   if(compute_inv_reg_error) {
     RegistrationOutcome inv_result;
-    registration.registerTwoGrids(trg_grid, src_grid, init_transform.inverse().matrix(), inv_result);
-    const float t_error = tdiff(result.transformation, inv_result.transformation.inverse(), trg_cloud);
+    vector<cv::DMatch> inv_matches;
+    registerLineClouds(*trg_line_cloud, *src_line_cloud,
+                       init_transform.inverse().matrix(), registration_parameters, pipeline_parameters,
+                       inv_result, inv_matches);
+    const float t_error = tdiff(result.transformation, inv_result.transformation.inverse(), *trg_cloud);
     cout << result << " inv_reg_error:" << t_error << endl;
     if(visualization) {
-      vis->setColor(255, 0, 255).addPointCloud(trg_cloud, inv_result.transformation.inverse().matrix());
+      vis->setColor(255, 0, 255).addPointCloud(*trg_cloud, inv_result.transformation.inverse().matrix());
     }
   } else {
     cout << result << endl;
   }
 
-  CLSMatchByCoeffComparator clsMatchByCoeffComparator;
-
   if(!matches_output_fn.empty()) {
-    vector<CLSMatch> matches = registration.getLastMatches();
-    cerr << "Matches (unfiltered): " << matches.size() << endl;
-
-    sort(matches.begin(), matches.end(), clsMatchByCoeffComparator);
-    matches.erase(matches.begin() + matches_portion*matches.size(), matches.end());
-    cerr << "Matches (filtered " << matches_portion*100 << "%): " << matches.size() << endl;
-
     ofstream matches_stream(matches_output_fn.c_str());
-    int not_nan_matches = 0;
-    for(vector<CLSMatch>::iterator m = matches.begin(); m < matches.end(); m++) {
-      if(m->isValid()) {
-        if(matches_output_as_lines) {
-          printCls(matches_stream, m->getSourceLine());
-          matches_stream << " ";
-          printCls(matches_stream, m->getTargetLine());
-          matches_stream << endl;
-        } else {
-          printMatchXYZ(matches_stream, *m);
-        }
-        not_nan_matches++;
-      }
+    for(vector<DMatch>::iterator m = matches.begin(); m < matches.end(); m++) {
+      matches_stream << m->trainIdx << " " << m->queryIdx << endl;
     }
-    cerr << "Matches (no NaN phases): " << not_nan_matches << endl;
 
     if(visualize_output_matches) {
-      show_output_matches(src_cloud, trg_cloud, result.transformation, matches);
+      show_output_matches(*src_cloud, *trg_cloud, result.transformation, matches);
     }
   }
 
   if(visualization) {
-    vis->setColor(255, 0, 0).addPointCloud(src_cloud)
-        .setColor(0, 0, 255).addPointCloud(trg_cloud, result.transformation.matrix())
+    vis->setColor(255, 0, 0).addPointCloud(*src_cloud)
+        .setColor(0, 0, 255).addPointCloud(*trg_cloud, result.transformation.matrix())
         .addPoses(vector<Eigen::Affine3f>(1, init_transform)).show();
   }
 
