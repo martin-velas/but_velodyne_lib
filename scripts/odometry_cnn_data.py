@@ -2,11 +2,50 @@
 
 import numpy as np
 import math
+from math import sin, cos
 import sys
 import eulerangles_lib
 import random
 
 from transformations import matrix_to_axis_angle
+
+
+VELO_TO_IMU = np.array([0,0,1,0,
+                        1,0,0,0,
+                        0,1,0,0,
+                        0,0,0,1]).reshape((4,4))
+
+
+def roll_to_matrix(roll_angle):
+    sr = sin(roll_angle)
+    cr = cos(roll_angle)
+    M = np.eye(3)
+    M[1,1] = cr; M[1,2] = -sr
+    M[2,1] = sr; M[2,2] = cr
+    return M
+
+
+def pitch_to_matrix(pitch_angle):
+    sp = sin(pitch_angle)
+    cp = cos(pitch_angle)
+    M = np.eye(3)
+    M[0,0] = cp; M[0,2] = sp
+    M[2,0] = -sp; M[2,2] = cp
+    return M
+
+
+def heading_to_matrix(heading_angle):
+    sh = sin(heading_angle)
+    ch = cos(heading_angle)
+    M = np.eye(3)
+    M[0,0] = ch; M[0,1] = -sh
+    M[1,0] = sh; M[1,1] = ch
+    return M
+
+
+def roll_pitch_heading_to_matrix(roll, pitch, heading):
+    # this order is verified (H*P*R)
+    return np.dot(heading_to_matrix(heading), np.dot(pitch_to_matrix(pitch), roll_to_matrix(roll)))
 
 
 def odom_rad_to_deg(odom):
