@@ -119,6 +119,9 @@ target_link_libraries(get-ranges but_velodyne)
 add_executable(rephase-velodyne-clouds src/apps/rephase-velodyne-clouds.cpp)
 target_link_libraries(rephase-velodyne-clouds but_velodyne)
 
+add_executable(interpolate-poses src/apps/interpolate-poses.cpp)
+target_link_libraries(interpolate-poses but_velodyne)
+
 ########################## Visualization apps: ###############################
 
 add_executable(show-kitti-poses src/apps/show-kitti-poses.cpp)
