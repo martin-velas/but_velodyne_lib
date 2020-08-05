@@ -50,6 +50,7 @@ namespace po = boost::program_options;
 bool parse_arguments(int argc, char **argv,
                      string &pcd_filename, string &output_filename,
                      int &generated_lines, int &preserved_lines,
+                     int &polar_bins, int &polar_bins_subdivision,
                      bool &visualize) {
 
   po::options_description desc("PCD to the LineCloud transformation\n"
@@ -62,6 +63,8 @@ bool parse_arguments(int argc, char **argv,
       ("output_line_cloud,o", po::value<string>(&output_filename)->required(), "Output LineCloud file")
       ("lines_per_cell_generated,g", po::value<int>(&generated_lines)->default_value(20), "Lines per cell generated")
       ("lines_per_cell_preserved,p", po::value<int>(&preserved_lines)->default_value(5), "Lines per cell preserved")
+      ("polar_bins", po::value<int>(&polar_bins)->default_value(36), "Polar bins count")
+      ("polar_bins_subdivision", po::value<int>(&polar_bins_subdivision)->default_value(1), "Polar bins subdivision")
       ("visualize,v", po::bool_switch(&visualize), "Run visualization")
   ;
 
@@ -117,18 +120,19 @@ void pcd_filename_to_frame_sensor_id(const string &filename, int &frame_id, int 
 int main(int argc, char** argv) {
 
   string input_pcd_filename, output_line_cloud_filename;
-  int lines_generated, lines_preserved;
+  int lines_generated, lines_preserved, polar_bins, polar_bin_subdivision;
   bool visualize;
 
   if (!parse_arguments(argc, argv, input_pcd_filename, output_line_cloud_filename,
-                       lines_generated, lines_preserved, visualize)) {
+                       lines_generated, lines_preserved, polar_bins, polar_bin_subdivision,
+                       visualize)) {
     return EXIT_FAILURE;
   }
 
   VelodynePointCloud point_cloud;
   VelodynePointCloud::fromFile(input_pcd_filename, point_cloud);
 
-  PolarGridOfClouds grid(point_cloud);
+  PolarGridOfClouds grid(point_cloud, polar_bins, polar_bin_subdivision);
 
   CollarLinesFilter registration_filter(lines_preserved);
   LineCloud line_cloud(grid, lines_generated, registration_filter);
