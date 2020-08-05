@@ -156,6 +156,8 @@ public:
 
   pcl::PointCloud<pcl::PointXYZ>::Ptr getMiddles(void) const;
 
+  static void fromFile(const std::string &infile, LineCloud &out_line_cloud);
+
 protected:
   void generateLineCloudFromCell(const PolarGridOfClouds &polar_grid,
                                  const CellId &source_cell,

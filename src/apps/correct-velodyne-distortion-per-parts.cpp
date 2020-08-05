@@ -26,6 +26,7 @@
 #include <boost/program_options.hpp>
 
 #include <but_velodyne/VelodynePointCloud.h>
+#include <but_velodyne/VelodyneMultiFrameSequence.h>
 #include <but_velodyne/KittiUtils.h>
 #include <but_velodyne/InterpolationSE3.h>
 

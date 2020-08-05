@@ -36,6 +36,7 @@
 #include <cv.h>
 
 #include <but_velodyne/VelodynePointCloud.h>
+#include <but_velodyne/VelodyneMultiFrameSequence.h>
 #include <but_velodyne/EigenUtils.h>
 #include <but_velodyne/CollarLinesRegistrationPipeline.h>
 

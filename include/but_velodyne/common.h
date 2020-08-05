@@ -101,6 +101,8 @@ float distance_pts(const PointT &p1, const PointT &p2) {
   return (p1.getVector3fMap() - p2.getVector3fMap()).norm();
 }
 
+bool endsWith(const std::string &fullString, const std::string &ending);
+
 }
 
 #endif /* COMMON_H_ */

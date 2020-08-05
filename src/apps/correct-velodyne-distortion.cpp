@@ -28,6 +28,7 @@
 #include <pcl/common/transforms.h>
 
 #include <but_velodyne/VelodynePointCloud.h>
+#include <but_velodyne/VelodyneMultiFrameSequence.h>
 #include <but_velodyne/KittiUtils.h>
 #include <but_velodyne/InterpolationSE3.h>
 
@@ -92,10 +93,6 @@ void getSlices(const VelodynePointCloud &in_cloud, vector<VelodynePointCloud> &s
   }
 }
 
-int phaseToInt(const float phase) {
-  return MIN(phase*100, 99);
-}
-
 void fix_cloud(const int frame_idx, const VelodynePointCloud &in_cloud,
     const Eigen::Affine3f &sensor_pose,
     const Eigen::Affine3f &delta_pose,
@@ -111,13 +108,42 @@ void fix_cloud(const int frame_idx, const VelodynePointCloud &in_cloud,
     Eigen::Affine3f t = interpolation.estimate(((float) i)/slices.size());
     transformPointCloud(slices[i], slices[i], t);
     out_cloud += slices[i];
-    cout << frame_idx << " " << phaseToInt(slices[i].front().phase) << " " << t << endl;
   }
 
   transformPointCloud(out_cloud, out_cloud, sensor_pose.inverse());
   if(!in_cloud.getAxisCorrection().isIdentity()) {
     transformPointCloud(out_cloud, out_cloud, in_cloud.getAxisCorrection().inverse());
   }
+}
+
+void getSlices(const LineCloud &in_line_cloud, vector<LineCloud> &slices) {
+  map<float, LineCloud> slices_map;
+  for(LineCloud::const_iterator l = in_line_cloud.begin(); l < in_line_cloud.end(); l++) {
+    slices_map[l->phase].push_back(*l);
+  }
+  for(map<float, LineCloud>::const_iterator s = slices_map.begin(); s != slices_map.end(); s++) {
+    slices.push_back(s->second);
+  }
+}
+
+void fix_cloud(const int frame_idx, const LineCloud &in_line_cloud,
+               const Eigen::Affine3f &sensor_pose,
+               const Eigen::Affine3f &delta_pose,
+               LineCloud &out_line_cloud) {
+  LineCloud in_line_cloud_calibrated;
+  in_line_cloud.transform(sensor_pose.matrix(), in_line_cloud_calibrated);
+
+  vector<LineCloud> slices;
+  getSlices(in_line_cloud_calibrated, slices);
+
+  LinearInterpolationSE3 interpolation(Eigen::Affine3f::Identity(), delta_pose);
+  for(int i = 0; i < slices.size(); i++) {
+    Eigen::Affine3f t = interpolation.estimate(((float) i)/slices.size());
+    slices[i].transform(t.matrix());
+    out_line_cloud += slices[i];
+  }
+
+  out_line_cloud.transform(sensor_pose.inverse().matrix());
 }
 
 void fix_cloud(const int frame_idx, const VelodynePointCloud &in_cloud,
@@ -135,7 +161,6 @@ void fix_cloud(const int frame_idx, const VelodynePointCloud &in_cloud,
     if(t_found == code_book.end()) {
       t = T0_inv*spline.estimate(p->phase);
       code_book[p->phase] = t;
-      cout << frame_idx << " " << phaseToInt(p->phase) << " " << t << endl;
     } else {
       t = t_found->second;
     }
@@ -143,6 +168,30 @@ void fix_cloud(const int frame_idx, const VelodynePointCloud &in_cloud,
   }
 
   transformPointCloud(out_cloud, out_cloud, sensor_pose.inverse());
+}
+
+void fix_cloud(const int frame_idx, const LineCloud &in_line_cloud,
+               const BSplineSE3 &spline,
+               const Eigen::Affine3f &sensor_pose,
+               LineCloud &out_line_cloud) {
+  in_line_cloud.transform(sensor_pose.matrix(), out_line_cloud);
+
+  typedef map<float, Eigen::Affine3f> CB;
+  CB code_book;
+  const Eigen::Affine3f &T0_inv = spline.estimate(0.0).inverse();
+  for(LineCloud::iterator l = out_line_cloud.begin(); l < out_line_cloud.end(); l++) {
+    Eigen::Affine3f t;
+    CB::iterator t_found = code_book.find(l->phase);
+    if(t_found == code_book.end()) {
+      t = T0_inv*spline.estimate(l->phase);
+      code_book[l->phase] = t;
+    } else {
+      t = t_found->second;
+    }
+    *l = l->transform(t);
+  }
+
+  out_line_cloud.transform(sensor_pose.inverse().matrix());
 }
 
 int main(int argc, char** argv) {
@@ -162,19 +211,34 @@ int main(int argc, char** argv) {
 
     for(int sensor_i = 0; sensor_i < calibration.sensorsCount(); sensor_i++) {
       VelodynePointCloud out_cloud;
+      LineCloud out_line_cloud;
       const Eigen::Affine3f &sensor_pose = multiframe.calibration.ofSensor(sensor_i);
 
       if(frame_i > 0 && frame_i+2 < poses.size()) {
         vector<Eigen::Affine3f> control_poses(poses.begin()+(frame_i-1), poses.begin()+(frame_i+3));
         const BSplineSE3 spline(control_poses);
-        fix_cloud(frame_i, *multiframe.clouds[sensor_i], spline, sensor_pose, out_cloud);
+        if(multiframe.hasPointClouds()) {
+          fix_cloud(frame_i, *multiframe.clouds[sensor_i], spline, sensor_pose, out_cloud);
+        } else {
+          fix_cloud(frame_i, *multiframe.line_clouds[sensor_i], spline, sensor_pose, out_line_cloud);
+        }
       } else {
         const Eigen::Affine3f poses_delta = poses[frame_i].inverse()*poses[frame_i+1];
-        fix_cloud(frame_i, *multiframe.clouds[sensor_i], sensor_pose, poses_delta, out_cloud);
+        if(multiframe.hasPointClouds()) {
+          fix_cloud(frame_i, *multiframe.clouds[sensor_i], sensor_pose, poses_delta, out_cloud);
+        } else {
+          fix_cloud(frame_i, *multiframe.line_clouds[sensor_i], sensor_pose, poses_delta, out_line_cloud);
+        }
       }
 
       boost::filesystem::path first_cloud(multiframe.filenames[sensor_i]);
-      io::savePCDFileBinary(out_dir + "/" + first_cloud.filename().string(), out_cloud);
+      string out_filename = out_dir + "/" + first_cloud.filename().string();
+      if(multiframe.hasPointClouds()) {
+        io::savePCDFileBinary(out_filename, out_cloud);
+      } else {
+        ofstream out_line_cloud_file(out_filename.c_str());
+        out_line_cloud_file << out_line_cloud;
+      }
     }
   }
 

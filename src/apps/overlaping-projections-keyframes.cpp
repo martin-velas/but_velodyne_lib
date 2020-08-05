@@ -34,6 +34,7 @@
 #include <but_velodyne/common.h>
 #include <but_velodyne/CollarLinesRegistrationPipeline.h>
 #include <but_velodyne/EigenUtils.h>
+#include <but_velodyne/VelodyneMultiFrameSequence.h>
 
 #include <pcl/PCLPointCloud2.h>
 #include <pcl/common/eigen.h>

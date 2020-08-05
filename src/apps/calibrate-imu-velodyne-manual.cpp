@@ -26,6 +26,7 @@
 
 #include <but_velodyne/Visualizer3D.h>
 #include <but_velodyne/KittiUtils.h>
+#include <but_velodyne/VelodyneMultiFrameSequence.h>
 #include <but_velodyne/AdaptiveIntensitiesNormalization.h>
 
 #include <pcl/common/eigen.h>

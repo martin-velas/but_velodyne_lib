@@ -29,6 +29,7 @@
 #include <but_velodyne/KittiUtils.h>
 #include <but_velodyne/VelodynePointCloud.h>
 #include <but_velodyne/EigenUtils.h>
+#include <but_velodyne/PhaseFilter.h>
 
 using namespace std;
 using namespace pcl;

@@ -311,4 +311,10 @@ std::istream& operator>>(std::istream &stream, LineCloud &lcd) {
   }
 }
 
+void LineCloud::fromFile(const std::string &infile, LineCloud &out_line_cloud) {
+  std::cerr << "Processing LineCloud file: " << infile << std::endl << std::flush;
+  std::ifstream in_stream(infile.c_str());
+  in_stream >> out_line_cloud;
+}
+
 } /* namespace but_velodyne */

@@ -29,6 +29,7 @@
 #include <boost/program_options.hpp>
 
 #include <but_velodyne/VelodynePointCloud.h>
+#include <but_velodyne/VelodyneMultiFrameSequence.h>
 #include <but_velodyne/common.h>
 
 using namespace std;

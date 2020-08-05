@@ -57,5 +57,9 @@ float harmonicalAverage(const float a, const float b) {
   }
 }
 
+bool endsWith(const string &fullString, const string &ending) {
+  return (fullString.compare(fullString.length() - ending.length(), ending.length(), ending) == 0);
+}
+
 }
 

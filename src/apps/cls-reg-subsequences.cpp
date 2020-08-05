@@ -40,6 +40,7 @@
 #include <pcl/io/pcd_io.h>
 
 #include <but_velodyne/VelodynePointCloud.h>
+#include <but_velodyne/VelodyneMultiFrameSequence.h>
 #include <but_velodyne/EigenUtils.h>
 #include <but_velodyne/KittiUtils.h>
 #include <but_velodyne/PoseGraphEdge.h>
