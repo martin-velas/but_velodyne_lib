@@ -53,7 +53,8 @@ bool parse_arguments(int argc, char **argv,
                      CollarLinesRegistrationPipeline::Parameters &pipeline_parameters,
                      boost::shared_ptr<MoveEstimator> &estimator,
                      SensorsCalibration &calibration,
-                     vector<string> &clouds_to_process);
+                     vector<string> &clouds_to_process,
+                     bool &visualize);
 
 /**
  * ./collar-lines-odom $(ls *.bin | sort | xargs)
@@ -65,9 +66,10 @@ int main(int argc, char** argv) {
   vector<string> clouds_to_process;
   boost::shared_ptr<MoveEstimator> estimator;
   SensorsCalibration calibration;
+  bool visualize;
 
   if (!parse_arguments(argc, argv, registration_parameters, pipeline_parameters,
-      estimator, calibration, clouds_to_process)) {
+      estimator, calibration, clouds_to_process, visualize)) {
     return EXIT_FAILURE;
   }
 
@@ -91,12 +93,32 @@ int main(int argc, char** argv) {
   int sensors = calibration.sensorsCount();
   vector<Mat> covariances(clouds_to_process.size()/sensors);
   VelodyneFileSequence sequence(clouds_to_process, calibration);
+
+  Visualizer3D::Ptr vis;
+  PointCloud<PointXYZ> src_vis_cloud, trg_vis_cloud;
+  if(visualize) {
+    vis = Visualizer3D::Ptr(new Visualizer3D);
+  }
+
   for (int frame_i = 0; sequence.hasNext(); frame_i++) {
     VelodyneMultiFrame multiframe = sequence.getNext();
+
+    if(visualize) {
+      multiframe.joinTo(trg_vis_cloud);
+      vis->keepOnlyClouds(0)
+              .setColor(0, 0, 255).addPointCloud(src_vis_cloud)
+              .setColor(255, 0, 0).addPointCloud(trg_vis_cloud)
+              .show();
+    }
 
     Eigen::Matrix4f t = registration.runRegistration(multiframe.clouds, calibration,
         covariances[frame_i]);
     registration.output(t);
+
+    if(visualize) {
+      vis->setColor(0, 255, 0).addPointCloud(trg_vis_cloud, t).show();
+      src_vis_cloud = trg_vis_cloud;
+    }
   }
 
   string cov_filename = output_path + "/covariances.yaml";
@@ -111,7 +133,8 @@ bool parse_arguments(int argc, char **argv,
                      CollarLinesRegistrationPipeline::Parameters &pipeline_parameters,
                      boost::shared_ptr<MoveEstimator> &estimator,
                      SensorsCalibration &calibration,
-                     vector<string> &clouds_to_process) {
+                     vector<string> &clouds_to_process,
+                     bool &visualize) {
   bool use_kalman;
   int linear_estimator;
   string init_poses;
@@ -138,6 +161,8 @@ bool parse_arguments(int argc, char **argv,
           "Use Kalman filter instead of linear predictor or precomputed poses for estimation of odometry")
       ("sensors_pose_file", po::value<string>(&sensors_pose_file)->default_value(""),
           "Extrinsic calibration parameters, when multiple Velodyne LiDARs are used")
+      ("visualize", po::bool_switch(&visualize),
+           "Run visualization before/after the registration.")
   ;
 
     po::variables_map vm;
