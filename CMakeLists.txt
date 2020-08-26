@@ -133,6 +133,9 @@ target_link_libraries(point-to-line-cloud but_velodyne)
 add_executable(show-kitti-poses src/apps/show-kitti-poses.cpp)
 target_link_libraries(show-kitti-poses but_velodyne)
 
+add_executable(show-lcd-matches src/apps/show-lcd-matches.cpp)
+target_link_libraries(show-lcd-matches but_velodyne)
+
 add_executable(build-3d-model src/apps/build-3d-model.cpp)
 target_link_libraries(build-3d-model but_velodyne)
 

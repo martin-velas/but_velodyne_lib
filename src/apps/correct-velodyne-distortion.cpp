@@ -116,31 +116,20 @@ void fix_cloud(const int frame_idx, const VelodynePointCloud &in_cloud,
   }
 }
 
-void getSlices(const LineCloud &in_line_cloud, vector<LineCloud> &slices) {
-  map<float, LineCloud> slices_map;
-  for(LineCloud::const_iterator l = in_line_cloud.begin(); l < in_line_cloud.end(); l++) {
-    slices_map[l->phase].push_back(*l);
-  }
-  for(map<float, LineCloud>::const_iterator s = slices_map.begin(); s != slices_map.end(); s++) {
-    slices.push_back(s->second);
-  }
-}
-
 void fix_cloud(const int frame_idx, const LineCloud &in_line_cloud,
                const Eigen::Affine3f &sensor_pose,
                const Eigen::Affine3f &delta_pose,
                LineCloud &out_line_cloud) {
   LineCloud in_line_cloud_calibrated;
-  in_line_cloud.transform(sensor_pose.matrix(), in_line_cloud_calibrated);
+  in_line_cloud.transform(sensor_pose.matrix(), out_line_cloud);
 
-  vector<LineCloud> slices;
-  getSlices(in_line_cloud_calibrated, slices);
+  LinearInterpolationSE3::Ptr interpolation_method(
+          new LinearInterpolationSE3(Eigen::Affine3f::Identity(), delta_pose));
+  InterpolationBuffered interpolation(interpolation_method, 0.0, 1.0);
 
-  LinearInterpolationSE3 interpolation(Eigen::Affine3f::Identity(), delta_pose);
-  for(int i = 0; i < slices.size(); i++) {
-    Eigen::Affine3f t = interpolation.estimate(((float) i)/slices.size());
-    slices[i].transform(t.matrix());
-    out_line_cloud += slices[i];
+  for(LineCloud::iterator l = out_line_cloud.begin(); l < out_line_cloud.end(); l++) {
+    Eigen::Affine3f t = interpolation.estimate(l->phase);
+    *l = l->transform(t);
   }
 
   out_line_cloud.transform(sensor_pose.inverse().matrix());
