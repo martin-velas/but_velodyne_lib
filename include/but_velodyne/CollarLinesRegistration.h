@@ -34,6 +34,8 @@
 #include <but_velodyne/LineCloud.h>
 #include <but_velodyne/Visualizer3D.h>
 
+#include <gtest/gtest.h>
+
 namespace but_velodyne
 {
 
@@ -308,14 +310,14 @@ protected:
   void getCorrespondingPoints(MatrixOfPoints &source_coresp_points,
                               MatrixOfPoints &target_coresp_points);
 
-  void getWeightingMatrix(WeightsMatrix &weightingMatrix);
+  void getWeightingMatrix(WeightsMatrix &weightingMatrix) const;
 
   Eigen::Matrix4f computeTransformationWeighted(const MatrixOfPoints &source_coresp_points,
                              const MatrixOfPoints &target_coresp_points);
 
   float computeError(const MatrixOfPoints &source_coresp_points,
                      const MatrixOfPoints &target_coresp_points,
-                     const Eigen::Matrix4f &transformation);
+                     const Eigen::Matrix4f &transformation) const;
 
   void filterMatchesByThreshold(const float threshold);
 
@@ -347,6 +349,9 @@ private:
   Eigen::VectorXf correspondences_weights;
   int refinements_done;
   std::vector<CLSMatch> last_point_matches;
+
+  FRIEND_TEST(CollarLinesRegistration, getWeightingMatrixTest);
+  FRIEND_TEST(CollarLinesRegistration, computeError);
 };
 
 } /* namespace but_velodyne */

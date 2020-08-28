@@ -172,16 +172,18 @@ float CollarLinesRegistration::computeError() {
   return error;
 }
 
-float CollarLinesRegistration::computeError(
+float CollarLinesRegistration::computeError (
     const MatrixOfPoints &source_coresp_points,
     const MatrixOfPoints &target_coresp_points,
-    const Matrix4f &transformation) {
+    const Matrix4f &transformation) const {
+  const int matches_cnt = matches.size();
+
   typedef Eigen::Matrix<TPoint3D::Scalar, TPoint3D::RowsAtCompileTime+1, Eigen::Dynamic> MatrixOfHomogeniousPoints;
   MatrixOfHomogeniousPoints target_points_transformed =
-      MatrixOfHomogeniousPoints::Ones(TPoint3D::RowsAtCompileTime+1, matches.size());
-  target_points_transformed.block(0, 0, 3, matches.size()) = target_coresp_points;
+      MatrixOfHomogeniousPoints::Ones(TPoint3D::RowsAtCompileTime+1, matches_cnt);
+  target_points_transformed.block(0, 0, 3, matches_cnt) = target_coresp_points;
   target_points_transformed = transformation * target_points_transformed;
-  MatrixOfPoints difference = source_coresp_points - target_points_transformed.block(0, 0, 3, matches.size());
+  MatrixOfPoints difference = source_coresp_points - target_points_transformed.block(0, 0, 3, matches_cnt);
   VectorXf square_distances = difference.cwiseProduct(difference).transpose() * Vector3f::Ones();
   VectorXf distances = square_distances.cwiseSqrt();
 
@@ -483,17 +485,16 @@ float CollarLinesRegistration::sinOfAngleWithGround(const Vector3f &orientation)
   return orientation.y() / orientation.norm();
 }
 
-void CollarLinesRegistration::getWeightingMatrix(WeightsMatrix &weighting_matrix) {
+void CollarLinesRegistration::getWeightingMatrix(WeightsMatrix &weighting_matrix) const {
   if(correspondences_weights.size() == 0) {
+    weighting_matrix.resize(matches.size());
     weighting_matrix.setIdentity();
     weighting_matrix.diagonal() /= (float)matches.size();
     return;
   }
 
-  float weights_normalization = 1.0 / correspondences_weights.sum();
-  correspondences_weights *= weights_normalization;
-
-  weighting_matrix.diagonal() = correspondences_weights;
+  const float weights_normalization = 1.0 / correspondences_weights.sum();
+  weighting_matrix.diagonal() = correspondences_weights * weights_normalization;
 
   assert(weighting_matrix.rows() == correspondences_weights.size());
   assert(weighting_matrix.cols() == correspondences_weights.size());
