@@ -117,8 +117,6 @@ void CollarLinesRegistration::Parameters::prepareForLoading(po::options_descript
           "Do not estimate the roll and pitch angles (only the heading and the translation)")
       ("nearest_neighbors", po::value<int>(&this->nearestNeighbors)->default_value(this->nearestNeighbors),
         "How many nearest neighbors (matches) are found for each line of source frame.")
-      ("rejection_by_line_distances", po::bool_switch(&this->rejection_by_line_distances),
-          "Line matches are thresholded by the distances of lines. By default, line midpoints are used.")
       ("separate_sensors", po::bool_switch(&this->separate_sensors),
           "Do not match lines across the sensors.")
       ("phase_weights_max", po::value<float>(&this->phase_weights_max)->default_value(this->phase_weights_max),
@@ -257,7 +255,23 @@ int CollarLinesRegistration::getMatches(const int target_index,
   return matches_count;
 }
 
-void CollarLinesRegistration::findClosestMatchesByMiddles() {
+float CollarLinesRegistration::getEffectiveThreshold(void) const {
+  if(params.distance_threshold == MEAN_THRESHOLD) {
+    return getMatchesMean();
+  } else if(params.distance_threshold == VALUE_THRESHOLD) {
+    assert(!isnan(params.distance_threshold_value));
+    if(isnan(params.distance_threshold_value)) {
+      cerr << "Warning: distance_threshold_value was not set!" << endl;
+    }
+    return params.distance_threshold_value;
+  } else if (params.distance_threshold == NO_THRESHOLD) {
+    return INFINITY;
+  } else {
+    return getMatchesPortion(thresholdTypeToFraction()*getEffectiveDecay());
+  }
+}
+
+void CollarLinesRegistration::findClosestMatchesByMiddles(void) {
   matches.clear();
 
   for(int target_index = 0; target_index < target_cloud.size(); target_index++) {
@@ -266,33 +280,13 @@ void CollarLinesRegistration::findClosestMatchesByMiddles() {
     int matches_count = getMatches(target_index, closest_index, min_distance);
 
     for(int i = 0; i < matches_count; i++) {
-      // distance is actually square of real distance
       const int source_index = closest_index[i];
-      float distance;
-      if(params.rejection_by_line_distances) {
-        const PointCloudLine &source_line = source_cloud[source_index].line;
-        const PointCloudLine &target_line = target_cloud[target_index].line;
-        Eigen::Vector3f distance_vec = target_line.distanceVectorFrom(source_line);
-        const Eigen::Vector3f source_normal = source_cloud[source_index].normal;
-        const Eigen::Vector3f target_normal = target_cloud[target_index].normal;
-        if(distance_vec.hasNaN()) {
-          distance = 10e6;
-        } else if(!source_normal.isZero() && !target_normal.isZero()) {
-          const Eigen::Vector3f normal = (source_normal + target_normal) * 0.5;
-          const Eigen::Vector3f projection_to_normal = (normal.dot(distance_vec) / distance_vec.norm())*normal;
-          distance = (distance_vec - projection_to_normal).norm();
-        } else {
-          distance = distance_vec.norm();
-        }
-      } else {
-        distance = min_distance[i];
-      }
+      float distance = min_distance[i];
 
       if(params.phase_weights_max > -0.0001) {
         const float source_phase = source_cloud[source_index].phase;
         const float target_phase = target_cloud[target_index].phase;
         const float phase_dist = MAX(1.0 - getPhaseWeight(source_phase, target_phase), 0.0);
-
         distance *= phase_dist;
       }
 
@@ -305,20 +299,7 @@ void CollarLinesRegistration::findClosestMatchesByMiddles() {
     cerr << "Matches found: " << matches.size() << endl;
   }
 
-  float effective_threshold;
-  if(params.distance_threshold == MEAN_THRESHOLD) {
-    effective_threshold = getMatchesMean();
-  } else if(params.distance_threshold == VALUE_THRESHOLD) {
-    assert(!isnan(params.distance_threshold_value));
-    if(isnan(params.distance_threshold_value)) {
-      cerr << "Warning: distance_threshold_value was not set!" << endl;
-    }
-    effective_threshold = params.distance_threshold_value;
-  } else if (params.distance_threshold == NO_THRESHOLD) {
-    effective_threshold = INFINITY;
-  } else {
-    effective_threshold = getMatchesPortion(thresholdTypeToFraction()*getEffectiveDecay());
-  }
+  float effective_threshold = getEffectiveThreshold();
   filterMatchesByThreshold(effective_threshold);
 
   if(params.verbose) {
@@ -362,7 +343,7 @@ float CollarLinesRegistration::getEffectiveDecay(void) const {
   return pow(params.distance_threshold_decay, refinements_done);
 }
 
-float CollarLinesRegistration::getMatchesPortion(float ratio) {
+float CollarLinesRegistration::getMatchesPortion(float ratio) const {
   vector<float> acc(matches.size());
   for(int i = 0; i < matches.size(); i++) {
     acc[i] = matches[i].distance;
@@ -371,9 +352,9 @@ float CollarLinesRegistration::getMatchesPortion(float ratio) {
   return acc[acc.size()*ratio];
 }
 
-float CollarLinesRegistration::getMatchesMean() {
+float CollarLinesRegistration::getMatchesMean(void) const {
   float sum = 0;
-  for(vector<DMatch>::iterator m = matches.begin(); m < matches.end(); m++) {
+  for(vector<DMatch>::const_iterator m = matches.begin(); m < matches.end(); m++) {
     sum += m->distance;
   }
   return sum / matches.size();

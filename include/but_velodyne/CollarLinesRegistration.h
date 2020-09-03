@@ -157,7 +157,6 @@ public:
         int nearestNeighbors_ = 1,
         bool estimate_translation_only_ = false,
         bool dont_estimate_roll_pitch_ = false,
-        bool rejection_by_line_distances_ = false,
         bool separate_sensors_ = false,
         float phase_weights_max_ = -1.0,
         float phase_weights_power_ = 4.0,
@@ -172,7 +171,6 @@ public:
         nearestNeighbors(nearestNeighbors_),
         estimate_translation_only(estimate_translation_only_),
         dont_estimate_roll_pitch(dont_estimate_roll_pitch_),
-        rejection_by_line_distances(rejection_by_line_distances_),
         separate_sensors(separate_sensors_),
         phase_weights_max(phase_weights_max_),
         phase_weights_power(phase_weights_power_),
@@ -188,7 +186,6 @@ public:
     int nearestNeighbors;
     bool estimate_translation_only;
     bool dont_estimate_roll_pitch;
-    bool rejection_by_line_distances;
     bool separate_sensors;
     float phase_weights_max;
     float phase_weights_power;
@@ -286,7 +283,7 @@ public:
   /**!
    * @return error (average distance of matching lines) of the last iteration
    */
-  float computeError();
+  float computeError(void);
 
   const void getLastMatches(std::vector<CLSMatch> &out_matches) const;
 
@@ -305,7 +302,9 @@ public:
 
 protected:
 
-  void findClosestMatchesByMiddles();
+  float getEffectiveThreshold(void) const;
+
+  void findClosestMatchesByMiddles(void);
 
   void getCorrespondingPoints(MatrixOfPoints &source_coresp_points,
                               MatrixOfPoints &target_coresp_points);
@@ -330,8 +329,8 @@ protected:
 
   float getEffectiveDecay(void) const;
 
-  float getMatchesPortion(float ratio);
-  float getMatchesMean();
+  float getMatchesPortion(float ratio) const;
+  float getMatchesMean(void) const;
 
   void fillKdtreesBySensors(void);
 
@@ -351,7 +350,8 @@ private:
   std::vector<CLSMatch> last_point_matches;
 
   FRIEND_TEST(CollarLinesRegistration, getWeightingMatrixTest);
-  FRIEND_TEST(CollarLinesRegistration, computeError);
+  FRIEND_TEST(CollarLinesRegistration, computeErrorTest);
+  FRIEND_TEST(CollarLinesRegistration, findClosestMatchesByMiddlesTest);
 };
 
 } /* namespace but_velodyne */

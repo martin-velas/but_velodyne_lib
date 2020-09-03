@@ -34,7 +34,7 @@ TEST(CollarLinesRegistration, getWeightingMatrixTest) {
   ASSERT_FLOAT_EQ(weights_matrix.diagonal()(2), 3.0 / 6.0);
 }
 
-TEST(CollarLinesRegistration, computeError) {
+TEST(CollarLinesRegistration, computeErrorTest) {
   CollarLinesRegistrationPtr reg = getDummyClsReg();
 
   reg->matches.resize(2);
@@ -54,6 +54,43 @@ TEST(CollarLinesRegistration, computeError) {
   trg_points << -1, 2, 3, 4, 5, 7;
   avg_error = reg->computeError(src_points, trg_points, Eigen::Matrix4f::Identity());
   ASSERT_FLOAT_EQ(3.0 / 2, avg_error);  // total error is 3 for 2 points
+}
+
+TEST(CollarLinesRegistration, findClosestMatchesByMiddlesTest) {
+  CollarLinesRegistration::Parameters params;
+
+  LineCloud src_lines, trg_lines;
+  src_lines.push_back(PointCloudLine(Eigen::Vector3f(0.0, 0, 0), Eigen::Vector3f(1.01, 0, 0)), 0, Eigen::Vector3f::UnitX(), 0.0);
+  src_lines.push_back(PointCloudLine(Eigen::Vector3f(1.0, 0, 0), Eigen::Vector3f(0.92, 0, 0)), 0, Eigen::Vector3f::UnitX(), 0.9);
+  trg_lines.push_back(PointCloudLine(Eigen::Vector3f(1.11, 0, 0), Eigen::Vector3f(0.91, 0, 0)), 0, Eigen::Vector3f::UnitX(), 0.9);
+  trg_lines.push_back(PointCloudLine(Eigen::Vector3f(0.10, 0, 0), Eigen::Vector3f(1.00, 0, 0)), 0, Eigen::Vector3f::UnitX(), 0.0);
+
+  // expected matches:
+  // trg[1] -> src[0] (best wo weights)
+  // trg[0] -> src[1] (best wi phase weights)
+
+  params.distance_threshold = CollarLinesRegistration::MEDIAN_THRESHOLD;
+  CollarLinesRegistration registration_median(src_lines, trg_lines, params);
+  registration_median.findClosestMatchesByMiddles();
+  ASSERT_EQ(1, registration_median.matches.size());
+  ASSERT_EQ(1, registration_median.matches[0].queryIdx);
+  ASSERT_EQ(0, registration_median.matches[0].trainIdx);
+
+  registration_median.params.phase_weights_max = 1.0;
+  registration_median.params.phase_weights_power = 4.0;
+  registration_median.findClosestMatchesByMiddles();
+  ASSERT_EQ(1, registration_median.matches.size());
+  ASSERT_EQ(0, registration_median.matches[0].queryIdx);
+  ASSERT_EQ(1, registration_median.matches[0].trainIdx);
+
+  params.distance_threshold = CollarLinesRegistration::NO_THRESHOLD;
+  CollarLinesRegistration registration_all(src_lines, trg_lines, params);
+  registration_all.findClosestMatchesByMiddles();
+  ASSERT_EQ(2, registration_all.matches.size());
+  ASSERT_EQ(0, registration_all.matches[0].queryIdx);
+  ASSERT_EQ(1, registration_all.matches[0].trainIdx);
+  ASSERT_EQ(1, registration_all.matches[1].queryIdx);
+  ASSERT_EQ(0, registration_all.matches[1].trainIdx);
 }
 
 };
