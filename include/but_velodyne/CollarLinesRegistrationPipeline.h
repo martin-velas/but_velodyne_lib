@@ -125,7 +125,7 @@ public:
   }
 
   bool operator<(const RegistrationOutcome &other) const {
-    if(!isnan(this->validation_error) && !isnan(other.validation_error))
+    if(isfinite(this->validation_error) && isfinite(other.validation_error))
       return this->validation_error < other.validation_error;
     else
       return this->error < other.error;

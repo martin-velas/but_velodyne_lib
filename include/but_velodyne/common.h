@@ -103,6 +103,16 @@ float distance_pts(const PointT &p1, const PointT &p2) {
 
 bool endsWith(const std::string &fullString, const std::string &ending);
 
+template <typename T>
+std::ostream& operator<<(std::ostream &stream, const std::vector<T> &items) {
+  stream << "[ ";
+  for(typename std::vector<T>::const_iterator i = items.begin(); i < items.end(); i++) {
+    stream << *i << ", ";
+  }
+  stream << "]" << std::endl;
+  return stream;
+}
+
 }
 
 #endif /* COMMON_H_ */
