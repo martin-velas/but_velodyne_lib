@@ -119,7 +119,6 @@ public:
    */
   enum Weights {
     RANGE_WEIGHTS,           // matches of close lines are more significant
-    VERTICAL_ANGLE_WEIGHTS,     // matches of vertical lines are more significant
     NO_WEIGHTS                  // all line matches are equal
   };
 
@@ -316,11 +315,6 @@ protected:
                      const Eigen::Matrix4f &transformation) const;
 
   void filterMatchesByThreshold(const float threshold);
-
-  float getVerticalWeight(const Eigen::Vector3f &source_line_orient,
-                          const Eigen::Vector3f &target_line_orient);
-
-  float sinOfAngleWithGround(const Eigen::Vector3f &orientation);
 
   float thresholdTypeToFraction(void) const;
 

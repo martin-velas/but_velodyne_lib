@@ -56,8 +56,6 @@ std::istream& operator>> (std::istream &in, CollarLinesRegistration::Weights &we
   boost::to_upper(token);
   if (token == "RANGE_WEIGHTS") {
     weightning = CollarLinesRegistration::RANGE_WEIGHTS;
-  } else if (token == "VERTICAL_ANGLE_WEIGHTS") {
-    weightning = CollarLinesRegistration::VERTICAL_ANGLE_WEIGHTS;
   } else if (token == "NO_WEIGHTS") {
     weightning = CollarLinesRegistration::NO_WEIGHTS;
   } else {
@@ -400,9 +398,7 @@ void CollarLinesRegistration::getCorrespondingPoints(
                                           source_q, target_q));
 
     float weight;
-    if(params.weighting == VERTICAL_ANGLE_WEIGHTS) {
-      weight = getVerticalWeight(source_line.orientation, target_line.orientation);
-    } else if(params.weighting == RANGE_WEIGHTS) {
+    if(params.weighting == RANGE_WEIGHTS) {
       weight = MAX(source_cloud[match->trainIdx].range, target_cloud[match->queryIdx].range);
     } else if(params.phase_weights_max > -0.0001) {
       const float source_phase = source_cloud[match->trainIdx].phase;
@@ -447,17 +443,6 @@ void CollarLinesRegistration::getCorrespondingPoints(
   if(params.visualize_cls_weights || params.visualize_cls_correspondences) {
     Visualizer3D::getCommonVisualizer()->show();
   }
-}
-
-float CollarLinesRegistration::getVerticalWeight(const Vector3f &source_line_orient,
-                                                   const Vector3f &target_line_orient) {
-  static const float min_weight = 0.01;
-  return (sinOfAngleWithGround(source_line_orient) *
-      sinOfAngleWithGround(target_line_orient)) + min_weight;
-}
-
-float CollarLinesRegistration::sinOfAngleWithGround(const Vector3f &orientation) {
-  return orientation.y() / orientation.norm();
 }
 
 void CollarLinesRegistration::getWeightingMatrix(WeightsMatrix &weighting_matrix) const {
