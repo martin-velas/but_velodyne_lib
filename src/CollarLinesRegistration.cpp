@@ -107,8 +107,6 @@ void CollarLinesRegistration::Parameters::prepareForLoading(po::options_descript
           "Value of mathing lines threshold in case of VALUE_THRESHOLD or PORTION_VALUE_THRESHOLD option is used")
       ("matching_threshold_decay", po::value<float>(&this->distance_threshold_decay)->default_value(this->distance_threshold_decay),
           "How the amount of matching lines is decaying after each iteration (portion*=decay).")
-      ("normalize_error_by_threshold", po::bool_switch(&this->normalize_error_by_threshold),
-          "Normalize error by the portion of lines taken for registration. Median threshold will cause error/=0.5.")
       ("line_weightning", po::value<CollarLinesRegistration::Weights>(&this->weighting)->default_value(this->weighting),
           "How the weights are assigned to the line matches - prefer vertical lines, close or treat matches as equal. Possible values: RANGE_WEIGHTS|VERTICAL_ANGLE_WEIGHTS|NO_WEIGHTS")
       ("translation_only", po::bool_switch(&this->estimate_translation_only),
@@ -190,10 +188,6 @@ float CollarLinesRegistration::computeError (
   VectorXf distances_weighted = weights * distances;
 
   float error = distances_weighted.sum();
-
-  if(params.normalize_error_by_threshold) {
-    error /= thresholdTypeToFraction()*getEffectiveDecay();
-  }
   return error;
 }
 

@@ -152,7 +152,6 @@ public:
         Threshold distance_threshold_ = MEDIAN_THRESHOLD,
         float distance_threshold_decay_ = 1.0f,
         float distance_threshold_value_ = NAN,
-        bool normalize_error_by_threshold_ = false,
         Weights weighting_ = NO_WEIGHTS,
         int nearestNeighbors_ = 1,
         bool estimate_translation_only_ = false,
@@ -166,7 +165,6 @@ public:
         distance_threshold(distance_threshold_),
         distance_threshold_decay(distance_threshold_decay_),
         distance_threshold_value(distance_threshold_value_),
-        normalize_error_by_threshold(normalize_error_by_threshold_),
         weighting(weighting_),
         nearestNeighbors(nearestNeighbors_),
         estimate_translation_only(estimate_translation_only_),
@@ -181,7 +179,6 @@ public:
     Threshold distance_threshold;       /// how is the threshold of line matches distance estimated
     float distance_threshold_decay;
     float distance_threshold_value;
-    bool normalize_error_by_threshold;
     Weights weighting;                  /// optional weighting of line matches
     int nearestNeighbors;
     bool estimate_translation_only;
@@ -330,6 +327,7 @@ protected:
   float getEffectiveDecay(void) const;
 
   float getMatchesPortion(float ratio) const;
+
   float getMatchesMean(void) const;
 
   void fillKdtreesBySensors(void);
