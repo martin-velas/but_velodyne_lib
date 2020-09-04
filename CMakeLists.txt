@@ -75,6 +75,9 @@ target_link_libraries(tests/RegistrationCrossValidation-test ${GTEST_LIBRARIES} 
 add_executable(tests/CollarLinesRegistration-test src/tests/CollarLinesRegistration-test.cpp)
 target_link_libraries(tests/CollarLinesRegistration-test ${GTEST_LIBRARIES} pthread but_velodyne)
 
+add_executable(tests/testsuite src/tests/testsuite.cpp)
+target_link_libraries(tests/testsuite ${GTEST_LIBRARIES} pthread but_velodyne)
+
 ########################### Odometry estimation: #############################w
 
 add_executable(collar-lines-odom src/apps/collar-lines-odom.cpp)

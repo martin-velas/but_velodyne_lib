@@ -181,9 +181,13 @@ TEST(CollarLinesRegistration, getEffectiveThresholdTest) {
   ASSERT_FLOAT_EQ(0.99, reg->thresholdTypeToFraction());
 }
 
-};
+}
+
+#ifndef TESTSUITE
 
 int main(int argc, char **argv) {
     testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }
+
+#endif
