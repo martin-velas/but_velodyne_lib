@@ -261,7 +261,7 @@ float CollarLinesRegistration::getEffectiveThreshold(void) const {
   } else if (params.distance_threshold == NO_THRESHOLD) {
     return INFINITY;
   } else {
-    return getMatchesPortion(thresholdTypeToFraction()*getEffectiveDecay());
+    return getMatchesDistanceThreshold(thresholdTypeToFraction()*getEffectiveDecay());
   }
 }
 
@@ -337,7 +337,7 @@ float CollarLinesRegistration::getEffectiveDecay(void) const {
   return pow(params.distance_threshold_decay, refinements_done);
 }
 
-float CollarLinesRegistration::getMatchesPortion(float ratio) const {
+float CollarLinesRegistration::getMatchesDistanceThreshold(float ratio) const {
   vector<float> acc(matches.size());
   for(int i = 0; i < matches.size(); i++) {
     acc[i] = matches[i].distance;
@@ -354,19 +354,19 @@ float CollarLinesRegistration::getMatchesMean(void) const {
   return sum / matches.size();
 }
 
-  float CollarLinesRegistration::getPhaseWeight(const float phase) const {
-    return pow(1.0 - fabs(phase - params.phase_weights_max), params.phase_weights_power);
-  }
+float CollarLinesRegistration::getPhaseWeight(const float phase) const {
+  return pow(1.0 - fabs(phase - params.phase_weights_max), params.phase_weights_power);
+}
 
-  float CollarLinesRegistration::getPhaseWeight(const float source_phase, const float target_phase) const {
-    if(isnan(source_phase) || isnan(target_phase)) {
-      return 0.0;
-    } else {
-      return MAX(getPhaseWeight(source_phase), getPhaseWeight(target_phase));
-    }
+float CollarLinesRegistration::getPhaseWeight(const float source_phase, const float target_phase) const {
+  if(isnan(source_phase) || isnan(target_phase)) {
+    return 0.0;
+  } else {
+    return MAX(getPhaseWeight(source_phase), getPhaseWeight(target_phase));
   }
+}
 
-  void CollarLinesRegistration::getCorrespondingPoints(
+void CollarLinesRegistration::getCorrespondingPoints(
     MatrixOfPoints &source_coresp_points,
     MatrixOfPoints &target_coresp_points) {
 
