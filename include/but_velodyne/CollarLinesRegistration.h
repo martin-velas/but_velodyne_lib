@@ -347,6 +347,7 @@ private:
   FRIEND_TEST(CollarLinesRegistration, getMatchesTest);
   FRIEND_TEST(CollarLinesRegistration, refineTest);
   FRIEND_TEST(CollarLinesRegistration, getEffectiveThresholdTest);
+  FRIEND_TEST(CollarLinesRegistration, getPhaseWeightTest);
 };
 
 } /* namespace but_velodyne */

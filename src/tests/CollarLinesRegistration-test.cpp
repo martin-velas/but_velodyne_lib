@@ -181,6 +181,21 @@ TEST(CollarLinesRegistration, getEffectiveThresholdTest) {
   ASSERT_FLOAT_EQ(0.99, reg->thresholdTypeToFraction());
 }
 
+TEST(CollarLinesRegistration, getPhaseWeightTest) {
+  CollarLinesRegistrationPtr reg = getDummyClsReg();
+
+  reg->params.phase_weights_max = 1.0;
+  reg->params.phase_weights_power = 2.0;
+  ASSERT_FLOAT_EQ(1.0, reg->getPhaseWeight(1.0));
+  ASSERT_FLOAT_EQ(0.0, reg->getPhaseWeight(0.0));
+  ASSERT_FLOAT_EQ(0.25, reg->getPhaseWeight(0.5));
+  ASSERT_FLOAT_EQ(1.0, reg->getPhaseWeight(0.5, 1.0));
+
+  reg->params.phase_weights_max = 0.5;
+  reg->params.phase_weights_power = 3.0;
+  ASSERT_FLOAT_EQ(reg->getPhaseWeight(1.0), reg->getPhaseWeight(0.0));
+}
+
 }
 
 #ifndef TESTSUITE
