@@ -538,37 +538,6 @@ Eigen::Matrix4f CollarLinesRegistration::computeTransformationWeighted(
   return transformation;
 }
 
-void CollarLinesRegistration::showLinesCorrenspondences() {
-  vector<DMatch> matches_in_plane;
-  float min_distance = INFINITY;
-  float max_distance = -1;
-  for(vector<DMatch>::iterator m = matches.begin(); m < matches.end(); m++) {
-    PointCloudLine source_line = source_cloud[m->trainIdx].line;
-    PointCloudLine target_line = target_cloud[m->queryIdx].line;
-    float distance = source_line.distanceTo(target_line, PointCloudLine::OF_CLOSEST_POINTS);
-    matches_in_plane.push_back(DMatch(m->queryIdx, m->trainIdx, distance));
-    min_distance = MIN(min_distance, distance);
-    max_distance = MAX(max_distance, distance);
-  }
-
-  Visualizer3D visualizer;
-  for(vector<DMatch>::iterator m = matches_in_plane.begin(); m < matches_in_plane.end(); m++) {
-    PointCloudLine source_line = source_cloud[m->trainIdx].line;
-    PointCloudLine target_line = target_cloud[m->queryIdx].line;
-    float distance = (m->distance-min_distance)/(max_distance-min_distance);    // [0;1]
-    visualizer.addLine(source_line, distance, 0.0, 0.0);
-    visualizer.addLine(target_line, 0.0, distance, 0.0);
-  }
-
-  for(vector<DMatch>::iterator m = rejected_matches.begin(); m < rejected_matches.end(); m++) {
-    PointCloudLine source_line = source_cloud[m->trainIdx].line;
-    PointCloudLine target_line = target_cloud[m->queryIdx].line;
-    visualizer.addLine(source_line, 1.0, 1.0, 1.0);
-    visualizer.addLine(target_line, 1.0, 1.0, 1.0);
-  }
-  visualizer.show();
-}
-
 const Eigen::Matrix4f CollarLinesRegistration::getTransformation(void) const {
   return transformation*initial_transformation;
 }

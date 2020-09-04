@@ -272,11 +272,6 @@ public:
   }
 
   /**!
-   * Visualize line correspondences found in last iteration
-   */
-  void showLinesCorrenspondences();
-
-  /**!
    * @return error (average distance of matching lines) of the last iteration
    */
   float computeError(void);
