@@ -1,6 +1,4 @@
 /*
- * Visualization of KITTI poses file.
- *
  * Copyright (C) Brno University of Technology (BUT)
  *
  * This file is part of software developed by Robo@FIT group.
@@ -24,25 +22,15 @@
  */
 
 #include <cstdlib>
-#include <cstdio>
 
 #include <boost/program_options.hpp>
 
 #include <but_velodyne/VelodynePointCloud.h>
 #include <but_velodyne/VelodyneMultiFrameSequence.h>
-#include <but_velodyne/Visualizer3D.h>
-#include <but_velodyne/KittiUtils.h>
-#include <but_velodyne/PolarGridOfClouds.h>
-#include <but_velodyne/LineCloud.h>
-#include <but_velodyne/CollarLinesRegistration.h>
-#include <but_velodyne/CollarLinesRegistrationPipeline.h>
-#include <but_velodyne/Termination.h>
+#include <but_velodyne/InterpolationSE3.h>
 
 #include <pcl/common/eigen.h>
 #include <pcl/common/transforms.h>
-#include <pcl/filters/voxel_grid.h>
-#include <pcl/filters/passthrough.h>
-#include <pcl/registration/transformation_estimation_svd.h>
 
 using namespace std;
 using namespace pcl;
@@ -121,18 +109,6 @@ void getSlices(const VelodynePointCloud &in_cloud, SliceMap &slices) {
   }
 }
 
-// returns t1*(alpha) + t2*(1-alpha)
-Eigen::Affine3f interpolate_poses(const Eigen::Affine3f &T1, const Eigen::Affine3f &T2, const float alpha) {
-  Eigen::Quaternionf R1(T1.rotation());
-  Eigen::Quaternionf R2(T2.rotation());
-  Eigen::Quaternionf R_result = R1.slerp(alpha, R2);
-  return Eigen::Affine3f(R_result);
-
-  //Eigen::Translation3f t_result(T1.translation() * alpha + T2.translation() * alpha);
-
-  //return t_result * R_result;
-}
-
 Eigen::Affine3f get_interpolated_pose(const vector<Eigen::Affine3f> &poses,
     const vector<float> &timestamps, const float time) {
   if(time < timestamps.front() || time > timestamps.back()) {
@@ -150,9 +126,7 @@ Eigen::Affine3f get_interpolated_pose(const vector<Eigen::Affine3f> &poses,
     }
   }
   float alpha = (time - timestamps[before]) / (timestamps[after] - timestamps[before]);
-  //cerr << "current: " << time << ", before: " << timestamps[before] << ", after: " << timestamps[after] << endl;
-  //cerr << "alpha: " << alpha << endl;
-  return interpolate_poses(poses[before], poses[after], alpha);
+  return LinearInterpolationSE3(poses[before], poses[after]).estimate(alpha);
 }
 
 void fix_cloud(const VelodynePointCloud &in_cloud,
@@ -161,13 +135,12 @@ void fix_cloud(const VelodynePointCloud &in_cloud,
     const vector<Eigen::Affine3f> &poses,
     const vector<float> &timestamps,
     VelodynePointCloud &out_cloud) {
-  //cerr << "Frame start: " << start << ", end: " << end << endl;
-
   SliceMap slices;
   getSlices(in_cloud, slices);
 
-  // static Visualizer3D vis;
-  // vis.keepOnlyClouds(0);
+  const Eigen::Affine3f start_pose = get_interpolated_pose(poses, timestamps, start);
+  cout << start_pose << endl;
+  const Eigen::Affine3f start_pose_inv = start_pose.inverse();
 
   const Eigen::Affine3f sensor_pose_inv = sensor_pose.inverse();
   for(SliceMap::iterator s = slices.begin(); s != slices.end(); s++) {
@@ -176,19 +149,13 @@ void fix_cloud(const VelodynePointCloud &in_cloud,
     }
     const float phase = s->second.front().phase;
     const float time = start + (end-start) * phase;
-    //cerr << "time: " << time << ", for phase: " << phase << endl;
-    Eigen::Affine3f interpolated_pose = get_interpolated_pose(poses, timestamps, time);
-    //cerr << "pose (raw): " << interpolated_pose << endl;
-    interpolated_pose = sensor_pose_inv * interpolated_pose * sensor_pose;
-    //cerr << "pose (cal): " << interpolated_pose << endl;
+    const Eigen::Affine3f interpolated_pose = get_interpolated_pose(poses, timestamps, time);
 
-    transformPointCloud(s->second, s->second, interpolated_pose);
+    const Eigen::Affine3f fix_pose = sensor_pose_inv * start_pose_inv * interpolated_pose * sensor_pose;
+
+    transformPointCloud(s->second, s->second, fix_pose);
     out_cloud += s->second;
-
-    // vis.setColor(255.0*phase, 0, 0).addPointCloud(s->second);
   }
-
-  // vis.show();
 }
 
 int main(int argc, char** argv) {
