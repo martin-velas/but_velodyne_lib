@@ -196,6 +196,123 @@ TEST(CollarLinesRegistration, getPhaseWeightTest) {
   ASSERT_FLOAT_EQ(reg->getPhaseWeight(1.0), reg->getPhaseWeight(0.0));
 }
 
+TEST(CollarLinesRegistration, getCorrespondingPoints) {
+  LineCloud src_lines, trg_lines;
+  src_lines.push_back(PointCloudLine(Eigen::Vector3f(1, 2, 3), Eigen::Vector3f(4, 5, 6)), 0, Eigen::Vector3f::UnitX(),
+                      0.0);
+  src_lines.push_back(PointCloudLine(Eigen::Vector3f(0, 0, 0), Eigen::Vector3f(1, 1, 0)), 0, Eigen::Vector3f::UnitX(),
+                      0.0);
+
+  trg_lines.push_back(PointCloudLine(Eigen::Vector3f(0, 1, 1), Eigen::Vector3f(1, -1, 0)), 0, Eigen::Vector3f::UnitX(),
+                      0.9);
+  trg_lines.push_back(PointCloudLine(Eigen::Vector3f(3, 2, 1), Eigen::Vector3f(6, 5, 4)), 0, Eigen::Vector3f::UnitX(),
+                      0.0);
+
+  CollarLinesRegistration::Parameters params;
+  CollarLinesRegistration registration(src_lines, trg_lines, params);
+
+  registration.matches.push_back(cv::DMatch(0, 1, 0.01));
+
+  CollarLinesRegistration::MatrixOfPoints src_pts(3, 1);
+  CollarLinesRegistration::MatrixOfPoints trg_pts(3, 1);
+  registration.getCorrespondingPoints(src_pts, trg_pts);
+
+  // expected matching points [0.5, 0.5, 0.0] -> [0.5, 0.5, 1.0]
+
+  ASSERT_FLOAT_EQ(0.5, src_pts(0, 0));
+  ASSERT_FLOAT_EQ(0.5, src_pts(1, 0));
+  ASSERT_FLOAT_EQ(0.0, src_pts(2, 0));
+  ASSERT_FLOAT_EQ(0.5, trg_pts(0, 0));
+  ASSERT_FLOAT_EQ(0.5, trg_pts(1, 0));
+  ASSERT_FLOAT_EQ(1.0, trg_pts(2, 0));
+}
+
+TEST(CollarLinesRegistration, computeTransformationTest) {
+
+  CollarLinesRegistrationPtr reg = getDummyClsReg();
+  reg->matches.resize(3);
+
+  CollarLinesRegistration::MatrixOfPoints src_pts(3, 3);
+  src_pts << 1.1, 0.1, 0.1,
+          0.2, 1.2, 0.2,
+          0.0, 0.0, 1.0;
+
+  CollarLinesRegistration::MatrixOfPoints trg_pts_translated(3, 3);
+  trg_pts_translated << 1.1, 0.1, 0.1,
+          0.2, 1.2, 0.2,
+          8.0, 8.0, 9.0;
+
+  Eigen::Affine3f T_found;
+  float tx_found, ty_found, tz_found, rx_found, ry_found, rz_found;
+
+  T_found = Eigen::Affine3f(reg->computeTransformationWeighted(src_pts, trg_pts_translated));
+  pcl::getTranslationAndEulerAngles(T_found, tx_found, ty_found, tz_found, rx_found, ry_found, rz_found);
+  ASSERT_NEAR(0, tx_found, 0.01);
+  ASSERT_NEAR(0, ty_found, 0.01);
+  ASSERT_NEAR(-8, tz_found, 0.01);
+  ASSERT_NEAR(0, rx_found, 0.01);
+  ASSERT_NEAR(0, ry_found, 0.01);
+  ASSERT_NEAR(0, rz_found, 0.01);
+
+  CollarLinesRegistration::MatrixOfPoints trg_pts_rotated(3, 3);
+  trg_pts_rotated << 1.1, 0.1, 0.1,
+          -0.2, -1.2, -0.2,
+          -0.0, -0.0, -1.0;
+
+  T_found = Eigen::Affine3f(reg->computeTransformationWeighted(src_pts, trg_pts_rotated));
+  pcl::getTranslationAndEulerAngles(T_found, tx_found, ty_found, tz_found, rx_found, ry_found, rz_found);
+  ASSERT_NEAR(0, tx_found, 0.01);
+  ASSERT_NEAR(0, ty_found, 0.01);
+  ASSERT_NEAR(0, tz_found, 0.01);
+  ASSERT_NEAR(M_PI, rx_found, 0.01);
+  ASSERT_NEAR(0, ry_found, 0.01);
+  ASSERT_NEAR(0, rz_found, 0.01);
+
+  CollarLinesRegistration::MatrixOfPoints trg_pts_translated_weights(3, 3);
+  trg_pts_translated << 1.1, 0.1, 0.1,
+          0.2, 1.2, 0.2,
+          8.0, 8.0, -8.0;
+  reg->correspondences_weights = Eigen::Vector3f::Ones();
+  reg->correspondences_weights << 10000, 10000, 0.0001;
+
+  T_found = Eigen::Affine3f(reg->computeTransformationWeighted(src_pts, trg_pts_translated));
+  pcl::getTranslationAndEulerAngles(T_found, tx_found, ty_found, tz_found, rx_found, ry_found, rz_found);
+  ASSERT_NEAR(0, tx_found, 0.01);
+  ASSERT_NEAR(0, ty_found, 0.01);
+  ASSERT_NEAR(-8, tz_found, 0.01);
+  ASSERT_NEAR(0, rx_found, 0.01);
+  ASSERT_NEAR(0, ry_found, 0.01);
+  ASSERT_NEAR(0, rz_found, 0.01);
+
+  CollarLinesRegistration::MatrixOfPoints src_pts_weighted(3, 4);
+  src_pts_weighted << 1.1, 0.1, 0.1, 1.0,
+          0.2, 1.2, 0.2, 1.0,
+          0.0, 0.0, 1.0, 1.0;
+
+  CollarLinesRegistration::MatrixOfPoints trg_pts_rotated_weighted(3, 4);
+  trg_pts_rotated_weighted << 1.1, 0.1, 0.1, 1.0,
+          -0.2, -1.2, -0.2, +1.0,
+          -0.0, -0.0, -1.0, -1.0;
+
+  reg->matches.resize(4);
+  reg->correspondences_weights = Eigen::Vector4f::Ones();
+  reg->correspondences_weights << 10000, 10000, 10000, 0.0001;
+
+  T_found = Eigen::Affine3f(reg->computeTransformationWeighted(src_pts_weighted, trg_pts_rotated_weighted));
+  pcl::getTranslationAndEulerAngles(T_found, tx_found, ty_found, tz_found, rx_found, ry_found, rz_found);
+  ASSERT_NEAR(0, tx_found, 0.01);
+  ASSERT_NEAR(0, ty_found, 0.01);
+  ASSERT_NEAR(0, tz_found, 0.01);
+  ASSERT_NEAR(M_PI, rx_found, 0.01);
+  ASSERT_NEAR(0, ry_found, 0.01);
+  ASSERT_NEAR(0, rz_found, 0.01);
+
+  reg->correspondences_weights << 10000, 10000, 10000, 10000;
+  T_found = Eigen::Affine3f(reg->computeTransformationWeighted(src_pts_weighted, trg_pts_rotated_weighted));
+  pcl::getTranslationAndEulerAngles(T_found, tx_found, ty_found, tz_found, rx_found, ry_found, rz_found);
+  ASSERT_TRUE(fabs(M_PI - rx_found) > 0.01);
+}
+
 }
 
 #ifndef TESTSUITE
