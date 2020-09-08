@@ -29,13 +29,10 @@
 #include <but_velodyne/VelodynePointCloud.h>
 #include <but_velodyne/Visualizer3D.h>
 #include <but_velodyne/KittiUtils.h>
-#include <but_velodyne/PolarGridOfClouds.h>
-#include <but_velodyne/LineCloud.h>
 
 #include <pcl/common/eigen.h>
 #include <pcl/common/transforms.h>
 #include <pcl/filters/voxel_grid.h>
-#include <pcl/filters/passthrough.h>
 #include <boost/circular_buffer.hpp>
 
 using namespace std;

@@ -23,12 +23,10 @@
 
 #include <vector>
 
-#include <cv.h>
 #include <opencv2/flann.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 
-#include <but_velodyne/VelodynePointCloud.h>
 #include <but_velodyne/KeypointsCorrespondenceProjector.h>
 #include <but_velodyne/Correspondence.h>
 #include <but_velodyne/Stopwatch.h>

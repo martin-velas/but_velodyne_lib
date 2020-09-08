@@ -22,7 +22,7 @@
  */
 
 #include <but_velodyne/AdaptiveIntensitiesNormalization.h>
-#include <but_velodyne/GlobalOptimization.h>
+#include <but_velodyne/Origin.h>
 
 using namespace std;
 using namespace pcl;

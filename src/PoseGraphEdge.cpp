@@ -23,8 +23,6 @@
 
 #include <iostream>
 
-#include <cv.h>
-#include <pcl/common/common.h>
 #include <pcl/common/eigen.h>
 #include <cxeigen.hpp>
 

@@ -22,7 +22,6 @@
  */
 
 #include <algorithm>
-#include <boost/algorithm/string.hpp>
 #include <boost/program_options/errors.hpp>
 #include <boost/format.hpp>
 

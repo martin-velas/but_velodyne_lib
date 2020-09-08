@@ -119,10 +119,6 @@ Visualizer3D& Visualizer3D::addLine(const PointCloudLine &line,
                                     float r, float g, float b) {
   viewer->addLine(line.getBeginPoint(), line.getEndPoint(),
                   r, g, b, getId("line"));
-  PointXYZ text_pos(line.getBeginPoint().x, line.getBeginPoint().y - 0.2, line.getBeginPoint().z);
-  /*stringstream ss;
-  ss << line.horizontalRangeDiff();
-  viewer->addText3D(ss.str(), text_pos, 0.1, 1.0, 0.0, 1.0, getId("text"));*/
   return *this;
 }
 

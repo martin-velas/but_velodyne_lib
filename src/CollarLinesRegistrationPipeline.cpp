@@ -184,7 +184,6 @@ vector<Eigen::Matrix4f> CollarLinesRegistrationPipeline::runRegistrationEffectiv
   Eigen::Matrix4f transformation = getPrediction();
   vector<Eigen::Matrix4f> results;
   for(int i = 0; i < history.size(); i++) {
-    int current_iterations;
     RegistrationOutcome result;
     registerTwoGrids(*(history[i].getGridCloud()), *target_grid_cloud,
                                       transformation, result);

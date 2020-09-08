@@ -28,22 +28,15 @@
  */
 
 #include <cstdlib>
-#include <cstdio>
-#include <libgen.h>
 
 #include <boost/program_options.hpp>
-#include <boost/circular_buffer.hpp>
 
 #include <cv.h>
 #include <pcl/common/eigen.h>
-#include <pcl/common/transforms.h>
-#include <pcl/io/pcd_io.h>
 
 #include <but_velodyne/VelodynePointCloud.h>
 #include <but_velodyne/VelodyneMultiFrameSequence.h>
-#include <but_velodyne/EigenUtils.h>
 #include <but_velodyne/KittiUtils.h>
-#include <but_velodyne/PoseGraphEdge.h>
 #include <but_velodyne/CollarLinesRegistrationPipeline.h>
 #include <but_velodyne/SubseqRegistration.h>
 

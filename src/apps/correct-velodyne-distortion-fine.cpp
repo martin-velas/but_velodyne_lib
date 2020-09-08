@@ -170,7 +170,6 @@ int main(int argc, char** argv) {
     return EXIT_FAILURE;
   }
 
-  int output_count = MIN(clouds_to_process.size(), poses.size()) - 1;
   VelodyneFileSequence file_sequence(clouds_to_process, calibration);
   for(int frame_i = 0;
       file_sequence.hasNext() && frame_i+1 < poses.size() && frame_i+1 < frame_borders.size();

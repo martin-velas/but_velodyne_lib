@@ -101,13 +101,6 @@ public:
       bool redistribute = false);
 
   /**!
-   * Visualization of the grouping into the polar bins - same bin = same color.
-   */
-  void showColored();
-
-  PolarGridOfClouds::Ptr summarize() const;
-
-  /**!
    * @param cellId identifier of the cell
    * @returns the points of the specific polar grid
    */

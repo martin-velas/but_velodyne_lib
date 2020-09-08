@@ -22,14 +22,11 @@
  */
 
 #include <cstdlib>
-#include <cstdio>
 
 #include <but_velodyne/Visualizer3D.h>
 #include <but_velodyne/KittiUtils.h>
-#include <but_velodyne/InterpolationSE3.h>
 
 #include <pcl/common/eigen.h>
-#include <pcl/common/transforms.h>
 
 #include <boost/program_options.hpp>
 

@@ -24,20 +24,15 @@
  */
 
 #include <cstdlib>
-#include <cstdio>
 
 #include <boost/program_options.hpp>
 
 #include <but_velodyne/VelodynePointCloud.h>
-#include <but_velodyne/VelodyneMultiFrameSequence.h>
 #include <but_velodyne/Visualizer3D.h>
-#include <but_velodyne/KittiUtils.h>
-#include <but_velodyne/PolarGridOfClouds.h>
 #include <but_velodyne/LineCloud.h>
 
 #include <pcl/common/eigen.h>
 #include <pcl/common/transforms.h>
-#include <pcl/io/pcd_io.h>
 
 using namespace std;
 using namespace pcl;

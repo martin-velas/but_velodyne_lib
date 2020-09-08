@@ -34,8 +34,7 @@ void extract_indices(typename pcl::PointCloud<PointT>::ConstPtr in_cloud,
 template <typename T>
 void extract_indices(const std::vector<T> &input,
     const std::vector<int> &indices,
-    std::vector<T> &output,
-    bool negative = false) {
+    std::vector<T> &output) {
   std::vector<T> raw_output;
   for(std::vector<int>::const_iterator i = indices.begin(); i < indices.end(); i++) {
     raw_output.push_back(input[*i]);

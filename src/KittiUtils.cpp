@@ -21,10 +21,7 @@
  * along with this file.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <cstdlib>
-#include <cstdio>
 #include <iostream>
-#include <fstream>
 
 #include <but_velodyne/KittiUtils.h>
 

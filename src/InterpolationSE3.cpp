@@ -24,7 +24,6 @@
 #include <iostream>
 
 #include <but_velodyne/InterpolationSE3.h>
-#include <but_velodyne/KittiUtils.h>
 #include <Eigen/Eigenvalues>
 
 using namespace std;

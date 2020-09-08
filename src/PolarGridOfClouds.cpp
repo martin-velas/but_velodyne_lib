@@ -27,7 +27,6 @@
 #include <pcl/common/transforms.h>
 
 #include <but_velodyne/PolarGridOfClouds.h>
-#include <but_velodyne/Visualizer3D.h>
 
 using namespace std;
 using namespace pcl;
@@ -101,7 +100,6 @@ void PolarGridOfClouds::fill(
     assert(ring < rings);
     assert(ring >= 0);
 
-    float angle = VelodynePointCloud::horizontalAngle(pt->z, pt->x);
     int polar_bin = getPolarBinIndex(*pt);
     assert(polar_bin < getPolarBins());
     assert(polar_bin >= 0);
@@ -139,37 +137,6 @@ int PolarGridOfClouds::computeNewRingIndex(const velodyne_pointcloud::VelodynePo
     }
   }
   return new_ring_id;
-}
-
-PolarGridOfClouds::Ptr PolarGridOfClouds::summarize() const {
-  PolarGridOfClouds::Ptr sumarized(
-      new PolarGridOfClouds(polar_superbins, bin_subdivision, rings, sensors));
-  for(int polar = 0; polar < getPolarBins(); polar++) {
-    for(int ring = 0; ring < rings; ring++) {
-      CellId cell_id(polar, ring);
-      if(!this->at(cell_id).empty()) {
-        Eigen::Vector4f centroid;
-        pcl::compute3DCentroid(this->at(cell_id), centroid);
-        velodyne_pointcloud::VelodynePoint centroid_ir;
-        centroid_ir.x = centroid(0);
-        centroid_ir.y = centroid(1);
-        centroid_ir.z = centroid(2);
-        centroid_ir.ring = ring;
-        centroid_ir.intensity = this->at(cell_id).averageIntensity();
-        sumarized->at(cell_id).push_back(centroid_ir);
-      }
-    }
-  }
-  return sumarized;
-}
-
-void PolarGridOfClouds::showColored() {
-  static Visualizer3D visualizer;
-  visualizer.keepOnlyClouds(0);
-  for(int i = 0; i < polar_grid.size(); i++) {
-    visualizer.addPointCloud(*polar_grid[i]);
-  }
-  visualizer.show();
 }
 
 }

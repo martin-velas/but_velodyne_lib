@@ -24,14 +24,12 @@
 #include <but_velodyne/VelodynePointCloud.h>
 
 #include <vector>
-#include <cstdlib>
 #include <cassert>
 #include <numeric>
 
 #include <cv.h>
 #include <pcl/common/eigen.h>
 #include <pcl/common/transforms.h>
-#include <pcl/filters/filter.h>
 
 #include <velodyne_pointcloud/point_types.h>
 
@@ -303,7 +301,6 @@ void VelodynePointCloud::setRingsByPointCount() {
 void VelodynePointCloud::setRingsByHorizontalAngles() {
   const float ANGLE_DIFF_THRESH = 60;
   const int WIN_HALF_SIZE = 5;
-  int ring = 0;
 
   vector<float> angles;
   for(int i = 0; i < this->size(); i++) {

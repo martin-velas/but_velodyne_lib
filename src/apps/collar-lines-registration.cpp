@@ -28,8 +28,6 @@
  */
 
 #include <cstdlib>
-#include <cstdio>
-#include <libgen.h>
 
 #include <pcl/common/eigen.h>
 #include <boost/program_options.hpp>

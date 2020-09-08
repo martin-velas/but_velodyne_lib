@@ -24,13 +24,11 @@
  */
 
 #include <cstdlib>
-#include <cstdio>
 
 #include <boost/program_options.hpp>
 
 #include <but_velodyne/Visualizer3D.h>
 #include <but_velodyne/KittiUtils.h>
-#include <but_velodyne/point_types.h>
 
 #include <pcl/PCLPointCloud2.h>
 #include <pcl/common/eigen.h>

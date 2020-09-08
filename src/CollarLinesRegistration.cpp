@@ -21,9 +21,7 @@
  * along with this file.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <numeric>
 
-#include <boost/accumulators/accumulators.hpp>
 #include <boost/accumulators/statistics/stats.hpp>
 #include <boost/accumulators/statistics/median.hpp>
 #include <boost/accumulators/statistics/mean.hpp>

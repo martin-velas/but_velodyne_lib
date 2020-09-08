@@ -6,10 +6,8 @@
  */
 
 #include <pcl/point_types.h>
-#include <pcl/features/normal_3d.h>
 
 #include <but_velodyne/CollarLinesFilter.h>
-#include <but_velodyne/Visualizer3D.h>
 
 using namespace std;
 using namespace pcl;

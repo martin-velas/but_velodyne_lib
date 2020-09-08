@@ -36,11 +36,9 @@
 #include <but_velodyne/EigenUtils.h>
 #include <but_velodyne/VelodyneMultiFrameSequence.h>
 
-#include <pcl/PCLPointCloud2.h>
 #include <pcl/common/eigen.h>
 #include <pcl/common/transforms.h>
 
-#include <cv.h>
 #include <opencv2/opencv.hpp>
 #include <cxeigen.hpp>
 

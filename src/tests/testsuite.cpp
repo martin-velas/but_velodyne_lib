@@ -24,7 +24,6 @@
 #define TESTSUITE
 
 #include <../src/tests/CollarLinesRegistration-test.cpp>
-#include <../src/tests/RegistrationCrossValidation-test.cpp>
 
 int main(int argc, char **argv) {
     testing::InitGoogleTest(&argc, argv);

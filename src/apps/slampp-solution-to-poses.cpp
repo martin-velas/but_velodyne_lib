@@ -25,12 +25,10 @@
  */
 
 #include <cstdlib>
-#include <cstdio>
 
 #include <but_velodyne/KittiUtils.h>
 
 #include <pcl/common/eigen.h>
-#include <pcl/common/transforms.h>
 
 using namespace std;
 using namespace pcl;

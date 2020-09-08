@@ -9,7 +9,6 @@
 
 #include <pcl/common/common.h>
 
-#include <but_velodyne/common.h>
 #include <algorithm>
 
 using namespace std;
