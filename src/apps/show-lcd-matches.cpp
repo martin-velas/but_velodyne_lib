@@ -97,8 +97,8 @@ int main(int argc, char** argv) {
 
   PointCloud<PointXYZ> src_cloud, trg_cloud;
   for(int sensor_i = 0; sensor_i < calibration.sensorsCount(); sensor_i++) {
-    ifstream src_file(clouds_fnames[sensor_i]);
-    ifstream trg_file(clouds_fnames[sensor_i + calibration.sensorsCount()]);
+    ifstream src_file(clouds_fnames[sensor_i].c_str());
+    ifstream trg_file(clouds_fnames[sensor_i + calibration.sensorsCount()].c_str());
 
     LineCloud src_lines, trg_lines;
     src_file >> src_lines;
