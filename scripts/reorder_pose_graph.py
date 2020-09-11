@@ -11,6 +11,8 @@ class Reindexer:
         self.lastIndex = -1
 
     def reindex(self, index):
+        if index < 0:
+            return index        # negative const vertices are not included in the solution test file
         if index in self.indices:
             return self.indices[index]
         else:
@@ -21,7 +23,7 @@ class Reindexer:
 
 if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser(description="Reordering of pose graph")
+    parser = argparse.ArgumentParser(description="Reordering of the indices in (sorted) pose graph")
     parser.add_argument("--out_graph", dest="out_graph", type=str, required=True)
     parser.add_argument("--out_map_json", dest="out_map_json", type=str, required=True)
     args = parser.parse_args()
