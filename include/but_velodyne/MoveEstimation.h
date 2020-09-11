@@ -87,9 +87,8 @@ public:
    * Compute mean (set to *this object) and covariance of multiple sets of move parameters.
    *
    * @param measurements [input] parameters of multiple moves
-   * @return covariance matrix of move parameters tx, tx, tz, rx, ry, rz
    */
-  cv::Mat setAsAverageFrom(const std::vector<MoveParameters> &meassurements);
+  void setAsAverageFrom(const std::vector<MoveParameters> &meassurements);
 
   /**!
    * Estimate approximation of covariance matrix for pose graph.

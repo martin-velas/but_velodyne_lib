@@ -13,7 +13,6 @@
 
 #include <but_velodyne/EigenUtils.h>
 #include <but_velodyne/VelodynePointCloud.h>
-#include <but_velodyne/PoseGraphEdge.h>
 
 namespace but_velodyne {
 

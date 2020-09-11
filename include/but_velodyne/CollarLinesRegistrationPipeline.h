@@ -182,14 +182,13 @@ public:
 
   /**!
    * @param estimator odometry predictor - Kalman filter or Linear predictor
-   * @param graph_file destination of pose graph (in SLAM++ format)
    * @param pipeline_params_ parameters of registration pipeline
    * @param registration_params_ parameters of collar line clouds registration itself
    */
-  CollarLinesRegistrationPipeline(MoveEstimator &estimator, ostream &graph_file,
+  CollarLinesRegistrationPipeline(MoveEstimator &estimator,
                                   Parameters pipeline_params_, CollarLinesRegistration::Parameters registration_params_) :
     estimation(estimator), cumulated_transformation(Eigen::Matrix4f::Identity()),
-    pose_index(0), graph_file(graph_file), history(pipeline_params_.historySize),
+    pose_index(0), history(pipeline_params_.historySize),
     pipeline_params(pipeline_params_), registration_params(registration_params_) {
   }
 
@@ -197,17 +196,13 @@ public:
    * Registration of new LiDAR meassurement.
    *
    * @param target_cloud new LiDAR meassurement
-   * @param covariance [output] covariance matrix of registration for SLAM++ (how much the algorithm trusts the result)
    */
-  Eigen::Matrix4f runRegistration(const VelodynePointCloud &target_cloud,
-                                  cv::Mat &covariance);
+  Eigen::Matrix4f runRegistration(const VelodynePointCloud &target_cloud);
 
   Eigen::Matrix4f runRegistration(const std::vector<VelodynePointCloud::Ptr> &target_clouds,
-                                  const SensorsCalibration &calibration,
-                                  cv::Mat &covariance);
+                                  const SensorsCalibration &calibration);
 
-  Eigen::Matrix4f runRegistration(PolarGridOfClouds::Ptr target_polar_grid,
-                                  cv::Mat &covariance);
+  Eigen::Matrix4f runRegistration(PolarGridOfClouds::Ptr target_polar_grid);
 
   /**!
    * Prints out the estimation of current sensor pose in KITTI format
@@ -245,8 +240,7 @@ protected:
                      Eigen::Matrix4f transformation);
 
   void pickBestByAverage(const vector<Eigen::Matrix4f> &transformations,
-                         Eigen::Matrix4f &mean_transformation,
-                         cv::Mat &covariance);
+                         Eigen::Matrix4f &mean_transformation);
 
 private:
   MoveEstimation estimation;
@@ -256,7 +250,6 @@ private:
   boost::circular_buffer< HistoryRecord<PolarGridOfClouds> > history;
 
   int pose_index;
-  ostream &graph_file;
 
   CollarLinesRegistration::Parameters registration_params;
 

@@ -210,9 +210,7 @@ int main(int argc, char** argv) {
   }
 
   LinearMoveEstimator null_estimator(0);
-  ofstream null_file("/dev/null");
-  CollarLinesRegistrationPipeline registration(null_estimator, null_file,
-      pipeline_parameters, registration_parameters);
+  CollarLinesRegistrationPipeline registration(null_estimator, pipeline_parameters, registration_parameters);
 
   PolarGridOfClouds src_grid(src_frame->clouds, calibration);
   PolarGridOfClouds trg_grid(trg_frame->clouds, calibration);

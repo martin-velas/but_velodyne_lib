@@ -97,23 +97,13 @@ cv::Mat MoveParameters::toCvMat() const {
   return measurements;
 }
 
-cv::Mat MoveParameters::setAsAverageFrom(const std::vector<MoveParameters> &meassurements) {
+void MoveParameters::setAsAverageFrom(const std::vector<MoveParameters> &meassurements) {
   this->setZeros();
   for(std::vector<MoveParameters>::const_iterator m = meassurements.begin();
         m < meassurements.end(); m++) {
     *this += *m;
   }
   *this /= meassurements.size();
-
-  cv::Mat output_covariance;
-  output_covariance = cv::Mat::zeros(6, 6, CV_64F);
-  for(std::vector<MoveParameters>::const_iterator m = meassurements.begin();
-            m < meassurements.end(); m++) {
-    cv::Mat diff = (*m - *this).toCvMat();
-    output_covariance += diff * diff.t();
-  }
-  output_covariance /= meassurements.size();
-  return output_covariance;
 }
 
 /* **************************** LinearMoveEstimator **************************** */

@@ -155,12 +155,10 @@ float getReverseRegistrationError(const PolarGridOfClouds &src_grid,
                                   const CollarLinesRegistration::Parameters &registration_parameters,
                                   const CollarLinesRegistrationPipeline::Parameters &pipeline_parameters) {
   LinearMoveEstimator null_estimator(0);
-  ofstream null_file("/dev/null");
   CollarLinesRegistration::Parameters reg_parameters_modified = registration_parameters;
   reg_parameters_modified.distance_threshold = CollarLinesRegistration::PORTION_VALUE_THRESHOLD;
   reg_parameters_modified.distance_threshold_value = overlap;
-  CollarLinesRegistrationPipeline registration(null_estimator, null_file,
-                                               pipeline_parameters, reg_parameters_modified);
+  CollarLinesRegistrationPipeline registration(null_estimator, pipeline_parameters, reg_parameters_modified);
   RegistrationOutcome result;
   registration.registerTwoGrids(src_grid, trg_grid, init_transform.matrix(), result);
 

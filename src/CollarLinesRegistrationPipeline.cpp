@@ -23,7 +23,6 @@
 
 #include <but_velodyne/CollarLinesRegistrationPipeline.h>
 #include <but_velodyne/CollarLinesValidation.h>
-#include <but_velodyne/PoseGraphEdge.h>
 #include <but_velodyne/CollarLinesFilter.h>
 #include <but_velodyne/KittiUtils.h>
 #include <but_velodyne/RegistrationCrossValidation.h>
@@ -190,18 +189,13 @@ vector<Eigen::Matrix4f> CollarLinesRegistrationPipeline::runRegistrationEffectiv
     transformation = result.transformation.matrix();
     printInfo(stopwatch.elapsed(), transformation, result.error);
     results.push_back(transformation);
-
-    Eigen::Matrix4f edge_trasform = history[i].getTransformation() * transformation;
-    PoseGraphEdge edge(history[i].getIndex(), pose_index, edge_trasform);
-    graph_file << edge << endl;
   }
 
   return results;
 }
 
 void CollarLinesRegistrationPipeline::pickBestByAverage(const vector<Eigen::Matrix4f> &transformations,
-                         Eigen::Matrix4f &mean_transformation,
-                         cv::Mat &covariance) {
+                         Eigen::Matrix4f &mean_transformation) {
   vector<MoveParameters> meassurements;
   for(vector<Eigen::Matrix4f>::const_iterator t = transformations.begin();
         t < transformations.end(); t++) {
@@ -209,7 +203,7 @@ void CollarLinesRegistrationPipeline::pickBestByAverage(const vector<Eigen::Matr
   }
 
   MoveParameters mean(0, 0, 0, 0, 0, 0);
-  covariance = mean.setAsAverageFrom(meassurements);
+  mean.setAsAverageFrom(meassurements);
 
   mean_transformation =  getTransformation(mean.x, mean.y, mean.z,
                                            mean.roll, mean.pitch, mean.yaw).matrix();
@@ -224,31 +218,27 @@ void CollarLinesRegistrationPipeline::updateHistory(const PolarGridOfClouds::Ptr
 }
 
 Eigen::Matrix4f CollarLinesRegistrationPipeline::runRegistration(
-    const VelodynePointCloud &target_cloud,
-    Mat &covariance) {
+    const VelodynePointCloud &target_cloud) {
   PolarGridOfClouds::Ptr target_polar_grid(new PolarGridOfClouds(target_cloud));
-  return runRegistration(target_polar_grid, covariance);
+  return runRegistration(target_polar_grid);
 }
 
 Eigen::Matrix4f CollarLinesRegistrationPipeline::runRegistration(
     const std::vector<VelodynePointCloud::Ptr> &target_clouds,
-    const SensorsCalibration &calibration,
-    cv::Mat &covariance) {
+    const SensorsCalibration &calibration) {
   PolarGridOfClouds::Ptr target_polar_grid(new PolarGridOfClouds(target_clouds, calibration));
-  return runRegistration(target_polar_grid, covariance);
+  return runRegistration(target_polar_grid);
 }
 
 Eigen::Matrix4f CollarLinesRegistrationPipeline::runRegistration(
-    PolarGridOfClouds::Ptr target_polar_grid,
-    cv::Mat &covariance) {
+    PolarGridOfClouds::Ptr target_polar_grid) {
   Eigen::Matrix4f transformation;
   if(!history.empty()) {
     pickBestByAverage(runRegistrationEffective(target_polar_grid),
-                      transformation, covariance);
+                      transformation);
     estimation.addMeassurement(transformation);
   } else {
     transformation = Eigen::Matrix4f::Identity();
-    covariance = cv::Mat::zeros(6, 6, CV_64FC1);
   }
   updateHistory(target_polar_grid, transformation);
   pose_index++;

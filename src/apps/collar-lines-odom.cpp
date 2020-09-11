@@ -28,11 +28,9 @@
  */
 
 #include <cstdlib>
-#include <cstdio>
 
 #include <pcl/common/eigen.h>
 #include <boost/program_options.hpp>
-#include <cv.h>
 
 #include <but_velodyne/VelodynePointCloud.h>
 #include <but_velodyne/VelodyneMultiFrameSequence.h>
@@ -72,25 +70,9 @@ int main(int argc, char** argv) {
     return EXIT_FAILURE;
   }
 
-  boost::filesystem::path first_cloud(clouds_to_process.front());
-  string output_path;
-  if (first_cloud.has_parent_path()) {
-    output_path = first_cloud.parent_path().string();
-  } else {
-    output_path = boost::filesystem::current_path().string();
-  }
-  string graph_filename = output_path + "/poses.graph";
-  ofstream graph_file(graph_filename.c_str());
-  if (!graph_file.is_open()) {
-    perror(graph_filename.c_str());
-    exit(1);
-  }
-
-  CollarLinesRegistrationPipeline registration(*estimator, graph_file,
-      pipeline_parameters, registration_parameters);
+  CollarLinesRegistrationPipeline registration(*estimator, pipeline_parameters, registration_parameters);
 
   int sensors = calibration.sensorsCount();
-  vector<Mat> covariances(clouds_to_process.size()/sensors);
   VelodyneFileSequence sequence(clouds_to_process, calibration);
 
   Visualizer3D::Ptr vis;
@@ -110,8 +92,7 @@ int main(int argc, char** argv) {
               .show();
     }
 
-    Eigen::Matrix4f t = registration.runRegistration(multiframe.clouds, calibration,
-        covariances[frame_i]);
+    Eigen::Matrix4f t = registration.runRegistration(multiframe.clouds, calibration);
     registration.output(t);
 
     if(visualize) {
@@ -119,10 +100,6 @@ int main(int argc, char** argv) {
       src_vis_cloud = trg_vis_cloud;
     }
   }
-
-  string cov_filename = output_path + "/covariances.yaml";
-  FileStorage cov_fs(cov_filename, FileStorage::WRITE);
-  cov_fs << "covariances" << covariances;
 
   return EXIT_SUCCESS;
 }
