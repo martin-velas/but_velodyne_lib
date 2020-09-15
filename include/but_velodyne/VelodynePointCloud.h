@@ -466,7 +466,7 @@ template <typename T>
 void outlier_removal(typename pcl::PointCloud<T>::ConstPtr cloud,
                      pcl::PointCloud<T> &cloud_filtered,
                      const int mean_k, const float std_mul_thresh) {
-  pcl::StatisticalOutlierRemoval<pcl::PointXYZ> filter;
+  pcl::StatisticalOutlierRemoval<T> filter;
   filter.setMeanK(mean_k);
   filter.setStddevMulThresh(std_mul_thresh);
 
