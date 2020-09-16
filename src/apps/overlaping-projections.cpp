@@ -54,7 +54,7 @@ bool parse_arguments(int argc, char **argv,
                      int &frames_dist, int &max_frames_dist, bool &circular,
                      float &depth_quantile,
                      float &depth_relative_tolerance, float &depth_absolute_tolerance,
-                     bool &average_with_zbuffer_occupancy,
+                     bool &average_with_zbuffer_occupancy, bool &use_pts_counters,
                      bool &visualize, int &azimuthal_bins, int &polar_bins) {
   string pose_filename, sensor_poses_filename;
 
@@ -79,6 +79,8 @@ bool parse_arguments(int argc, char **argv,
     ("visualize", po::bool_switch(&visualize), "Run visualization.")
     ("average_with_zbuffer_occupancy", po::bool_switch(&average_with_zbuffer_occupancy),
         "Average with nuber of occupied cells in the Z-buffer.")
+    ("use_pts_counters", po::bool_switch(&use_pts_counters),
+        "Use points counters to reduce the overlap.")
     ("azimuthal_bins", po::value<int>(&azimuthal_bins)->default_value(180),
         "Azimuthal bins count.")
     ("polar_bins", po::value<int>(&polar_bins)->default_value(90),
@@ -123,13 +125,13 @@ int main(int argc, char** argv) {
   int source_index, expected_frames_dist, max_frames_dist;
   bool circular;
   float depth_quantile, depth_relative_tolerance, depth_absolute_tolerance;
-  bool visualize, average_with_zbuffer_occupancy;
+  bool average_with_zbuffer_occupancy, use_pts_counters, visualize;
   int azimuthal_bins, polar_bins;
 
   if(!parse_arguments(argc, argv,
       poses, calibration, filenames, source_index, expected_frames_dist, max_frames_dist, circular,
       depth_quantile, depth_relative_tolerance, depth_absolute_tolerance,
-      average_with_zbuffer_occupancy, visualize, azimuthal_bins, polar_bins)) {
+      average_with_zbuffer_occupancy, use_pts_counters, visualize, azimuthal_bins, polar_bins)) {
     return EXIT_FAILURE;
   }
 
@@ -144,7 +146,7 @@ int main(int argc, char** argv) {
     PointCloud<VelodynePoint> src_cloud;
     src_frame->joinTo(src_cloud);
     transformPointCloud(src_cloud, src_cloud, Eigen::Affine3f(poses[i].rotation()));
-    SphericalZbuffer src_zbuffer(src_cloud, azimuthal_bins, polar_bins, depth_quantile);
+    SphericalZbuffer src_zbuffer(src_cloud, azimuthal_bins, polar_bins, depth_quantile, use_pts_counters);
 
     for(int j = i+1; j < sequence.size(); j++) {
       int frames_distace = get_frames_distance(i, j, sequence.size(), circular);

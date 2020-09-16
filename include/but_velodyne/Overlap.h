@@ -21,7 +21,8 @@ public:
   typedef boost::shared_ptr<SphericalZbuffer> Ptr;
 
   SphericalZbuffer(const pcl::PointCloud<velodyne_pointcloud::VelodynePoint> &cloud_,
-      const int azimuthal_bins_, const int polar_bins_, const float depth_quantile);
+      const int azimuthal_bins_, const int polar_bins_, const float depth_quantile,
+      const bool use_pts_counters = false);
 
   float getDepth(const float azimuth, const float polar_angle) const;
 
@@ -55,6 +56,7 @@ private:
   std::vector<float> depths;
   std::vector<bool> visited;
   int cells_occupied;
+  std::vector<int> pts_counters;
 };
 
 int get_frames_distance(const int i, const int j, const int frames_count, const bool circular);

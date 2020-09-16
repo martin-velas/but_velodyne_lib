@@ -43,10 +43,11 @@ void sphericalToPoint(const float azimuth, const float polar, const float range,
 }
 
 SphericalZbuffer::SphericalZbuffer(const PointCloud<VelodynePoint> &cloud_,
-    const int azimuthal_bins_, const int polar_bins_, const float depth_quantile) :
+    const int azimuthal_bins_, const int polar_bins_, const float depth_quantile, const bool use_pts_counters) :
     azimuthal_bins(azimuthal_bins_), polar_bins(polar_bins_),
     azimuthal_resolution(AZIMUTHAL_RANGE / azimuthal_bins_), polar_resolution(POLAR_RANGE / polar_bins_),
-    depths(azimuthal_bins_*polar_bins_), visited(azimuthal_bins_*polar_bins_, false) {
+    depths(azimuthal_bins_*polar_bins_), visited(azimuthal_bins_*polar_bins_, false),
+    pts_counters(azimuthal_bins_*polar_bins_, use_pts_counters ? 0 : 1000000) {
   vector< vector<float> > depth_sets(azimuthal_bins*polar_bins);
   for(PointCloud<VelodynePoint>::const_iterator pt = cloud_.begin(); pt < cloud_.end(); pt++) {
     float azimuth, polar, range;
@@ -57,6 +58,7 @@ SphericalZbuffer::SphericalZbuffer(const PointCloud<VelodynePoint> &cloud_,
       cerr << idx << " " << depth_sets.size() << endl;
     }
     depth_sets[idx].push_back(range);
+    pts_counters[idx] += 10;
   }
 
   cells_occupied = 0;
@@ -105,7 +107,8 @@ bool SphericalZbuffer::containsPoint(const VelodynePoint &point,
   pointToSpherical(point, azimuth, polar_angle, range);
   this->visit(azimuth, polar_angle);
   const float zdepth = this->getDepth(azimuth, polar_angle);
-  return (zdepth*(1.0 + depth_relative_tolerance) + depth_relative_tolerance) > range;
+  const int idx = getIndex(azimuth, polar_angle);
+  return pts_counters[idx] > 0 && (zdepth*(1.0 + depth_relative_tolerance) + depth_relative_tolerance) > range;
 }
 
 void SphericalZbuffer::addToVisualizer(Visualizer3D &visualizer, const PointCloud<VelodynePoint> &src_cloud,
@@ -137,7 +140,9 @@ void SphericalZbuffer::setDepth(const float azimuth, const float polar_angle, co
 }
 
 void SphericalZbuffer::visit(const float azimuth, const float polar_angle) {
-  visited[getIndex(azimuth, polar_angle)] = true;
+  int idx = getIndex(azimuth, polar_angle);
+  visited[idx] = true;
+  pts_counters[idx]--;
 }
 
 int SphericalZbuffer::getIndex(const float azimuth, const float polar_angle) const {
