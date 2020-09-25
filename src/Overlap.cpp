@@ -192,8 +192,8 @@ void DenseCloudOverlap::compute(pcl::PointCloud<PointT>::ConstPtr src_cloud,
   PointCloud<PointT>::Ptr src_sampled(new PointCloud<PointT>);
   PointCloud<PointT>::Ptr trg_sampled(new PointCloud<PointT>);
   if(param.leaf_size > 0.0) {
-    subsample_by_voxel_grid(src_cloud, *src_sampled, param.leaf_size);
-    subsample_by_voxel_grid(trg_cloud, *trg_sampled, param.leaf_size);
+    subsample_by_voxel_grid(src_cloud, *src_sampled, param.leaf_size, param.outlier_stdev_thresh);
+    subsample_by_voxel_grid(trg_cloud, *trg_sampled, param.leaf_size, param.outlier_stdev_thresh);
   } else {
     *src_sampled += *src_cloud;
     *trg_sampled += *trg_cloud;
@@ -241,15 +241,17 @@ size_t DenseCloudOverlap::computeTrgOverlap(pcl::PointCloud<PointT>::ConstPtr sr
   return trg_overlap.size();
 }
 
-void DenseCloudOverlap::Parameters::loadFrom(boost::program_options::options_description &desc) {
+void DenseCloudOverlap::Parameters::loadFrom(po::options_description &desc) {
   desc.add_options()
-          ("visualization,v", po::bool_switch(&visualization),
-           "Show visualization.")
-          ("leaf_size,l", po::value<float>(&leaf_size)->default_value(leaf_size),
-           "Kd-tree leaf size for downsampling. If (size <= 0) then no resampling.")
-          ("max_match_distance,m", po::value<float>(&max_match_distance)->default_value(max_match_distance),
-           "Correspondence distance threshold.")
-          ;
+    ("visualization,v", po::bool_switch(&visualization),
+     "Show visualization.")
+    ("leaf_size,l", po::value<float>(&leaf_size)->default_value(leaf_size),
+     "Kd-tree leaf size for downsampling. If (size <= 0) then no resampling.")
+    ("max_match_distance,m", po::value<float>(&max_match_distance)->default_value(max_match_distance),
+     "Correspondence distance threshold.")
+    ("outlier_stdev_thresh", po::value<float>(&outlier_stdev_thresh)->default_value(outlier_stdev_thresh),
+     "Standard deviation of the distance for statistical outlier removal.")
+  ;
 }
 
 void ClsOverlapEstimator::Parameters::prepareForLoading(po::options_description &options_desc) {

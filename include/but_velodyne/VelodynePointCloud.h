@@ -476,7 +476,7 @@ void outlier_removal(typename pcl::PointCloud<T>::ConstPtr cloud,
 
 template <typename T>
 void subsample_by_voxel_grid(typename pcl::PointCloud<T>::ConstPtr input, pcl::PointCloud<T> &subsampled,
-                             const float leaf_size) {
+                             const float leaf_size, const float outlier_stdev_thresh) {
   pcl::VoxelGrid<T> grid;
   grid.setLeafSize(leaf_size, leaf_size, leaf_size);
 
@@ -486,7 +486,7 @@ void subsample_by_voxel_grid(typename pcl::PointCloud<T>::ConstPtr input, pcl::P
 
   if(original_size == subsampled.size()) {
     typename pcl::PointCloud<T>::Ptr inliers(new pcl::PointCloud<T>);
-    outlier_removal(input, *inliers, 10, 10.0);
+    outlier_removal(input, *inliers, 10, outlier_stdev_thresh);
     grid.setInputCloud(inliers);
     grid.filter(subsampled);
   }

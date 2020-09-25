@@ -47,13 +47,15 @@ public:
                 float epsilon_ = 1e-6,
                 float max_match_distance_ = 0.1,
                 size_t max_iterations_ = 100,
-                size_t neighbours_for_normal_ = 30) :
+                size_t neighbours_for_normal_ = 30,
+                float outlier_stdev_thresh_ = 10.0) :
                 visualization(visualization_),
                 leaf_size(leaf_size_),
                 epsilon(epsilon_),
                 max_match_distance(max_match_distance_),
                 max_iterations(max_iterations_),
-                neighbours_for_normal(neighbours_for_normal_) {
+                neighbours_for_normal(neighbours_for_normal_),
+                outlier_stdev_thresh(outlier_stdev_thresh_) {
         }
 
         bool visualization;
@@ -62,6 +64,7 @@ public:
         float max_match_distance;
         size_t max_iterations;
         size_t neighbours_for_normal;
+        float outlier_stdev_thresh;
 
         void loadFrom(boost::program_options::options_description &desc);
 

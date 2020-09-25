@@ -58,7 +58,9 @@ void DenseCloudRegistration::Parameters::loadFrom(po::options_description &desc)
            "Correspondence distance threshold.")
           ("neighbours_for_normal,n",
            po::value<size_t>(&neighbours_for_normal)->default_value(neighbours_for_normal),
-           "How many neighbours are taken in account when the normal is estimated.");
+           "How many neighbours are taken in account when the normal is estimated.")
+          ("outlier_stdev_thresh", po::value<float>(&outlier_stdev_thresh)->default_value(outlier_stdev_thresh),
+           "Standard deviation of the distance for statistical outlier removal.");
 }
 
 DenseCloudRegistration::DenseCloudRegistration(PointCloud<PointT>::ConstPtr src_cloud_,
@@ -71,8 +73,8 @@ DenseCloudRegistration::DenseCloudRegistration(PointCloud<PointT>::ConstPtr src_
   PointCloud<PointT>::Ptr trg_sampled(new PointCloud <PointT>);
 
   if(param.leaf_size > 0.0) {
-    subsample_by_voxel_grid(src_cloud_, *src_sampled, param.leaf_size);
-    subsample_by_voxel_grid(trg_cloud_, *trg_sampled, param.leaf_size);
+    subsample_by_voxel_grid(src_cloud_, *src_sampled, param.leaf_size, param.outlier_stdev_thresh);
+    subsample_by_voxel_grid(trg_cloud_, *trg_sampled, param.leaf_size, param.outlier_stdev_thresh);
   } else {
     *src_sampled += *src_cloud_;
     *trg_sampled += *trg_cloud_;
