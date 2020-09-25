@@ -73,6 +73,10 @@ public:
     all_lines.erase(all_lines.begin() + all_lines.size() * (1.0 - ratio),
         all_lines.end());
   }
+
+  void clear(void) {
+    all_lines.erase(all_lines.begin(), all_lines.end());
+  }
 };
 
 
@@ -132,6 +136,11 @@ public:
     return refined_pose;
   }
 
+  void reset(void) {
+    lines_map.clear();
+    indexed = false;
+  }
+
 protected:
 
   void addToMap(const LineCloud &line_cloud,
@@ -177,7 +186,7 @@ bool parse_arguments(int argc, char **argv,
     CollarLinesRegistrationPipeline::Parameters &pipeline_parameters,
     vector<Eigen::Affine3f> &init_poses, SensorsCalibration &calibration,
     vector<string> &clouds_to_process, float &prune_ratio, bool &visualization,
-    string &matches_output_file, float &matches_portion) {
+    string &matches_output_file, float &matches_portion, int &reset_after_nframes) {
   string pose_file, sensors_pose_file;
 
   po::options_description desc("Collar Lines Registration of Velodyne scans against the map\n"
@@ -200,6 +209,8 @@ bool parse_arguments(int argc, char **argv,
         "Output file for the matches used in final registration.")
     ("matches_portion", po::value<float>(&matches_portion)->default_value(0.9),
         "Keep this portion of best matches (by the distance)")
+    ("reset_after_nframes", po::value<int>(&reset_after_nframes)->default_value(-1),
+         "Reset of the map after each N frames")
   ;
 
   po::variables_map vm;
@@ -245,10 +256,12 @@ int main(int argc, char** argv) {
   bool visualization;
   string matches_output_filename;
   float matches_portion;
+  int reset_after_nframes;
 
   if (!parse_arguments(argc, argv,
       registration_parameters, pipeline_parameters, init_poses, calibration,
-      clouds_filenames, prune_ratio, visualization, matches_output_filename, matches_portion)) {
+      clouds_filenames, prune_ratio, visualization, matches_output_filename, matches_portion,
+      reset_after_nframes)) {
     return EXIT_FAILURE;
   }
 
@@ -274,24 +287,31 @@ int main(int argc, char** argv) {
 
     } else {
       Eigen::Affine3f init_pose = refined_poses.back() * (init_poses[frame_i-1].inverse() * init_poses[frame_i]);
-      vector<CLSMatch> matches;
-      pose = registration.runMapping(multiframe, calibration, init_pose, matches);
-      cerr << "Matches (unfiltered): " << matches.size() << endl;
+      if(reset_after_nframes > 0 && (frame_i % reset_after_nframes) == 0) {
+        registration.reset();
+        pose = init_pose;
+        registration.addToMap(multiframe.clouds, calibration, pose);
 
-      sort(matches.begin(), matches.end(), clsMatchByCoeffComparator);
-      matches.erase(matches.begin() + matches_portion*matches.size(), matches.end());
-      cerr << "Matches (filtered " << matches_portion*100 << "%): " << matches.size() << endl;
+      } else {
+        vector<CLSMatch> matches;
+        pose = registration.runMapping(multiframe, calibration, init_pose, matches);
+        cerr << "Matches (unfiltered): " << matches.size() << endl;
 
-      if(matches_output.is_open()) {
-        for(vector<CLSMatch>::const_iterator m = matches.begin(); m < matches.end(); m++) {
-          const int src_frame_id = m->getSourceLine().sensor_id;
-          const PointXYZ &trg_pt = m->getTrgPt();
-          PointXYZ real_src_point = transformPoint(m->getSrcPt(), refined_poses[src_frame_id].inverse());
-          matches_output
-            << src_frame_id << " "
-            << real_src_point.x << " " << real_src_point.y << " " << real_src_point.z << " "
-            << frame_i << " "
-            << trg_pt.x << " " << trg_pt.y << " " << trg_pt.z << endl;
+        sort(matches.begin(), matches.end(), clsMatchByCoeffComparator);
+        matches.erase(matches.begin() + matches_portion*matches.size(), matches.end());
+        cerr << "Matches (filtered " << matches_portion*100 << "%): " << matches.size() << endl;
+
+        if(matches_output.is_open()) {
+          for(vector<CLSMatch>::const_iterator m = matches.begin(); m < matches.end(); m++) {
+            const int src_frame_id = m->getSourceLine().sensor_id;
+            const PointXYZ &trg_pt = m->getTrgPt();
+            PointXYZ real_src_point = transformPoint(m->getSrcPt(), refined_poses[src_frame_id].inverse());
+            matches_output
+                    << src_frame_id << " "
+                    << real_src_point.x << " " << real_src_point.y << " " << real_src_point.z << " "
+                    << frame_i << " "
+                    << trg_pt.x << " " << trg_pt.y << " " << trg_pt.z << endl;
+          }
         }
       }
     }
