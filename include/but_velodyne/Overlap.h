@@ -13,6 +13,7 @@
 #include <boost/program_options.hpp>
 
 #include <but_velodyne/Visualizer3D.h>
+#include <but_velodyne/CollarLinesRegistration.h>
 
 namespace but_velodyne {
 
@@ -99,6 +100,50 @@ protected:
 
     size_t computeTrgOverlap(pcl::PointCloud<PointT>::ConstPtr src_cloud,
                              pcl::PointCloud<PointT>::ConstPtr trg_cloud) const;
+};
+
+class ClsOverlapEstimator {
+
+public:
+
+    class Parameters {
+    public:
+        Parameters (
+                const float max_t_ = 0.2,
+                const float max_R_deg_ = 2.0) :
+                max_t(max_t_),
+                max_R_deg(max_R_deg_) {
+        }
+
+        void prepareForLoading(boost::program_options::options_description &options_desc);
+
+        float max_t;
+        float max_R_deg;
+    } param;
+
+    ClsOverlapEstimator(const LineCloud::Ptr src_lines_, const Parameters param_) :
+            src_lines(src_lines_), param(param_) {
+      max_R_tan = tan(degToRad(param.max_R_deg));
+      src_kdtree.setInputCloud(src_lines_->getMiddles());
+    }
+
+    float overlapWith(const LineCloud &trg_lines, const Eigen::Affine3f &T_delta,
+                      LineCloud &within, LineCloud &rest);
+
+    float overlapWith(const LineCloud &trg_lines, const Eigen::Affine3f &T_delta);
+
+protected:
+
+    vector<cv::DMatch> getMatches(const LineCloud &trg_lines, const Eigen::Affine3f &T_delta);
+
+    bool isMatchInlier(const cv::DMatch &m, const LineCloud &trg_lines) const;
+
+private:
+
+    const LineCloud::Ptr src_lines;
+    float max_R_tan;
+    pcl::KdTreeFLANN<pcl::PointXYZ> src_kdtree;
+
 };
 
 } /* namespace but_velodyne */

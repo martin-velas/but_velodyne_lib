@@ -252,5 +252,52 @@ void DenseCloudOverlap::Parameters::loadFrom(boost::program_options::options_des
           ;
 }
 
+void ClsOverlapEstimator::Parameters::prepareForLoading(po::options_description &options_desc) {
+  options_desc.add_options()
+    ("max_t", po::value<float>(&max_t)->default_value(0.2), "Max translation [m] allowed.")
+    ("max_R", po::value<float>(&max_R_deg)->default_value(2.0), "Max rotation [deg] allowed.")
+  ;
+}
+
+float ClsOverlapEstimator::overlapWith(const LineCloud &trg_lines, const Eigen::Affine3f &T_delta,
+                  LineCloud &within, LineCloud &rest) {
+  const vector<cv::DMatch> matches = getMatches(trg_lines, T_delta);
+  for(vector<cv::DMatch>::const_iterator m = matches.begin(); m < matches.end(); m++) {
+    const LineCloud::PointCloudLineWithMiddleAndOrigin &trg_l = trg_lines[m->queryIdx];
+    if(isMatchInlier(*m, trg_lines)) {
+      within.push_back(trg_l);
+    } else {
+      rest.push_back(trg_l);
+    }
+  }
+  return float(within.size()) / trg_lines.size();
+}
+
+float ClsOverlapEstimator::overlapWith(const LineCloud &trg_lines, const Eigen::Affine3f &T_delta) {
+  const vector<cv::DMatch> matches = getMatches(trg_lines, T_delta);
+  int inliers = 0;
+  for(vector<cv::DMatch>::const_iterator m = matches.begin(); m < matches.end(); m++) {
+    if(isMatchInlier(*m, trg_lines)) {
+      inliers++;
+    }
+  }
+  return float(inliers) / trg_lines.size();
+}
+
+vector<cv::DMatch> ClsOverlapEstimator::getMatches(const LineCloud &trg_lines, const Eigen::Affine3f &T_delta) {
+  CollarLinesRegistration::Parameters cls_params;
+  cls_params.distance_threshold = CollarLinesRegistration::NO_THRESHOLD;
+  CollarLinesRegistration cls_fitting(*src_lines, src_kdtree, trg_lines,
+                                      cls_params, T_delta.matrix());
+  cls_fitting.computeError();
+  return cls_fitting.getMatches();
+}
+
+bool ClsOverlapEstimator::isMatchInlier(const cv::DMatch &m, const LineCloud &trg_lines) const {
+  const float &src_range = (*src_lines)[m.trainIdx].range;
+  const float &trg_range = trg_lines[m.queryIdx].range;
+  // the distances are squared in DMatch
+  return sqrt(m.distance) < MAX(src_range, trg_range) * max_R_tan + param.max_t;
+}
 
 } /* namespace but_velodyne */

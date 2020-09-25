@@ -103,6 +103,9 @@ target_link_libraries(transform-pcd but_velodyne)
 add_executable(overlaping-projections src/apps/overlaping-projections.cpp)
 target_link_libraries(overlaping-projections but_velodyne)
 
+add_executable(overlaping-cls src/apps/overlaping-cls.cpp)
+target_link_libraries(overlaping-cls but_velodyne)
+
 add_executable(overlaping-projections-keyframes src/apps/overlaping-projections-keyframes.cpp)
 target_link_libraries(overlaping-projections-keyframes but_velodyne)
 
