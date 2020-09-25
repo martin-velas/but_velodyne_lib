@@ -84,9 +84,7 @@ LineCloud::PointCloudLineWithMiddleAndOrigin LineCloud::PointCloudLineWithMiddle
 
 LineCloud::LineCloud(const PolarGridOfClouds &polar_grid,
                      const int lines_per_cell_pair_generated,
-                     CollarLinesFilter &filter_) :
-    filter(filter_)
-{
+                     const CollarLinesFilter &filter_) {
   for(int sensor_idx = 0; sensor_idx < polar_grid.sensors; sensor_idx++) {
     for(int polar = 0; polar < polar_grid.getPolarBins(); polar++) {
       for(int ring = 0; ring < polar_grid.rings-1; ring++) {
@@ -95,7 +93,7 @@ LineCloud::LineCloud(const PolarGridOfClouds &polar_grid,
         std::vector<float> phases;
         generateLineCloudFromCell(polar_grid,
                                   CellId(polar, ring, sensor_idx),
-                                  lines_per_cell_pair_generated,
+                                  lines_per_cell_pair_generated, filter_,
                                   lines_among_cells, phases);
         vector<Eigen::Vector3f> normals;
         estimate_normals(lines_among_cells, normals);
@@ -142,6 +140,7 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr LineCloud::getMiddles(void) const {
 void LineCloud::generateLineCloudAmongCells(const PolarGridOfClouds &polar_grid,
                                             CellId cell1_id, CellId cell2_id,
                                             int lines_per_cell_pair_generated,
+                                            const CollarLinesFilter &filter,
                                             vector<PointCloudLine> &output_lines,
                                             vector<float> &output_phases) const {
   const VelodynePointCloud *cell1 = &polar_grid[cell1_id];
@@ -187,13 +186,14 @@ void LineCloud::generateLineCloudAmongCells(const PolarGridOfClouds &polar_grid,
 void LineCloud::generateLineCloudFromCell(const PolarGridOfClouds &polar_grid,
                                const CellId &source_cell,
                                const int lines_per_cell_pair_generated,
+                               const CollarLinesFilter &filter,
                                std::vector<PointCloudLine> &line_cloud,
                                vector<float> &output_phases) const {
   vector<CellId> target_cells = getTargetCells(source_cell, polar_grid.getPolarBins(), polar_grid.bin_subdivision);
   for(vector<CellId>::iterator target_cell = target_cells.begin(); target_cell < target_cells.end(); target_cell++) {
     generateLineCloudAmongCells(polar_grid,
                                 source_cell, *target_cell,
-                                lines_per_cell_pair_generated,
+                                lines_per_cell_pair_generated, filter,
                                 line_cloud, output_phases);
   }
 }

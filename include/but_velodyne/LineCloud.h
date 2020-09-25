@@ -95,8 +95,7 @@ public:
   /**!
    * Initialize empty line cloud.
    */
-  LineCloud() :
-    filter(CollarLinesFilter(0)) {
+  LineCloud() {
     // empty
   }
 
@@ -108,7 +107,7 @@ public:
    */
   LineCloud(const PolarGridOfClouds &polar_grid,
             const int lines_per_cell_pair_generated,
-            CollarLinesFilter &filter_);
+            const CollarLinesFilter &filter_);
 
   PointCloudLineWithMiddleAndOrigin& operator [](int idx) {
       return data[idx];
@@ -162,12 +161,14 @@ protected:
   void generateLineCloudFromCell(const PolarGridOfClouds &polar_grid,
                                  const CellId &source_cell,
                                  const int lines_per_cell_pair_generated,
+                                 const CollarLinesFilter &filter,
                                  std::vector<PointCloudLine> &line_cloud,
                                  std::vector<float> &output_phases) const;
 
   void generateLineCloudAmongCells(const PolarGridOfClouds &polar_grid,
                                    CellId cell1, CellId cell2,
                                    int lines_per_cell_pair_generated,
+                                   const CollarLinesFilter &filter,
                                    std::vector<PointCloudLine> &line_cloud,
                                    std::vector<float> &output_phases) const;
 
@@ -175,7 +176,6 @@ protected:
 
 private:
   static cv::RNG& rng;
-  CollarLinesFilter filter;
 
   std::vector<PointCloudLineWithMiddleAndOrigin> data;       ///! collar line segments
 };

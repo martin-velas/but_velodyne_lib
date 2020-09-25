@@ -47,7 +47,9 @@ void CollarLinesFilter::filterLines(const vector<PointCloudLine> &in_lines,
   vector<PointCloudLineWithIndex> filtered_lines;
   for(size_t i = 0; i < in_lines.size(); i++) {
     const PointCloudLine &line = in_lines[i];
-    filtered_lines.push_back(PointCloudLineWithIndex(line, i));
+    if(this->checkLine(line, src_cell, targ_cell)) {
+      filtered_lines.push_back(PointCloudLineWithIndex(line, i));
+    }
   }
 
   if(comparation_metric == LINE_LENGTH) {
