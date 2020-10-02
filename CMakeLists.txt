@@ -156,6 +156,9 @@ target_link_libraries(cloud-intensities-normalization but_velodyne)
 add_executable(imu-orientations-extraction src/apps/imu-orientations-extraction.cpp)
 target_link_libraries(imu-orientations-extraction but_velodyne)
 
+add_executable(pano-pcd-correspondences src/apps/pano-pcd-correspondences.cpp)
+target_link_libraries(pano-pcd-correspondences but_velodyne)
+
 ########################## Loops detection/closure: ##########################
 
 add_executable(sync-velodyne-clouds-by-angle src/apps/sync-velodyne-clouds-by-angle.cpp)

@@ -109,10 +109,10 @@ struct CLSMatchByCoeffComparator {
  */
 class CollarLinesRegistration
 {
+public:
   typedef Eigen::Vector3f TPoint3D;
   typedef Eigen::Matrix<TPoint3D::Scalar, TPoint3D::RowsAtCompileTime, Eigen::Dynamic> MatrixOfPoints;
   typedef Eigen::DiagonalMatrix<TPoint3D::Scalar, Eigen::Dynamic, Eigen::Dynamic> WeightsMatrix;
-public:
 
   /**!
    * How the weights are assigned to the collar line matches.
