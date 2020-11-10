@@ -339,7 +339,8 @@ float CollarLinesRegistration::getMatchesDistanceThreshold(float ratio) const {
     acc[i] = matches[i].distance;
   }
   std::sort(acc.begin(), acc.end());
-  return acc[acc.size()*ratio];
+  const int threshold_idx = MAX(0, MIN(acc.size()*ratio, acc.size()-1));
+  return acc[threshold_idx];
 }
 
 float CollarLinesRegistration::getMatchesMean(void) const {
