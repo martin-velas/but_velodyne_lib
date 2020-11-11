@@ -65,6 +65,22 @@ void CollarLinesFilter::filterLines(const vector<PointCloudLine> &in_lines,
   }
 }
 
+/*
+ * Using law of sines:
+ * max_length = range * ( sin(angle_between_rays) / sin(min_incidence_angle) )
+ *
+ * Using angle_between_rays = 2deg and min incidence angle (with surface) 6deg:
+ * max_length = range * ( sin(2) / sin(6) )
+ *
+ * and since sin is almost linear for small angles:
+ * max_length = range * ( 2 / 6 )
+ */
+bool CollarLinesFilterRangeCheck::checkLine(const PointCloudLine &line, const CellId &src_cell, const CellId &targ_cell) const {
+  const float length = line.orientation.norm();
+  const float min_pt_range = MIN(line.point.norm(), (line.point + line.orientation).norm());
+  return length < (min_pt_range / 3.0);
+}
+
 bool AngularCollarLinesFilter::checkLine(const PointCloudLine &line, const CellId &src_cell, const CellId &targ_cell) const {
   float expected_diff = getExpectedRangesDiff(src_cell.ring, targ_cell.ring);
 

@@ -45,6 +45,20 @@ private:
   COMPARATION comparation_metric;
 };
 
+class CollarLinesFilterRangeCheck : public CollarLinesFilter {
+
+public:
+
+  CollarLinesFilterRangeCheck(const int lines_to_preserve_)
+          : CollarLinesFilter(lines_to_preserve_) {
+  }
+
+protected:
+
+  virtual bool checkLine(const PointCloudLine &line, const CellId &src_cell, const CellId &targ_cell) const;
+
+};
+
 class AngularCollarLinesFilter : public CollarLinesFilter {
 public:
   class Parameters {
