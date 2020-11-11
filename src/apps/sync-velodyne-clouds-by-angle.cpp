@@ -200,6 +200,11 @@ int main(int argc, char** argv) {
   vector<AngleAndPhase> borders;
   get_borders(cloud_filenames, fps, start_angle, borders);
 
+  if(borders.empty()) {
+    cerr << "ERROR - no borders have been found!" << endl;
+    return EXIT_FAILURE;
+  }
+
   stringstream ss_borders_fn;
   ss_borders_fn << output_dir << "/frame-beginnings." << velodyne_idx << ".txt";
   ofstream borders_fd(ss_borders_fn.str().c_str());
@@ -208,6 +213,8 @@ int main(int argc, char** argv) {
   for(int i = 0; i+1 < borders.size(); i++) {
     const AngleAndPhase &beginning = borders[i];
     const AngleAndPhase &end = borders[i+1];
+
+    cerr << "Frame: " << i << " made from data [" << beginning << ", " << end << "]" << endl;
 
     VelodynePointCloud raw_cloud;
     for(int raw_i = beginning.source_cloud_idx; raw_i <= end.source_cloud_idx; raw_i++) {
