@@ -104,7 +104,7 @@ public:
 
     static float horizontalAngle(const float to_font, const float to_right) {
       float heading = fabs(360.0 - VelodynePointCloud::horizontalAngle(to_font, to_right));
-      heading += 90.0;
+      heading += 180.0;
       if(heading >= 360.0) {
         heading -= 360;
       }
@@ -191,9 +191,9 @@ protected:
       // projection of the range to XY plane
       float horizontal_range = cos(pitch) * range;
 
-      // 0rad = left; pi/2 = front; pi = right; 3/2 pi = back:
+      // 0rad = back; pi/2 = left; pi = front; 3/2 pi = right:
       float heading = px.x / ((float) drawing_image.cols) * 2.0*M_PI;
-      heading = (heading <= M_PI) ? (M_PI - heading) : (3*M_PI - heading);
+      heading = 3*M_PI_2 - heading;
       pt.x = cos(heading) * horizontal_range;
       pt.y = sin(heading) * horizontal_range;
 
@@ -442,27 +442,48 @@ Eigen::Affine3f getCameraCalibration(const vector<PointLineMatch> &correspondenc
 
 int main(int argc, char** argv) {
 
-  PointCloud<PointXYZI> cloud;
-  cv::Mat pano_img;
-  Eigen::Affine3f camera_pose_initial;
-  float distance_threshold;
-  if(!parse_arguments(argc, argv, cloud, pano_img, camera_pose_initial, distance_threshold)) {
-    return EXIT_FAILURE;
-  }
-
-  vector<PointLineMatch> correspondences;
-  Eigen::Affine3f camera_calibration = Eigen::Affine3f::Identity();
-  do {
-    const Eigen::Affine3f camera_pose = camera_pose_initial * camera_calibration;
-    EquirectangularCorrespPicker picker(pano_img, camera_pose, cloud, distance_threshold);
-    correspondences = picker.pickCorrespondences();
-
-    cerr << "Picked " << correspondences.size() << " correspondences" << endl;
-    if(correspondences.size() > 0) {
-      camera_calibration = camera_calibration * getCameraCalibration(correspondences);
-      cout << camera_calibration << endl;
+  if(argc != 2) {
+    PointCloud<PointXYZI> cloud;
+    cv::Mat pano_img;
+    Eigen::Affine3f camera_pose_initial;
+    float distance_threshold;
+    if(!parse_arguments(argc, argv, cloud, pano_img, camera_pose_initial, distance_threshold)) {
+      return EXIT_FAILURE;
     }
-  } while(correspondences.size() != 0);
+
+    vector<PointLineMatch> correspondences;
+    Eigen::Affine3f camera_calibration = Eigen::Affine3f::Identity();
+    do {
+      const Eigen::Affine3f camera_pose = camera_pose_initial * camera_calibration;
+      EquirectangularCorrespPicker picker(pano_img, camera_pose, cloud, distance_threshold);
+      correspondences = picker.pickCorrespondences();
+
+      cerr << "Picked " << correspondences.size() << " correspondences" << endl;
+      if(correspondences.size() > 0) {
+        camera_calibration = camera_calibration * getCameraCalibration(correspondences);
+        cout << camera_calibration << endl;
+      }
+    } while(correspondences.size() != 0);
+  } else {
+    ifstream corresp_file(argv[1]);
+    vector<PointLineMatch> correspondences;
+    const PointXYZ origin(0, 0, 0);
+    while(true) {
+      PointXYZ pt_lidar;
+      PointXYZ pt_camera;
+
+      corresp_file >> pt_lidar.x >> pt_lidar.y >> pt_lidar.z;
+      corresp_file >> pt_camera.x >> pt_camera.y >> pt_camera.z;
+
+      if(corresp_file.eof()) {
+        break;
+      } else {
+        PointCloudLine line;
+        correspondences.push_back(PointLineMatch(pt_lidar, PointCloudLine(origin, pt_camera)));
+      }
+    }
+    cout << getCameraCalibration(correspondences) << endl;
+  }
 
   return EXIT_SUCCESS;
 }
