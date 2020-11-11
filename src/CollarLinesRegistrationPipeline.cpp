@@ -174,6 +174,47 @@ float registerLineClouds(const LineCloud &source_line_cloud, const LineCloud &ta
   return output_result.error;
 }
 
+void registerLineClouds(const LineCloud &source_line_cloud, const LineCloud &target_line_cloud,
+                        const Eigen::Matrix4f &initial_transformation,
+                        const CollarLinesRegistration::Parameters &registration_params,
+                        const CollarLinesRegistrationPipeline::Parameters &pipeline_params,
+                        RegistrationOutcome &output_result, std::vector<DMatch> &matches) {
+  CollarLinesRegistration::Parameters registration_params_effective = registration_params;
+  registration_params_effective.verbose = pipeline_params.verbose;
+
+  CollarLinesRegistration cls_fitting(source_line_cloud, target_line_cloud,
+                                      registration_params_effective, initial_transformation.matrix());
+  Termination termination(pipeline_params.term_params);
+  float best_error = 1e9;
+  for(int sampling_it = 0;
+      (sampling_it < pipeline_params.term_params.iterationsPerSampling) && !termination();
+      sampling_it++) {
+    float fitting_error = cls_fitting.refine();
+    Eigen::Matrix4f transformation = cls_fitting.getTransformation();
+    termination.addNewError(fitting_error);
+    RegistrationOutcome current_result;
+    current_result.transformation = Eigen::Affine3f(transformation);
+    current_result.error = fitting_error;
+    current_result.error_deviation = termination.getErrorDeviation();
+    if(pipeline_params.verbose) {
+      cerr << "Current result: " << current_result << endl;
+    }
+    if(!pipeline_params.pick_by_lowest_error || current_result.error < best_error) {
+      output_result = current_result;
+      best_error = current_result.error;
+      if(pipeline_params.verbose) {
+        cerr << "Was picked as BEST." << endl;
+      }
+    }
+  }
+  output_result.term_reason = termination.why();
+  matches.clear();
+  const vector<cv::DMatch> &last_matches = cls_fitting.getMatches();
+  for(vector<cv::DMatch>::const_iterator m = last_matches.begin(); m < last_matches.end(); m++) {
+    matches.push_back(*m);
+  }
+}
+
 vector<Eigen::Matrix4f> CollarLinesRegistrationPipeline::runRegistrationEffective(
     const PolarGridOfClouds::Ptr &target_grid_cloud) {
 
