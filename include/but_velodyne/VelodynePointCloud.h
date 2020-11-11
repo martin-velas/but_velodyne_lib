@@ -42,6 +42,7 @@
 #include <pcl/filters/impl/extract_indices.hpp>
 #include <pcl/filters/impl/random_sample.hpp>
 #include <pcl/filters/statistical_outlier_removal.h>
+#include <pcl/filters/passthrough.h>
 
 #include <velodyne_pointcloud/point_types.h>
 
@@ -475,8 +476,54 @@ void outlier_removal(typename pcl::PointCloud<T>::ConstPtr cloud,
 }
 
 template <typename T>
+void split_along_largest_axis(typename pcl::PointCloud<T>::ConstPtr input,
+                              pcl::PointCloud<T> &half1, pcl::PointCloud<T> &half2) {
+  T min_pt, max_pt;
+  pcl::getMinMax3D(*input, min_pt, max_pt);
+
+  float min_val, max_val, middle;
+  std::string axis;
+
+  pcl::PointXYZ range;
+  range.getVector3fMap() = max_pt.getVector3fMap() - min_pt.getVector3fMap();
+  if(range.x > range.z) {
+    if(range.x > range.y) {
+      min_val = min_pt.x; max_val = max_pt.x; middle = min_pt.x + range.x/2.0f;
+      axis = "x";
+    } else {
+      min_val = min_pt.y; max_val = max_pt.y; middle = min_pt.y + range.y/2.0f;
+      axis = "y";
+    }
+  } else {
+    if(range.y > range.z) {
+      min_val = min_pt.y; max_val = max_pt.y; middle = min_pt.y + range.y/2.0f;
+      axis = "y";
+    } else {
+      min_val = min_pt.z; max_val = max_pt.z; middle = min_pt.z + range.z/2.0f;
+      axis = "z";
+    }
+  }
+
+  pcl::PassThrough<T> pass;
+  pass.setInputCloud(input);
+  pass.setFilterFieldName(axis);
+
+  pass.setFilterLimits(min_val, middle);
+  pass.filter(half1);
+
+  pass.setFilterLimits(middle, max_val);
+  pass.filter(half2);
+}
+
+template <typename T>
 void subsample_by_voxel_grid(typename pcl::PointCloud<T>::ConstPtr input, pcl::PointCloud<T> &subsampled,
-                             const float leaf_size, const float outlier_stdev_thresh) {
+                             const float leaf_size) {
+  // do not deal with very small clouds
+  if(input->size() < 100) {
+    subsampled += *input;
+    return;
+  }
+
   pcl::VoxelGrid<T> grid;
   grid.setLeafSize(leaf_size, leaf_size, leaf_size);
 
@@ -485,10 +532,17 @@ void subsample_by_voxel_grid(typename pcl::PointCloud<T>::ConstPtr input, pcl::P
   grid.filter(subsampled);
 
   if(original_size == subsampled.size()) {
-    typename pcl::PointCloud<T>::Ptr inliers(new pcl::PointCloud<T>);
-    outlier_removal(input, *inliers, 10, outlier_stdev_thresh);
-    grid.setInputCloud(inliers);
-    grid.filter(subsampled);
+    typename pcl::PointCloud<T>::Ptr input1(new pcl::PointCloud<T>);
+    typename pcl::PointCloud<T>::Ptr input2(new pcl::PointCloud<T>);
+    split_along_largest_axis(input, *input1, *input2);
+
+    pcl::PointCloud<T> sampled1, sampled2;
+    subsample_by_voxel_grid(input1, sampled1, leaf_size);
+    subsample_by_voxel_grid(input2, sampled2, leaf_size);
+
+    subsampled.clear();
+    subsampled += sampled1;
+    subsampled += sampled2;
   }
 }
 

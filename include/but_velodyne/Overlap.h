@@ -79,13 +79,11 @@ public:
                 float outlier_stdev_thresh_ = 10.0) :
                 visualization(visualization_),
                 leaf_size(leaf_size_),
-                max_match_distance(max_match_distance_),
-                outlier_stdev_thresh(outlier_stdev_thresh_) {
+                max_match_distance(max_match_distance_) {
         }
         bool visualization;
         float leaf_size;
         float max_match_distance;
-        float outlier_stdev_thresh;
 
         void loadFrom(boost::program_options::options_description &desc);
 

@@ -136,6 +136,9 @@ target_link_libraries(collar-lines-registration-line-clouds but_velodyne)
 add_executable(point-to-line-cloud src/apps/point-to-line-cloud.cpp)
 target_link_libraries(point-to-line-cloud but_velodyne)
 
+add_executable(voxel-grid src/apps/voxel-grid.cpp)
+target_link_libraries(voxel-grid but_velodyne)
+
 ########################## Visualization apps: ###############################
 
 add_executable(show-kitti-poses src/apps/show-kitti-poses.cpp)
