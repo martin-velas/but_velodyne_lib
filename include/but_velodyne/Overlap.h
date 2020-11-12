@@ -75,8 +75,7 @@ public:
         Parameters(
                 bool visualization_ = false,
                 float leaf_size_ = 0.05,
-                float max_match_distance_ = 0.1,
-                float outlier_stdev_thresh_ = 10.0) :
+                float max_match_distance_ = 0.1) :
                 visualization(visualization_),
                 leaf_size(leaf_size_),
                 max_match_distance(max_match_distance_) {

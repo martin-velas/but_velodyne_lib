@@ -47,8 +47,7 @@ public:
                 float epsilon_ = 1e-6,
                 float max_match_distance_ = 0.1,
                 size_t max_iterations_ = 100,
-                size_t neighbours_for_normal_ = 30,
-                float outlier_stdev_thresh_ = 10.0) :
+                size_t neighbours_for_normal_ = 30) :
                 visualization(visualization_),
                 leaf_size(leaf_size_),
                 epsilon(epsilon_),
