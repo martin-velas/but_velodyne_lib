@@ -518,6 +518,12 @@ void split_along_largest_axis(typename pcl::PointCloud<T>::ConstPtr input,
 template <typename T>
 void subsample_by_voxel_grid(typename pcl::PointCloud<T>::ConstPtr input, pcl::PointCloud<T> &subsampled,
                              const float leaf_size) {
+  // close to zero or negative leaf size causes no resampling
+  if(leaf_size < 0.0001) {
+    subsampled += *input;
+    return;
+  }
+
   // do not deal with very small clouds
   if(input->size() < 100) {
     subsampled += *input;
