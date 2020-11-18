@@ -132,6 +132,11 @@ class Odometry:
         pt_transformed = np.dot(self.M, pt_col)
         return np.array(np.transpose(pt_transformed)).flatten().tolist()
 
+    def getDofAxisAngles(self):
+        axis, angle = matrix_to_axis_angle(self.M)
+        return [self.dof[i] for i in range(3)] + [axis[i]*angle for i in range(3)]
+
+
 def load_kitti_poses(file):
     poses = []
     if not hasattr(file, "readlines"):
@@ -237,3 +242,9 @@ if __name__ == "__main__":
     print t_odom * odom
 
     print type(odom.M)
+
+    print "--------------------------------------------------------------------------------"
+
+    print odom
+    print odom.dof
+    print odom.getDofAxisAngles()
