@@ -57,7 +57,7 @@ src/VelodynePointCloud.cpp src/Visualizer3D.cpp src/VelodyneSpecification.cpp sr
 src/EigenUtils.cpp src/common.cpp
 src/SubseqRegistration.cpp src/KittiUtils.cpp src/RegistrationCrossValidation.cpp src/CollarLinesValidation.cpp
 src/Overlap.cpp src/InterpolationSE3.cpp src/Calibration.cpp src/AdaptiveIntensitiesNormalization.cpp
-src/DenseCloudRegistration.cpp src/VelodyneMultiFrameSequence.cpp src/PhaseFilter.cpp)
+src/DenseCloudRegistration.cpp src/VelodyneMultiFrameSequence.cpp src/PhaseFilter.cpp src/CollarLinesMap.cpp)
 target_include_directories(but_velodyne PUBLIC ${PROJECT_SOURCE_DIR}/include)
 target_link_libraries(but_velodyne ${PCL_LIBRARIES})
 target_link_libraries(but_velodyne ${OpenCV_LIBS})
