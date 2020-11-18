@@ -65,7 +65,7 @@ public:
 
   void add(const LineCloud &lines, const int frame_id) {
     all_lines.append(lines, frame_id);
-    cerr << "all: " << all_lines.size() << "; new: " << lines.size() << endl;
+    cerr << "All lines: " << all_lines.size() << "; from new frame [" << frame_id << "]: " << lines.size() << endl;
   }
 
   void prune(const float ratio) {
@@ -173,7 +173,7 @@ protected:
 
 private:
   float prune_ratio;
-  CollarLinesFilter filter;
+  CollarLinesFilterRangeCheck filter;
   CLSMap lines_map;
   pcl::KdTreeFLANN<pcl::PointXYZ> map_kdtree;
   bool indexed;
@@ -242,9 +242,6 @@ bool parse_arguments(int argc, char **argv,
   return true;
 }
 
-/**
- * ./collar-lines-odom $(ls *.bin | sort | xargs)
- */
 int main(int argc, char** argv) {
 
   CollarLinesRegistration::Parameters registration_parameters;
@@ -303,7 +300,7 @@ int main(int argc, char** argv) {
 
         if(matches_output.is_open()) {
           for(vector<CLSMatch>::const_iterator m = matches.begin(); m < matches.end(); m++) {
-            const int src_frame_id = m->getSourceLine().sensor_id;
+            const int src_frame_id = m->getSourceLine().frame_id;
             const PointXYZ &trg_pt = m->getTrgPt();
             PointXYZ real_src_point = transformPoint(m->getSrcPt(), refined_poses[src_frame_id].inverse());
             matches_output
