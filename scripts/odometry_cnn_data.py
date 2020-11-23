@@ -48,6 +48,11 @@ def roll_pitch_heading_to_matrix(roll, pitch, heading):
     return np.dot(heading_to_matrix(heading), np.dot(pitch_to_matrix(pitch), roll_to_matrix(roll)))
 
 
+def omega_phi_kappa_to_matrix(omega, phi, kappa):
+    # this order is verified (O*P*K)
+    return np.dot(roll_to_matrix(omega), np.dot(pitch_to_matrix(phi), heading_to_matrix(kappa)))
+
+
 def odom_rad_to_deg(odom):
     return odom[0:3] + [odom[i]*180.0/math.pi for i in range(3, 6)]
 
