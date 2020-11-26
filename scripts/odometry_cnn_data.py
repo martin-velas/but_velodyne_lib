@@ -7,7 +7,7 @@ import sys
 import eulerangles_lib
 import random
 
-from transformations import matrix_to_axis_angle
+from transformations import matrix_to_axis_angle, euler_from_matrix
 
 
 VELO_TO_IMU = np.array([0,0,1,0,
@@ -51,6 +51,20 @@ def roll_pitch_heading_to_matrix(roll, pitch, heading):
 def omega_phi_kappa_to_matrix(omega, phi, kappa):
     # this order is verified (O*P*K)
     return np.dot(roll_to_matrix(omega), np.dot(pitch_to_matrix(phi), heading_to_matrix(kappa)))
+
+
+# returns [roll, pitch, heading]
+# e.g. order zyx means M = Rz(heading) * Ry(pitch) * Rx(roll)
+def matrix2rph(M, order):
+    r1, r2, r3 = euler_from_matrix(M, "r" + order)
+    return {
+        "xyz": [r1, r2, r3],
+        "xzy": [r1, r3, r2],
+        "yxz": [r2, r1, r3],
+        "yzx": [r3, r1, r2],
+        "zxy": [r2, r3, r1],
+        "zyx": [r3, r2, r1]
+    }[order]
 
 
 def odom_rad_to_deg(odom):
