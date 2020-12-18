@@ -272,7 +272,8 @@ bool parse_arguments(int argc, char **argv,
                      PointCloud<PointXYZI> &cloud,
                      cv::Mat &pano_img,
                      Eigen::Affine3f &camera_pose,
-                     float &dist_thresh) {
+                     float &dist_thresh,
+                     bool &rotation_only) {
   string cloud_fn, pano_img_fn, camera_pose_fn;
 
   po::options_description desc("Visualization for picking LB-Velodyne correspondences\n"
@@ -284,6 +285,7 @@ bool parse_arguments(int argc, char **argv,
     ("pano_image,i", po::value<string>(&pano_img_fn)->required(), "Camera equirectangular image.")
     ("camera_pose,p", po::value<string>(&camera_pose_fn)->required(), "Camera pose file.")
     ("distance_thresh", po::value<float>(&dist_thresh)->default_value(50), "Distance threshold.")
+    ("rotation_only", po::bool_switch(&rotation_only), "Estimate rotation only.")
   ;
   po::variables_map vm;
   po::parsed_options parsed = po::parse_command_line(argc, argv, desc);
@@ -332,41 +334,46 @@ typedef CollarLinesRegistration::MatrixOfPoints MatrixOfPoints;
 typedef CollarLinesRegistration::TPoint3D TPoint3D;
 
 Eigen::Affine3f estimateTransformation(const MatrixOfPoints &source_coresp_points,
-                                       const MatrixOfPoints &target_coresp_points) {
-  // Lets compute the translation
+                                       const MatrixOfPoints &target_coresp_points,
+                                       const bool rotation_only) {
   // Define Column vector using definition of TPoint3D
-  TPoint3D centroid_0;
-  centroid_0 << target_coresp_points.row(0).sum(),
-                target_coresp_points.row(1).sum(),
-                target_coresp_points.row(2).sum();
-  centroid_0 /= target_coresp_points.cols();
-
-  TPoint3D centroid_1;
-  centroid_1 << source_coresp_points.row(0).sum(),
-                source_coresp_points.row(1).sum(),
-                source_coresp_points.row(2).sum();
-  centroid_1 /= source_coresp_points.cols();
-
-  typedef Eigen::Matrix<TPoint3D::Scalar, 4, 1> _TyVector4;
-  Eigen::Matrix4f transformation = _TyVector4::Ones().asDiagonal();
-
-  Eigen::Matrix<TPoint3D::Scalar, 1, Eigen::Dynamic> identity_vec =
-          Eigen::Matrix<TPoint3D::Scalar, 1, Eigen::Dynamic>::Ones(1, target_coresp_points.cols()); //setOnes();
-
-  // Create matrix with repeating values in columns
-  MatrixOfPoints translate_0_mat = centroid_0 * identity_vec;
-  MatrixOfPoints translate_1_mat = centroid_1 * identity_vec;
-
-  // Translation of source_coresp_points to the target_coresp_points (Remember this is opposite of camera movement)
-  // ie if camera is moving forward, the translation of target_coresp_points to source_coresp_points is opposite
-  // TPoint3D t = (centroid_1 - centroid_0);
+  TPoint3D centroid_0, centroid_1;
 
   // Translate the point cloud 0 to the coordinates of point cloud 1
   MatrixOfPoints target_coresp_points_translated(target_coresp_points.rows(), target_coresp_points.cols());
   MatrixOfPoints source_coresp_points_translated(source_coresp_points.rows(), source_coresp_points.cols());
 
-  target_coresp_points_translated = target_coresp_points - translate_0_mat;
-  source_coresp_points_translated = source_coresp_points - translate_1_mat;
+  if(rotation_only) {
+    centroid_0 << 0.0, 0.0, 0.0;
+    centroid_1 << 0.0, 0.0, 0.0;
+    target_coresp_points_translated = target_coresp_points;
+    source_coresp_points_translated = source_coresp_points;
+  } else {
+    // Lets compute the translation
+    centroid_0 << target_coresp_points.row(0).sum(),
+            target_coresp_points.row(1).sum(),
+            target_coresp_points.row(2).sum();
+    centroid_0 /= target_coresp_points.cols();
+
+    centroid_1 << source_coresp_points.row(0).sum(),
+            source_coresp_points.row(1).sum(),
+            source_coresp_points.row(2).sum();
+    centroid_1 /= source_coresp_points.cols();
+
+    Eigen::Matrix<TPoint3D::Scalar, 1, Eigen::Dynamic> identity_vec =
+            Eigen::Matrix<TPoint3D::Scalar, 1, Eigen::Dynamic>::Ones(1, target_coresp_points.cols()); //setOnes();
+
+    // Create matrix with repeating values in columns
+    MatrixOfPoints translate_0_mat = centroid_0 * identity_vec;
+    MatrixOfPoints translate_1_mat = centroid_1 * identity_vec;
+
+    // Translation of source_coresp_points to the target_coresp_points (Remember this is opposite of camera movement)
+    // ie if camera is moving forward, the translation of target_coresp_points to source_coresp_points is opposite
+    // TPoint3D t = (centroid_1 - centroid_0);
+
+    target_coresp_points_translated = target_coresp_points - translate_0_mat;
+    source_coresp_points_translated = source_coresp_points - translate_1_mat;
+  }
 
   // Compute the Covariance matrix of these two pointclouds moved to the origin
   // This is not properly covariance matrix as there is missing the 1/N
@@ -388,6 +395,9 @@ Eigen::Affine3f estimateTransformation(const MatrixOfPoints &source_coresp_point
   // R is the rotation of point_0_translated to fit the source_coresp_points_translated
   Eigen::Matrix3f R = svd.matrixV() * E * (svd.matrixU().transpose());
 
+  typedef Eigen::Matrix<TPoint3D::Scalar, 4, 1> _TyVector4;
+  Eigen::Matrix4f transformation = _TyVector4::Ones().asDiagonal();
+
   transformation.block(0, 0, 3, 3) = R;
   // The translation must be computed as centroid_1 - rotated centroid_0
   transformation.block(0, 3, 3, 1) = centroid_1 - (R * centroid_0);
@@ -405,7 +415,8 @@ void shiftCorrespondences(const vector<PointLineMatch> &correspondences,
 }
 
 // p1 = LiDAR pt, p2 = point on the camera ray
-Eigen::Affine3f getCameraCalibration(const vector<PointLineMatch> &correspondences) {
+Eigen::Affine3f getCameraCalibration(const vector<PointLineMatch> &correspondences,
+                                     const bool rotation_only) {
 
   Eigen::Affine3f calibration = Eigen::Affine3f::Identity();
 
@@ -424,7 +435,7 @@ Eigen::Affine3f getCameraCalibration(const vector<PointLineMatch> &correspondenc
       trg_lidar_points.block(0, i, 3, 1)  = m->pt2.getVector3fMap();
     }
 
-    const Eigen::Affine3f delta = estimateTransformation(src_camera_points, trg_lidar_points);
+    const Eigen::Affine3f delta = estimateTransformation(src_camera_points, trg_lidar_points, rotation_only);
 
     const float delta_t = delta.translation().norm();
     const float delta_R = Eigen::AngleAxisf(delta.rotation()).angle();
@@ -442,12 +453,14 @@ Eigen::Affine3f getCameraCalibration(const vector<PointLineMatch> &correspondenc
 
 int main(int argc, char** argv) {
 
+  bool rotation_only = false;
   if(argc != 2) {
     PointCloud<PointXYZI> cloud;
     cv::Mat pano_img;
     Eigen::Affine3f camera_pose_initial;
     float distance_threshold;
-    if(!parse_arguments(argc, argv, cloud, pano_img, camera_pose_initial, distance_threshold)) {
+    if(!parse_arguments(argc, argv, cloud, pano_img, camera_pose_initial, distance_threshold,
+            rotation_only)) {
       return EXIT_FAILURE;
     }
 
@@ -460,7 +473,7 @@ int main(int argc, char** argv) {
 
       cerr << "Picked " << correspondences.size() << " correspondences" << endl;
       if(correspondences.size() > 0) {
-        camera_calibration = camera_calibration * getCameraCalibration(correspondences);
+        camera_calibration = camera_calibration * getCameraCalibration(correspondences, rotation_only);
         cout << camera_calibration << endl;
       }
     } while(correspondences.size() != 0);
@@ -482,7 +495,7 @@ int main(int argc, char** argv) {
         correspondences.push_back(PointLineMatch(pt_lidar, PointCloudLine(origin, pt_camera)));
       }
     }
-    cout << getCameraCalibration(correspondences) << endl;
+    cout << getCameraCalibration(correspondences, rotation_only) << endl;
   }
 
   return EXIT_SUCCESS;
