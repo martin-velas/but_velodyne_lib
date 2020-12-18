@@ -33,9 +33,9 @@ using namespace pcl;
 
 namespace but_velodyne {
 
-Eigen::Affine3f CollarLinesRegistrationToMap::runMapping(
-        const VelodyneMultiFrame &multiframe, const SensorsCalibration &calibration, const Eigen::Affine3f &init_pose,
-        vector <CLSMatch> &matches) {
+Eigen::Affine3f CollarLinesRegistrationToMap::runMapping(const VelodyneMultiFrame &multiframe,
+        const SensorsCalibration &calibration, const Eigen::Affine3f &init_pose, const int frame_id,
+        vector <CLSMatch> &matches, Termination::Reason &reason) {
   PointCloud<PointXYZ> target_cloud_vis;
   if (vis) {
     multiframe.joinTo(target_cloud_vis);
@@ -48,8 +48,8 @@ Eigen::Affine3f CollarLinesRegistrationToMap::runMapping(
   }
   PolarGridOfClouds target_polar_grid(multiframe.clouds, calibration);
   LineCloud target_line_cloud(target_polar_grid, params.linesPerCellGenerated, filter);
-  Eigen::Affine3f refined_pose = registerLineCloud(target_line_cloud, init_pose, matches);
-  addToMap(target_line_cloud, refined_pose);
+  Eigen::Affine3f refined_pose = registerLineCloud(target_line_cloud, init_pose, matches, reason);
+  addToMap(target_line_cloud, refined_pose, frame_id);
   if (lines_map.size() * prune_ratio > target_line_cloud.size()) {
     cerr << "[DEBUG] Before pruning: " << lines_map.size() << endl;
     lines_map.prune(prune_ratio);
@@ -66,7 +66,7 @@ Eigen::Affine3f CollarLinesRegistrationToMap::runMapping(
 }
 
 Eigen::Affine3f CollarLinesRegistrationToMap::registerLineCloud(const LineCloud &target,
-        const Eigen::Affine3f &initial_transformation, vector <CLSMatch> &matches) {
+        const Eigen::Affine3f &initial_transformation, vector<CLSMatch> &matches, Termination::Reason &reason) {
   Termination termination(params.term_params);
   Eigen::Matrix4f transformation = initial_transformation.matrix();
   CollarLinesRegistration icl_fitting(lines_map.all_lines, map_kdtree, target,
@@ -77,6 +77,7 @@ Eigen::Affine3f CollarLinesRegistrationToMap::registerLineCloud(const LineCloud 
     transformation = icl_fitting.getTransformation();
   }
   icl_fitting.getLastMatches(matches);
+  reason = termination.why();
   return Eigen::Affine3f(transformation);
 }
 

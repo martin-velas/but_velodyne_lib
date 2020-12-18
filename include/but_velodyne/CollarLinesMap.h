@@ -79,22 +79,22 @@ public:
             filter(pipeline_params_.linesPerCellPreserved),
             params(pipeline_params_),
             registration_params(registration_params_),
-            prune_ratio(prune_ratio_), indexed(false), last_frame_id(-1) {
+            prune_ratio(prune_ratio_), indexed(false) {
       if (visualization) {
         vis = Visualizer3D::getCommonVisualizer();
       }
     }
 
     void addToMap(const std::vector<VelodynePointCloud::Ptr> &point_clouds,
-                  const SensorsCalibration &calibration, const Eigen::Affine3f &pose) {
+                  const SensorsCalibration &calibration, const Eigen::Affine3f &pose, const int frame_id) {
       PolarGridOfClouds polar_grid(point_clouds, calibration);
       LineCloud line_cloud(polar_grid, params.linesPerCellGenerated, filter);
-      addToMap(line_cloud, pose);
+      addToMap(line_cloud, pose, frame_id);
     }
 
-    Eigen::Affine3f runMapping(const VelodyneMultiFrame &multiframe,
-                               const SensorsCalibration &calibration, const Eigen::Affine3f &init_pose,
-                               vector <CLSMatch> &matches);
+    Eigen::Affine3f runMapping(const VelodyneMultiFrame &multiframe, const SensorsCalibration &calibration,
+            const Eigen::Affine3f &init_pose, const int frame_id,
+            vector <CLSMatch> &matches, Termination::Reason &reason);
 
     void reset(void) {
       lines_map.clear();
@@ -103,11 +103,10 @@ public:
 
 protected:
 
-    void addToMap(const LineCloud &line_cloud,
-                  const Eigen::Affine3f &pose) {
+    void addToMap(const LineCloud &line_cloud, const Eigen::Affine3f &pose, const int frame_id) {
       LineCloud line_cloud_transformed;
       line_cloud.transform(pose.matrix(), line_cloud_transformed);
-      lines_map.add(line_cloud_transformed, ++last_frame_id);
+      lines_map.add(line_cloud_transformed, frame_id);
       indexed = false;
     }
 
@@ -116,8 +115,8 @@ protected:
       indexed = true;
     }
 
-    Eigen::Affine3f registerLineCloud(const LineCloud &target,
-                                      const Eigen::Affine3f &initial_transformation, vector <CLSMatch> &matches);
+    Eigen::Affine3f registerLineCloud(const LineCloud &target, const Eigen::Affine3f &initial_transformation,
+                                      vector <CLSMatch> &matches, Termination::Reason &reason);
 
 private:
     float prune_ratio;
@@ -126,7 +125,6 @@ private:
     pcl::KdTreeFLANN<pcl::PointXYZ> map_kdtree;
     bool indexed;
     Visualizer3D::Ptr vis;
-    int last_frame_id;
 };
 
 }

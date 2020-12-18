@@ -145,18 +145,19 @@ int main(int argc, char** argv) {
     Eigen::Affine3f pose;
     if(frame_i == 0) {
       pose = init_poses.front().matrix();
-      registration.addToMap(multiframe.clouds, calibration, pose);
+      registration.addToMap(multiframe.clouds, calibration, pose, frame_i);
 
     } else {
       Eigen::Affine3f init_pose = refined_poses.back() * (init_poses[frame_i-1].inverse() * init_poses[frame_i]);
       if(reset_after_nframes > 0 && (frame_i % reset_after_nframes) == 0) {
         registration.reset();
         pose = init_pose;
-        registration.addToMap(multiframe.clouds, calibration, pose);
+        registration.addToMap(multiframe.clouds, calibration, pose, frame_i);
 
       } else {
         vector<CLSMatch> matches;
-        pose = registration.runMapping(multiframe, calibration, init_pose, matches);
+        Termination::Reason reason;
+        pose = registration.runMapping(multiframe, calibration, init_pose, frame_i, matches, reason);
         cerr << "Matches (unfiltered): " << matches.size() << endl;
 
         sort(matches.begin(), matches.end(), clsMatchByCoeffComparator);
