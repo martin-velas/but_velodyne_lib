@@ -205,7 +205,7 @@ protected:
       for(CloudT::const_iterator pt = cloud_slice.begin(); pt < cloud_slice.end(); pt++, idx++) {
         Vec3f spherical = pointToSpherical(*pt);
         const Point2i px = anglesToPixel(spherical);
-        this->drawPointToImage(px, spherical(2) / distance_threshold);
+        this->drawPointToImage(px, spherical(2) / distance_threshold, (pt->intensity+300.0) / 800.0);
         pixel_map_of_cloud[px] = idx;
         for(int dx = -4; dx <= 4; dx++) {
           for(int dy = -4; dy <= 4; dy++) {
@@ -223,10 +223,10 @@ protected:
       return px;
     }
 
-    void drawPointToImage(const Point2i &px, const float intensity) {
+    void drawPointToImage(const Point2i &px, const float rel_distance, const float rel_intensity) {
       uchar r, g, b;
-      Visualizer3D::colorizeIntensity(intensity, r, g, b);
-      circle(drawing_image, px, 1, CV_RGB(r, g, b), 1);
+      Visualizer3D::colorizeIntensity(rel_distance, r, g, b);
+      circle(drawing_image, px, 2, CV_RGB(r*rel_intensity, g*rel_intensity, b*rel_intensity), 2);
     }
 
     void preparePointCloudSlice(const Eigen::Affine3f camera_pose,
