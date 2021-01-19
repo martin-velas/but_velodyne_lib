@@ -28,10 +28,9 @@
 #include <but_velodyne/VelodynePointCloud.h>
 #include <but_velodyne/VelodyneMultiFrameSequence.h>
 #include <but_velodyne/KittiUtils.h>
-#include <but_velodyne/InterpolationSE3.h>
+#include <but_velodyne/FrameCorrectionPerParts.h>
 
 #include <pcl/common/eigen.h>
-#include <pcl/common/transforms.h>
 
 using namespace std;
 using namespace pcl;
@@ -94,41 +93,6 @@ bool parse_arguments(int argc, char **argv,
   return true;
 }
 
-boost::shared_ptr< vector<VelodynePointCloud> > split_by_phase(
-    const VelodynePointCloud &in_cloud, const int slices_cnt) {
-  boost::shared_ptr< vector<VelodynePointCloud> > slices(new vector<VelodynePointCloud>(slices_cnt));
-  const float slice_size = 1.0 / slices_cnt;
-  for(VelodynePointCloud::const_iterator p = in_cloud.begin(); p < in_cloud.end(); p++) {
-    int slice_i;
-    if(0.9999 < p->phase && p->phase < 1.0001) {
-      slice_i = slices_cnt-1;
-    } else {
-      slice_i = int (floor(p->phase / slice_size));
-    }
-    slices->at(slice_i).push_back(*p);
-  }
-  return slices;
-}
-
-void fix_cloud(const VelodynePointCloud &in_cloud,
-    InterpolationBuffered &interpolation,
-    const Eigen::Affine3f &sensor_pose,
-    VelodynePointCloud &out_cloud) {
-  transformPointCloud(in_cloud, out_cloud, sensor_pose);
-  for(VelodynePointCloud::iterator p = out_cloud.begin(); p < out_cloud.end(); p++) {
-    *p = transformPoint(*p, interpolation.estimate(p->phase));
-  }
-  transformPointCloud(out_cloud, out_cloud, sensor_pose.inverse());
-}
-
-void get_control_points(const vector<Eigen::Affine3f> &slice_poses, const int t1_idx,
-    const int slices_cnt, vector<Eigen::Affine3f> &control_points) {
-  const Eigen::Affine3f relative_pose_inv = slice_poses[(t1_idx/slices_cnt)*slices_cnt].inverse();
-  for(int i = t1_idx-1; i <= t1_idx+2; i++) {
-    control_points.push_back(relative_pose_inv*slice_poses[i]);
-  }
-}
-
 int main(int argc, char** argv) {
 
   vector<Eigen::Affine3f> slice_poses;
@@ -141,49 +105,17 @@ int main(int argc, char** argv) {
     return EXIT_FAILURE;
   }
 
-  float slice_fraction = 1.0/slices_cnt;
+  FrameCorrectionPerParts correction(slice_poses, slices_cnt);
 
   VelodyneFileSequence file_sequence(clouds_to_process, calibration);
   for(int frame_i = 0; file_sequence.hasNext(); frame_i++) {
 
     VelodyneMultiFrame multiframe = file_sequence.getNext();
-    const Eigen::Affine3f &first_inv = slice_poses[frame_i*slices_cnt].inverse();
 
     for(int sensor_i = 0; sensor_i < calibration.sensorsCount(); sensor_i++) {
-
-      const Eigen::Affine3f &sensor_pose = multiframe.calibration.ofSensor(sensor_i);
-
-      const VelodynePointCloud &in_cloud = *multiframe.clouds[sensor_i];
-      boost::shared_ptr< vector<VelodynePointCloud> > in_cloud_parts =
-          split_by_phase(in_cloud, slices_cnt);
-
       VelodynePointCloud out_cloud;
-      for(int slice_i = 0; slice_i < slices_cnt; slice_i++) {
-
-        int pose_i = frame_i*slices_cnt + slice_i;
-        InterpolationSE3::Ptr interpolation;
-
-        if(pose_i == 0 || pose_i == slice_poses.size()-2) {
-          Eigen::Affine3f current = first_inv * slice_poses[pose_i];
-          Eigen::Affine3f next = first_inv * slice_poses[pose_i+1];
-          interpolation.reset(new LinearInterpolationSE3(current, next));
-
-        } else if(pose_i >= slice_poses.size()-1) {
-          PCL_ERROR("ERROR, this should not happen (pose_i >= slice_poses.size()-1)");
-          return EXIT_FAILURE;
-
-        } else {
-          vector<Eigen::Affine3f> control_points;
-          get_control_points(slice_poses, pose_i, slices_cnt, control_points);
-          interpolation.reset(new BSplineSE3(control_points));
-        }
-
-        float min_phase = slice_i*slice_fraction;
-        InterpolationBuffered interpolation_buffered(interpolation, -min_phase, 1.0/slice_fraction);
-
-        VelodynePointCloud out_cloud_part;
-        fix_cloud(in_cloud_parts->at(slice_i), interpolation_buffered, sensor_pose, out_cloud_part);
-        out_cloud += out_cloud_part;
+      if(!correction.fixFrame(multiframe, frame_i, sensor_i, out_cloud)) {
+        return EXIT_FAILURE;
       }
 
       boost::filesystem::path first_cloud(multiframe.filenames[sensor_i]);
