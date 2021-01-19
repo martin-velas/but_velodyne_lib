@@ -94,6 +94,9 @@ target_link_libraries(overlaping-dense-clouds but_velodyne)
 add_executable(cls-reg-to-map src/apps/cls-reg-to-map.cpp)
 target_link_libraries(cls-reg-to-map but_velodyne)
 
+add_executable(cls-reg-to-map-dual src/apps/cls-reg-to-map-dual.cpp)
+target_link_libraries(cls-reg-to-map-dual but_velodyne)
+
 add_executable(cls-reg-subsequences src/apps/cls-reg-subsequences.cpp)
 target_link_libraries(cls-reg-subsequences but_velodyne)
 

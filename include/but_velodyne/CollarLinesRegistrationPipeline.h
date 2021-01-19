@@ -180,6 +180,8 @@ public:
 
   } pipeline_params;
 
+  CollarLinesRegistration::Parameters registration_params;
+
   /**!
    * @param estimator odometry predictor - Kalman filter or Linear predictor
    * @param pipeline_params_ parameters of registration pipeline
@@ -246,13 +248,8 @@ private:
   MoveEstimation estimation;
   Eigen::Matrix4f cumulated_transformation;
   Stopwatch stopwatch;
-
   boost::circular_buffer< HistoryRecord<PolarGridOfClouds> > history;
-
   int pose_index;
-
-  CollarLinesRegistration::Parameters registration_params;
-
   std::vector<CLSMatch> last_matches;
 };
 

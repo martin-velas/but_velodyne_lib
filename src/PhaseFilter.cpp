@@ -60,4 +60,12 @@ void PhaseFilter::filter(VelodyneMultiFrame &multiframe) const {
   }
 }
 
+void PhaseFilter::filter(const LineCloud &input, LineCloud &slice) const {
+  for(LineCloud::const_iterator l = input.begin(); l < input.end(); l++) {
+    if(min_phase <= l->phase && l->phase < max_phase) {
+      slice.push_back(*l);
+    }
+  }
+}
+
 }

@@ -67,7 +67,6 @@ public:
     }
 };
 
-
 class CollarLinesRegistrationToMap {
 public:
     CollarLinesRegistrationPipeline::Parameters params;
@@ -101,8 +100,6 @@ public:
       indexed = false;
     }
 
-protected:
-
     void addToMap(const LineCloud &line_cloud, const Eigen::Affine3f &pose, const int frame_id) {
       LineCloud line_cloud_transformed;
       line_cloud.transform(pose.matrix(), line_cloud_transformed);
@@ -110,13 +107,17 @@ protected:
       indexed = false;
     }
 
+    void pruneIfNeeded(const int new_points_cnt);
+
+    Eigen::Affine3f registerLineCloud(const LineCloud &target, const Eigen::Affine3f &initial_transformation,
+                                      vector <CLSMatch> &matches, Termination::Reason &reason);
+
+protected:
+
     void buildKdTree(void) {
       map_kdtree.setInputCloud(lines_map.getMiddlesPtr());
       indexed = true;
     }
-
-    Eigen::Affine3f registerLineCloud(const LineCloud &target, const Eigen::Affine3f &initial_transformation,
-                                      vector <CLSMatch> &matches, Termination::Reason &reason);
 
 private:
     float prune_ratio;

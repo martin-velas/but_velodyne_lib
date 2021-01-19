@@ -33,6 +33,15 @@ using namespace pcl;
 
 namespace but_velodyne {
 
+void CollarLinesRegistrationToMap::pruneIfNeeded(const int new_points_cnt) {
+  if (lines_map.size() * prune_ratio > new_points_cnt) {
+    cerr << "[DEBUG] Before pruning: " << lines_map.size() << endl;
+    lines_map.prune(prune_ratio);
+    indexed = false;
+    cerr << "[DEBUG] After pruning: " << lines_map.size() << endl;
+  }
+}
+
 Eigen::Affine3f CollarLinesRegistrationToMap::runMapping(const VelodyneMultiFrame &multiframe,
         const SensorsCalibration &calibration, const Eigen::Affine3f &init_pose, const int frame_id,
         vector <CLSMatch> &matches, Termination::Reason &reason) {
@@ -43,19 +52,11 @@ Eigen::Affine3f CollarLinesRegistrationToMap::runMapping(const VelodyneMultiFram
             .setColor(150, 150, 150).addPointCloud(*lines_map.all_lines.getMiddles()).show();
   }
 
-  if (!indexed) {
-    buildKdTree();
-  }
   PolarGridOfClouds target_polar_grid(multiframe.clouds, calibration);
   LineCloud target_line_cloud(target_polar_grid, params.linesPerCellGenerated, filter);
   Eigen::Affine3f refined_pose = registerLineCloud(target_line_cloud, init_pose, matches, reason);
   addToMap(target_line_cloud, refined_pose, frame_id);
-  if (lines_map.size() * prune_ratio > target_line_cloud.size()) {
-    cerr << "[DEBUG] Before pruning: " << lines_map.size() << endl;
-    lines_map.prune(prune_ratio);
-    indexed = false;
-    cerr << "[DEBUG] After pruning: " << lines_map.size() << endl;
-  }
+  pruneIfNeeded(target_line_cloud.size());
 
   if (vis) {
     vis->keepOnlyClouds(1).setColor(0, 200, 0)
@@ -67,6 +68,10 @@ Eigen::Affine3f CollarLinesRegistrationToMap::runMapping(const VelodyneMultiFram
 
 Eigen::Affine3f CollarLinesRegistrationToMap::registerLineCloud(const LineCloud &target,
         const Eigen::Affine3f &initial_transformation, vector<CLSMatch> &matches, Termination::Reason &reason) {
+  if (!indexed) {
+    buildKdTree();
+  }
+
   Termination termination(params.term_params);
   Eigen::Matrix4f transformation = initial_transformation.matrix();
   CollarLinesRegistration icl_fitting(lines_map.all_lines, map_kdtree, target,
