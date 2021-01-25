@@ -158,6 +158,22 @@ public:
     return colored;
   }
 
+  static pcl::PointCloud<pcl::PointXYZRGB>::Ptr colorizeCloudByPhaseWeights(const VelodynePointCloud &cloud,
+          const float max_phase, const float dist_power) {
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr colored(new pcl::PointCloud<pcl::PointXYZRGB>);
+    colored->resize(cloud.size());
+    for(int i = 0; i < cloud.size(); i++) {
+      const velodyne_pointcloud::VelodynePoint &pt = cloud[i];
+      pcl::PointXYZRGB &colored_pt = colored->at(i);
+      copyXYZ(pt, colored_pt);
+      const float phase_weight = pow(1.0 - fabs(pt.phase - max_phase), dist_power);
+      colored_pt.r = phase_weight * 255;
+      colored_pt.g = 0;
+      colored_pt.b = (1-phase_weight) * 255;
+    }
+    return colored;
+  }
+
   template<typename PointT>
   static pcl::PointCloud<pcl::PointXYZRGB>::Ptr colorizeCloud(const pcl::PointCloud<PointT> &cloud, bool grayscale = false) {
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr rgb_cloud(new pcl::PointCloud<pcl::PointXYZRGB>);
