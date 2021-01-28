@@ -22,6 +22,7 @@
  */
 
 #include <but_velodyne/VelodyneMultiFrameSequence.h>
+#include <but_velodyne/Visualizer3D.h>
 
 using namespace std;
 using namespace pcl;
@@ -44,6 +45,35 @@ VelodyneMultiFrame::VelodyneMultiFrame(const std::vector<std::string> &filenames
     } else {
       clouds.push_back(VelodynePointCloud::Ptr(new VelodynePointCloud));
       VelodynePointCloud::fromFile(filenames[i], *clouds[i], transform_pcd_files);
+    }
+  }
+}
+
+void VelodyneMultiFrame::transform(const Eigen::Affine3f &pose) {
+  for(int i = 0; i < this->calibration.sensorsCount(); i++) {
+    const Eigen::Affine3f &C = this->calibration.ofSensor(i);
+    const Eigen::Affine3f &T = C.inverse()*pose*C;
+
+    if(this->hasPointClouds()) {
+      transformPointCloud(*this->clouds[i], *this->clouds[i], T);
+    }
+
+    if(this->hasLineClouds()) {
+      this->line_clouds[i]->transform(T.matrix());
+    }
+  }
+}
+
+void VelodyneMultiFrame::save(const string &out_dir) const {
+  for(int sensor_i = 0; sensor_i < calibration.sensorsCount(); sensor_i++) {
+    boost::filesystem::path cloud_path(filenames[sensor_i]);
+    string out_filename = out_dir + "/" + cloud_path.filename().string();
+    if(this->hasPointClouds()) {
+      io::savePCDFileBinary(out_filename, *clouds[sensor_i]);
+    }
+    if(this->hasLineClouds()) {
+      ofstream out_file(out_filename.c_str());
+      out_file << *line_clouds[sensor_i];
     }
   }
 }
@@ -94,6 +124,16 @@ void VelodyneMultiFrame::joinTo(PointCloud<PointXYZ> &output) const {
   output.resize(mid_output.size());
   for(int i = 0; i < output.size(); i++) {
     copyXYZ(mid_output[i], output[i]);
+  }
+}
+
+void VelodyneMultiFrame::joinTo(LineCloud &output) const {
+  if(this->hasLineClouds()) {
+    for(int i = 0; i < line_clouds.size(); i++) {
+      LineCloud transformed;
+      line_clouds[i]->transform(calibration.ofSensor(i).matrix(), transformed);
+      output += transformed;
+    }
   }
 }
 

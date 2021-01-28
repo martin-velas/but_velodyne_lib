@@ -213,16 +213,16 @@ vector<CellId> LineCloud::getTargetCells(const CellId &source_cell, int total_po
 }
 
 void LineCloud::transform(const Eigen::Matrix4f &t_matrix, LineCloud &output) const {
-  output.data.clear();
   Eigen::Affine3f transformation(t_matrix);
-  for(vector<PointCloudLineWithMiddleAndOrigin>::const_iterator l = data.begin(); l < data.end(); l++) {
-    output.data.push_back(l->transform(transformation));
+  output.data = this->data;
+  for(LineCloud::iterator l = output.data.begin(); l < output.data.end(); l++) {
+    *l = l->transform(transformation);
   }
 }
 
 void LineCloud::transform(const Eigen::Matrix4f &t_matrix) {
   Eigen::Affine3f transformation(t_matrix);
-  for(vector<PointCloudLineWithMiddleAndOrigin>::iterator l = data.begin(); l < data.end(); l++) {
+  for(LineCloud::iterator l = data.begin(); l < data.end(); l++) {
     *l = l->transform(transformation);
   }
 }

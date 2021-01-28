@@ -46,6 +46,10 @@ public:
             filenames(filenames_), clouds(clouds_), line_clouds(line_clouds_), calibration(calibration_) {
     }
 
+    void transform(const Eigen::Affine3f &pose);
+
+    void save(const std::string &out_dir) const;
+
     void joinTo(pcl::PointCloud <PointWithSource> &output) const;
 
     void joinTo(pcl::PointCloud <velodyne_pointcloud::VelodynePoint> &output, bool distinguish_rings = false) const;
@@ -53,6 +57,8 @@ public:
     void joinTo(pcl::PointCloud <pcl::PointXYZI> &output) const;
 
     void joinTo(pcl::PointCloud <pcl::PointXYZ> &output) const;
+
+    void joinTo(LineCloud &output) const;
 
     bool hasPointClouds(void) const {
       return clouds.size() != 0;

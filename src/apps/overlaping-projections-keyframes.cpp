@@ -153,7 +153,8 @@ float getReverseRegistrationError(const PolarGridOfClouds &src_grid,
                                   const Eigen::Affine3f &init_transform,
                                   const float overlap,
                                   const CollarLinesRegistration::Parameters &registration_parameters,
-                                  const CollarLinesRegistrationPipeline::Parameters &pipeline_parameters) {
+                                  const CollarLinesRegistrationPipeline::Parameters &pipeline_parameters,
+                                  Eigen::Affine3f &registration_pose) {
   LinearMoveEstimator null_estimator(0);
   CollarLinesRegistration::Parameters reg_parameters_modified = registration_parameters;
   reg_parameters_modified.distance_threshold = CollarLinesRegistration::PORTION_VALUE_THRESHOLD;
@@ -164,6 +165,8 @@ float getReverseRegistrationError(const PolarGridOfClouds &src_grid,
 
   RegistrationOutcome inv_result;
   registration.registerTwoGrids(trg_grid, src_grid, init_transform.inverse().matrix(), inv_result);
+
+  registration_pose = result.transformation;
   return tdiff(result.transformation, inv_result.transformation.inverse(), 10.0);
 }
 
@@ -197,30 +200,50 @@ int main(int argc, char** argv) {
     transformPointCloud(src_cloud, src_cloud, Eigen::Affine3f(poses[src_i].rotation()));
     SphericalZbuffer src_zbuffer(src_cloud, 180, 90, depth_quantile);
 
-    float previous_overlap = threshold;
-    for(int trg_i = src_i+1; trg_i < sequence.size(); trg_i++) {
+    bool backward = false;
+    for(int trg_i = src_i+1; trg_i < sequence.size();) {
       VelodyneMultiFrame::Ptr trg_frame = sequence[trg_i];
-      PolarGridOfClouds trg_grid(trg_frame->clouds, calibration);
       PointCloud<VelodynePoint> trg_cloud;
       trg_frame->joinTo(trg_cloud);
       transformPointCloud(trg_cloud, trg_cloud, Eigen::Affine3f(poses[trg_i].rotation()));
-      Eigen::Vector3f translation = poses[trg_i].translation() - poses[src_i].translation();
+      const Eigen::Vector3f translation = poses[trg_i].translation() - poses[src_i].translation();
       transformPointCloud(trg_cloud, trg_cloud, translation, Eigen::Quaternionf::Identity());
-      float overlap = computeOverlap(src_zbuffer, src_cloud, trg_cloud,
-          depth_relative_tolerance, depth_absolute_tolerance, average_with_zbuffer_occupancy, visualize);
-      Eigen::Affine3f init_t = poses[src_i].inverse() * poses[trg_i];
-      float t_error = getReverseRegistrationError(src_grid, trg_grid, init_t, overlap, registration_parameters, pipeline_parameters);
-      if(((overlap < threshold || t_error > max_reg_error) && src_i+1 != trg_i) || trg_i == sequence.size()-1) {
-        if(trg_i == sequence.size()-1) {
-          cout << src_i << " " << trg_i << " " << previous_overlap << endl;
-          return EXIT_SUCCESS;
-        } else {
-          cout << src_i << " " << trg_i-1 << " " << previous_overlap << endl;
-          src_i = trg_i-1;
-        }
-        break;
+      const float overlap = computeOverlap(src_zbuffer, src_cloud, trg_cloud,
+                                           depth_relative_tolerance, depth_absolute_tolerance,
+                                           average_with_zbuffer_occupancy, visualize);
+      if(overlap < threshold) {
+        backward = true;
       }
-      previous_overlap = overlap;
+
+      if(!backward && (trg_i+1 < sequence.size())) {
+        // all OK - go forward
+        trg_i++;
+
+      } else {
+        // some event - can not go forward
+
+        const Eigen::Affine3f init_t = poses[src_i].inverse() * poses[trg_i];
+        const PolarGridOfClouds trg_grid(trg_frame->clouds, calibration);
+        Eigen::Affine3f registration;
+        const float t_error = getReverseRegistrationError(src_grid, trg_grid, init_t, overlap, registration_parameters,
+                                                    pipeline_parameters, registration);
+        if(t_error < max_reg_error) {
+          backward = false;
+        }
+
+        if(backward && (trg_i-1 > src_i)) {
+          // can go backward
+          trg_i--;
+          cerr << "BACKOFF [" << src_i << ", " << trg_i << "], overlap: " << overlap << "; inv_error: " << t_error << endl;
+
+        } else {
+          // can not go forward nor backward
+          cout << src_i << " " << trg_i << " " << overlap << " " << t_error << " " << registration << endl;
+          src_i = trg_i + 1;
+          break;
+        }
+      }
+
     }
   }
 

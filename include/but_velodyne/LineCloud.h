@@ -92,6 +92,10 @@ public:
     return this->data.erase(begin, end);
   }
 
+  void clear(void) {
+    this->data.clear();
+  }
+
   /**!
    * Initialize empty line cloud.
    */

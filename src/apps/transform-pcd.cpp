@@ -65,7 +65,7 @@ bool parse_arguments(int argc, char **argv,
     return true;
 }
 
-bool loadTxtCloud(const string &in_filename, pcl::PointCloud<pcl::PointXYZI> &cloud) {
+bool loadTxtCloud(const string &in_filename, VelodynePointCloud &cloud) {
   ifstream infile(in_filename.c_str());
   if(!infile.is_open()) {
     return false;
@@ -73,7 +73,7 @@ bool loadTxtCloud(const string &in_filename, pcl::PointCloud<pcl::PointXYZI> &cl
   string line;
   while (std::getline(infile, line)) {
     std::istringstream iss(line);
-    pcl::PointXYZI pt;
+    velodyne_pointcloud::VelodynePoint pt;
     iss >> pt.x >> pt.y >> pt.z;
     float intensity;
     iss >> intensity;
@@ -93,7 +93,7 @@ int main (int argc, char** argv) {
     return EXIT_FAILURE;
   }
 
-  pcl::PointCloud<pcl::PointXYZI> cloud;
+  VelodynePointCloud cloud;
 
   boost::filesystem::path in_path(in_filename);
   string extension = in_path.extension().string();

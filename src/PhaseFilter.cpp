@@ -23,6 +23,8 @@
 
 #include <but_velodyne/PhaseFilter.h>
 
+using namespace std;
+
 namespace but_velodyne {
 
 void PhaseFilter::filter(VelodynePointCloud &cloud) const {
@@ -60,12 +62,19 @@ void PhaseFilter::filter(VelodyneMultiFrame &multiframe) const {
   }
 }
 
-void PhaseFilter::filter(const LineCloud &input, LineCloud &slice) const {
-  for(LineCloud::const_iterator l = input.begin(); l < input.end(); l++) {
-    if(min_phase <= l->phase && l->phase < max_phase) {
-      slice.push_back(*l);
+void PhaseFilter::filter(const LineCloud &input, LineCloud &slice, vector<int> &indices) const {
+  for(int i = 0; i < input.size(); i++) {
+    const LineCloud::PointCloudLineWithMiddleAndOrigin &l = input[i];
+    if(min_phase <= l.phase && l.phase < max_phase) {
+      slice.push_back(l);
+      indices.push_back(i);
     }
   }
+}
+
+void PhaseFilter::filter(const LineCloud &input, LineCloud &slice) const {
+  vector<int> dummy_indices;
+  this->filter(input, slice, dummy_indices);
 }
 
 }

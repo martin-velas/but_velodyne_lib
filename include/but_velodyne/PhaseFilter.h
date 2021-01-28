@@ -43,6 +43,8 @@ public:
 
     void filter(VelodyneMultiFrame &multiframe) const;
 
+    void filter(const LineCloud &input, LineCloud &slice, std::vector<int> &indices) const;
+
     void filter(const LineCloud &input, LineCloud &slice) const;
 
     float getMaxPhase() const {

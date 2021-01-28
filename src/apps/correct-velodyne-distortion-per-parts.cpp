@@ -112,12 +112,12 @@ int main(int argc, char** argv) {
 
     VelodyneMultiFrame multiframe = file_sequence.getNext();
 
-    for(int sensor_i = 0; sensor_i < calibration.sensorsCount(); sensor_i++) {
-      VelodynePointCloud out_cloud;
-      if(!correction.fixFrame(multiframe, frame_i, sensor_i, out_cloud)) {
-        return EXIT_FAILURE;
-      }
+    if(!correction.fixFrame(multiframe, frame_i)) {
+      return EXIT_FAILURE;
+    }
 
+    for(int sensor_i = 0; sensor_i < calibration.sensorsCount(); sensor_i++) {
+      VelodynePointCloud &out_cloud = *multiframe.clouds[sensor_i];
       boost::filesystem::path first_cloud(multiframe.filenames[sensor_i]);
       io::savePCDFileBinary(out_dir + "/" + first_cloud.filename().string(), out_cloud);
     }
