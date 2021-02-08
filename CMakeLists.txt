@@ -122,6 +122,9 @@ target_link_libraries(calibrate-imu-velodyne-by-normals but_velodyne)
 add_executable(calibrate-imu-velodyne-manual src/apps/calibrate-imu-velodyne-manual.cpp)
 target_link_libraries(calibrate-imu-velodyne-manual but_velodyne)
 
+add_executable(calibration-imu-velodyne-manual-two-frames src/apps/calibration-imu-velodyne-manual-two-frames.cpp)
+target_link_libraries(calibration-imu-velodyne-manual-two-frames but_velodyne)
+
 add_executable(calibrate-imu-velodyne-AXXB src/apps/calibrate-imu-velodyne-AXXB.cpp)
 target_link_libraries(calibrate-imu-velodyne-AXXB but_velodyne)
 
