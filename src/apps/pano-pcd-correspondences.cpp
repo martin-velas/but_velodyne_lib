@@ -495,7 +495,7 @@ int main(int argc, char** argv) {
         correspondences.push_back(PointLineMatch(pt_lidar, PointCloudLine(origin, pt_camera)));
       }
     }
-    cout << getCameraCalibration(correspondences, rotation_only) << endl;
+    cout << getCameraCalibration(correspondences, true) << endl;
   }
 
   return EXIT_SUCCESS;
