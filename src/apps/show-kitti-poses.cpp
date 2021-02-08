@@ -78,9 +78,8 @@ bool parse_arguments(int argc, char **argv,
                      vector<Eigen::Affine3f> &poses,
                      vector<string> &clouds_to_process,
                      SensorsCalibration &calibration,
-                     bool &index_by_cloud_name,
-                     bool &color_by_phase,
-                     bool &show_indices, bool &single) {
+                     bool &index_by_cloud_name, bool &color_by_phase,
+                     bool &show_indices, bool &single, bool &no_coordinates) {
   string pose_filename, calibration_filename;
 
   po::options_description desc("Poses and point clouds visualization\n"
@@ -94,6 +93,7 @@ bool parse_arguments(int argc, char **argv,
     ("color_by_phase", po::bool_switch(&color_by_phase), "Color clouds by rotor phase.")
     ("show_indices", po::bool_switch(&show_indices), "Show indices over poses.")
     ("single,s", po::bool_switch(&single), "Show each frame separately.")
+    ("no_coordinates", po::bool_switch(&no_coordinates), "Do now show coordinates.")
   ;
   po::variables_map vm;
   po::parsed_options parsed = po::parse_command_line(argc, argv, desc);
@@ -136,13 +136,20 @@ int main(int argc, char** argv) {
   vector<Eigen::Affine3f> poses;
   vector<string> clouds_fnames;
   SensorsCalibration calibration;
-  bool index_by_cloud_name, color_by_phase, show_indices, single_view;
+  bool index_by_cloud_name, color_by_phase, show_indices, single_view, no_coordinates;
   if(!parse_arguments(argc, argv, poses, clouds_fnames, calibration,
-      index_by_cloud_name, color_by_phase, show_indices, single_view)) {
+      index_by_cloud_name, color_by_phase, show_indices, single_view, no_coordinates)) {
     return EXIT_FAILURE;
   }
 
   Visualizer3D visualizer;
+
+  if(no_coordinates) {
+    visualizer.getViewer()->removeCoordinateSystem("reference");
+    visualizer.getViewer()->removeAllShapes();
+  } else {
+    visualizer.addPoses(poses, 0.2);
+  }
 
   visualizer.setColor(255, 0, 0);
   visualizer.setColor(0, 0, 255);
@@ -175,7 +182,7 @@ int main(int argc, char** argv) {
     }
   }
 
-  visualizer.addPoses(poses, 0.2).show();
+  visualizer.show();
 
   return EXIT_SUCCESS;
 }
