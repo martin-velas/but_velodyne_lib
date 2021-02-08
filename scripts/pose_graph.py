@@ -105,3 +105,35 @@ class EdgeToFeature:
     def __str__(self):
         return "EDGE_SE3_XYZ %d %d %f %f %f %s" % \
                (self.src_i, self.feat_i, self.t[0], self.t[1], self.t[2], self.precision_matrix)
+
+
+class Edge3DSelf:
+
+    def __init__(self, id, pose, inf_matrix_diagonal):
+        self.id = id
+        self.pose = pose
+        self.precision_matrix = PrecisionMatrix(inf_matrix_diagonal)
+
+    # EDGE3SELF:AXISANGLE id x y z aa0 aa1 aa2 m00 m01 m02 m03 m04 m05 m11 m12 m13 m14 m15 m22 m23 m24 m25 m33 m34 m35 m44 m45 m55
+    def __str__(self):
+        output = "EDGE3SELF:AXISANGLE %s " % (self.id,)
+        for d in self.pose.getDofAxisAngles():
+            output += "%s " % d
+        output += str(self.precision_matrix)
+        return output
+
+
+class Edge3DTernary:
+
+    def __init__(self, idSrc, idTrg, idTransform, inf_matrix_diagonal):
+        self.idSrc = idSrc
+        self.idTrg = idTrg
+        self.idTransform = idTransform
+        self.precision_matrix = PrecisionMatrix(inf_matrix_diagonal)
+
+    # EDGE3TERNARY:AXISANGLE id0 id1 idC 0 0 0 0 0 0 m00 m01 m02 m03 m04 m05 m11 m12 m13 m14 m15 m22 m23 m24 m25 m33 m34 m35 m44 m45 m55
+    def __str__(self):
+        output = "EDGE3TERNARY:AXISANGLE %s %s %s " % (self.idSrc, self.idTrg, self.idTransform)
+        output += "0 0 0 0 0 0 "
+        output += str(self.precision_matrix)
+        return output
