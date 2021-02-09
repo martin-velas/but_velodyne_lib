@@ -127,6 +127,10 @@ public:
 
     void prepareForLoading(boost::program_options::options_description &options_desc);
 
+    bool doValidation(void) const {
+      return (targetValidationError > 0.0) || (significantValidationErrorDeviation > 0.0);
+    }
+
   } term_params;
 
   typedef enum {

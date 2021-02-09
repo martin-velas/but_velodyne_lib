@@ -225,6 +225,11 @@ public:
                           const Eigen::Matrix4f &initial_transformation,
                           Termination &termination, RegistrationOutcome &result);
 
+  void registerLineClouds(const LineCloud &source_line_cloud,
+                          const LineCloud &target_line_cloud,
+                          const Eigen::Matrix4f &initial_transformation,
+                          Termination &termination, RegistrationOutcome &result);
+
   const std::vector<CLSMatch>& getLastMatches(void) const {
     return last_matches;
   }
@@ -269,11 +274,24 @@ float registerLineClouds(
     const CollarLinesRegistrationPipeline::Parameters &pipeline_params,
     Termination &termination, RegistrationOutcome &result, std::vector<CLSMatch> &matches);
 
+float registerLineClouds(const LineCloud &source_line_cloud, const LineCloud &target_line_cloud,
+                         const Eigen::Matrix4f &initial_transformation,
+                         const CollarLinesRegistration::Parameters &registration_params,
+                         const CollarLinesRegistrationPipeline::Parameters &pipeline_params,
+                         Termination &termination, RegistrationOutcome &result, std::vector<CLSMatch> &matches);
+
 void registerLineClouds(const LineCloud &source_line_cloud, const LineCloud &target_line_cloud,
                         const Eigen::Matrix4f &initial_transformation,
                         const CollarLinesRegistration::Parameters &registration_params,
                         const CollarLinesRegistrationPipeline::Parameters &pipeline_params,
                         RegistrationOutcome &output_result, std::vector<cv::DMatch> &matches);
+
+float registerLineClouds(const LineCloud &source_line_cloud, const LineCloud &target_line_cloud,
+                         const Eigen::Matrix4f &initial_transformation,
+                         const CollarLinesRegistration::Parameters &registration_params,
+                         const CollarLinesRegistrationPipeline::Parameters &pipeline_params,
+                         Termination &termination, RegistrationOutcome &result,
+                         std::vector<CLSMatch> &cls_matches, std::vector<cv::DMatch> &idx_matches);
 
 } /* namespace but_velodyne */
 

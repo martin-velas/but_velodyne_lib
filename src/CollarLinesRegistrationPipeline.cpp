@@ -81,15 +81,25 @@ void CollarLinesRegistrationPipeline::registerTwoGrids(const PolarGridOfClouds &
     while(!termination()) {
       // resampling:
       LineCloud source_line_cloud(source, pipeline_params.linesPerCellGenerated, registration_filter);
-      LineCloud validation_source_line_cloud(source, validation_lines_generated, validation_filter);
       LineCloud target_line_cloud(target, pipeline_params.linesPerCellGenerated, registration_filter);
-      LineCloud validation_target_line_cloud(target, validation_lines_generated, validation_filter);
-      if(pipeline_params.verbose) {
-        cerr << "Source lines: " << source_line_cloud.size() << " (" << validation_source_line_cloud.size() << ") for validation." << endl;
-        cerr << "Target lines: " << target_line_cloud.size() << " (" << validation_target_line_cloud.size() << ") for validation." << endl;
+
+      if(pipeline_params.term_params.doValidation()) {
+        LineCloud validation_source_line_cloud(source, validation_lines_generated, validation_filter);
+        LineCloud validation_target_line_cloud(target, validation_lines_generated, validation_filter);
+        if(pipeline_params.verbose) {
+          cerr << "Source lines: " << source_line_cloud.size() << " (" << validation_source_line_cloud.size() << " for validation)" << endl;
+          cerr << "Target lines: " << target_line_cloud.size() << " (" << validation_target_line_cloud.size() << " for validation)" << endl;
+        }
+        registerLineClouds(source_line_cloud, target_line_cloud, validation_source_line_cloud, validation_target_line_cloud,
+                           initial_transformation, termination, nfold_outcomes[fold]);
+      } else {
+        if(pipeline_params.verbose) {
+          cerr << "Source lines: " << source_line_cloud.size() << endl;
+          cerr << "Target lines: " << target_line_cloud.size() << endl;
+        }
+        registerLineClouds(source_line_cloud, target_line_cloud, initial_transformation, termination, nfold_outcomes[fold]);
       }
-      registerLineClouds(source_line_cloud, target_line_cloud, validation_source_line_cloud, validation_target_line_cloud,
-                         initial_transformation, termination, nfold_outcomes[fold]);
+
       initial_transformation = nfold_outcomes[fold].transformation.matrix();
     }
     nfold_outcomes[fold].term_reason = termination.why();
@@ -130,6 +140,15 @@ void CollarLinesRegistrationPipeline::registerLineClouds(const LineCloud &source
       validation_source_line_cloud, validation_target_line_cloud,
       initial_transformation, registration_params, pipeline_params,
       termination, result, last_matches);
+}
+
+void CollarLinesRegistrationPipeline::registerLineClouds(const LineCloud &source_line_cloud,
+                                                         const LineCloud &target_line_cloud,
+                                                         const Eigen::Matrix4f &initial_transformation,
+                                                         Termination &termination, RegistrationOutcome &result) {
+  but_velodyne::registerLineClouds(source_line_cloud, target_line_cloud,
+                                   initial_transformation, registration_params, pipeline_params,
+                                   termination, result, last_matches);
 }
 
 float registerLineClouds(const LineCloud &source_line_cloud, const LineCloud &target_line_cloud,
@@ -179,12 +198,33 @@ void registerLineClouds(const LineCloud &source_line_cloud, const LineCloud &tar
                         const CollarLinesRegistration::Parameters &registration_params,
                         const CollarLinesRegistrationPipeline::Parameters &pipeline_params,
                         RegistrationOutcome &output_result, std::vector<DMatch> &matches) {
+  Termination termination(pipeline_params.term_params);
+  vector<CLSMatch> cls_dummy_matches;
+  registerLineClouds(source_line_cloud, target_line_cloud, initial_transformation,
+          registration_params, pipeline_params, termination, output_result, cls_dummy_matches, matches);
+}
+
+float registerLineClouds(const LineCloud &source_line_cloud, const LineCloud &target_line_cloud,
+                         const Eigen::Matrix4f &initial_transformation,
+                         const CollarLinesRegistration::Parameters &registration_params,
+                         const CollarLinesRegistrationPipeline::Parameters &pipeline_params,
+                         Termination &termination, RegistrationOutcome &result, std::vector<CLSMatch> &matches) {
+  vector<cv::DMatch> idx_dummy_matches;
+  registerLineClouds(source_line_cloud, target_line_cloud, initial_transformation,
+                     registration_params, pipeline_params, termination, result, matches, idx_dummy_matches);
+}
+
+float registerLineClouds(const LineCloud &source_line_cloud, const LineCloud &target_line_cloud,
+                         const Eigen::Matrix4f &initial_transformation,
+                         const CollarLinesRegistration::Parameters &registration_params,
+                         const CollarLinesRegistrationPipeline::Parameters &pipeline_params,
+                         Termination &termination, RegistrationOutcome &output_result,
+                         std::vector<CLSMatch> &cls_matches, std::vector<cv::DMatch> &idx_matches) {
   CollarLinesRegistration::Parameters registration_params_effective = registration_params;
   registration_params_effective.verbose = pipeline_params.verbose;
 
   CollarLinesRegistration cls_fitting(source_line_cloud, target_line_cloud,
                                       registration_params_effective, initial_transformation.matrix());
-  Termination termination(pipeline_params.term_params);
   float best_error = 1e9;
   for(int sampling_it = 0;
       (sampling_it < pipeline_params.term_params.iterationsPerSampling) && !termination();
@@ -208,11 +248,15 @@ void registerLineClouds(const LineCloud &source_line_cloud, const LineCloud &tar
     }
   }
   output_result.term_reason = termination.why();
-  matches.clear();
+
+  idx_matches.clear();
   const vector<cv::DMatch> &last_matches = cls_fitting.getMatches();
   for(vector<cv::DMatch>::const_iterator m = last_matches.begin(); m < last_matches.end(); m++) {
-    matches.push_back(*m);
+    idx_matches.push_back(*m);
   }
+
+  cls_matches.clear();
+  cls_fitting.getLastMatches(cls_matches);
 }
 
 vector<Eigen::Matrix4f> CollarLinesRegistrationPipeline::runRegistrationEffective(
